@@ -59,11 +59,10 @@
 }
 ```
 
-### Required Additions for Database
+### Required Additions for Database & File Upload
 ```bash
-npm install mysql2
-npm install dotenv
-npm install --save-dev @types/mysql
+npm install mysql2 dotenv formidable
+npm install --save-dev @types/mysql @types/formidable
 ```
 
 ---
@@ -596,9 +595,198 @@ const { description = '', vendors = [] } = req.body;
 
 ---
 
-## 8. Environment Configuration
+## 8. File Upload & Image Handling
 
-### 8.1 .env File Structure
+### 8.1 Image Upload Configuration
+
+**Install Required Package:**
+```bash
+npm install multer
+npm install --save-dev @types/multer
+```
+
+**File Storage Setup:**
+```typescript
+// src/utils/upload.ts
+import multer from 'multer';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+
+// Storage configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Store in public/uploads/recipes/
+    cb(null, 'public/uploads/recipes');
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename: uuid-timestamp.extension
+    const ext = path.extname(file.originalname);
+    const filename = `${uuidv4()}-${Date.now()}${ext}`;
+    cb(null, filename);
+  },
+});
+
+// File filter for images only
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (extname && mimetype) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
+  }
+};
+
+// Upload middleware
+export const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  },
+});
+```
+
+### 8.2 Image Upload Patterns
+
+**Single Image Upload:**
+```typescript
+// Using Next.js API routes with multer requires special handling
+// Use formidable or next-connect middleware
+
+import formidable from 'formidable';
+import fs from 'fs/promises';
+import path from 'path';
+
+export const config = {
+  api: {
+    bodyParser: false, // Disable Next.js body parsing
+  },
+};
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    await cors(req, res);
+
+    if (req.method === 'POST') {
+      const form = formidable({
+        uploadDir: path.join(process.cwd(), 'public/uploads/recipes'),
+        keepExtensions: true,
+        maxFileSize: 5 * 1024 * 1024, // 5MB
+        filename: (name, ext, part) => {
+          return `${uuidv4()}-${Date.now()}${path.extname(part.originalFilename || '')}`;
+        },
+      });
+
+      const [fields, files] = await form.parse(req);
+
+      // Process uploaded image
+      const uploadedFile = files.image?.[0];
+      if (uploadedFile) {
+        const imageUrl = `/uploads/recipes/${path.basename(uploadedFile.filepath)}`;
+        // Save imageUrl to database
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, error: 'Upload failed' });
+  }
+}
+```
+
+**Multiple Images Upload:**
+```typescript
+const [fields, files] = await form.parse(req);
+
+// Handle multiple images
+const images = files.images || [];
+const imageUrls = images.map(file =>
+  `/uploads/recipes/${path.basename(file.filepath)}`
+);
+
+// Store in recipe_images table
+for (const imageUrl of imageUrls) {
+  await query(
+    'INSERT INTO recipe_images (recipe_id, image_url) VALUES (?, ?)',
+    [recipeId, imageUrl]
+  );
+}
+```
+
+### 8.3 Image Deletion
+
+```typescript
+// Delete image from filesystem when removing from database
+import fs from 'fs/promises';
+import path from 'path';
+
+async function deleteRecipeImages(recipeId: number) {
+  // Get image URLs from database
+  const images = await query(
+    'SELECT image_url FROM recipe_images WHERE recipe_id = ?',
+    [recipeId]
+  );
+
+  // Delete files from filesystem
+  for (const image of images as any[]) {
+    const filepath = path.join(process.cwd(), 'public', image.image_url);
+    try {
+      await fs.unlink(filepath);
+    } catch (error) {
+      console.error('Error deleting image:', error);
+    }
+  }
+
+  // Delete from database
+  await query('DELETE FROM recipe_images WHERE recipe_id = ?', [recipeId]);
+}
+```
+
+### 8.4 Image Validation
+
+```typescript
+const validateImage = (file: Express.Multer.File) => {
+  const errors: string[] = [];
+
+  // Check file type
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  if (!allowedTypes.includes(file.mimetype)) {
+    errors.push('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
+  }
+
+  // Check file size (5MB max)
+  const maxSize = 5 * 1024 * 1024;
+  if (file.size > maxSize) {
+    errors.push('File size exceeds 5MB limit.');
+  }
+
+  return errors;
+};
+```
+
+### 8.5 Database Schema for Images
+
+```sql
+-- recipe_images table
+CREATE TABLE recipe_images (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  recipe_id INT NOT NULL,
+  image_url VARCHAR(500) NOT NULL,
+  is_primary BOOLEAN DEFAULT FALSE,
+  display_order INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+  INDEX idx_recipe_id (recipe_id)
+);
+```
+
+---
+
+## 9. Environment Configuration
+
+### 9.1 .env File Structure
 
 ```bash
 # Environment
@@ -621,7 +809,7 @@ JWT_SECRET=your-secret-key-here
 JWT_EXPIRES_IN=3d
 ```
 
-### 8.2 Config File Pattern
+### 9.2 Config File Pattern
 
 ```typescript
 // config.ts
@@ -651,9 +839,9 @@ export const config = {
 
 ---
 
-## 9. Migration from Mock to Real Database
+## 10. Migration from Mock to Real Database
 
-### 9.1 Key Differences
+### 10.1 Key Differences
 
 | Aspect | Mock (Current) | Real Database (New) |
 |--------|---------------|---------------------|
@@ -664,7 +852,7 @@ export const config = {
 | Relations | Manual object nesting | Foreign keys |
 | Validation | Client-side only | Database constraints + app-level |
 
-### 9.2 Migration Checklist
+### 10.2 Migration Checklist
 
 - [ ] Install `mysql2` and `dotenv` packages
 - [ ] Create `.env` file with database credentials
@@ -679,9 +867,9 @@ export const config = {
 
 ---
 
-## 10. API Endpoint Standards
+## 11. API Endpoint Standards
 
-### 10.1 RESTful Naming
+### 11.1 RESTful Naming
 
 ```
 GET    /api/products           - Get all products
@@ -697,7 +885,7 @@ PUT    /api/recipes/:id        - Update recipe
 DELETE /api/recipes/:id        - Delete recipe
 ```
 
-### 10.2 Request/Response Examples
+### 11.2 Request/Response Examples
 
 **POST /api/products**
 ```json
@@ -746,9 +934,9 @@ DELETE /api/recipes/:id        - Delete recipe
 
 ---
 
-## 11. Development Workflow
+## 12. Development Workflow
 
-### 11.1 Adding a New Feature
+### 12.1 Adding a New Feature
 
 1. **Create API Route File**
    ```typescript
@@ -781,7 +969,7 @@ DELETE /api/recipes/:id        - Delete recipe
    - Verify response format
    - Test error cases
 
-### 11.2 Code Review Checklist
+### 12.2 Code Review Checklist
 
 - [ ] Follows TypeScript standards
 - [ ] Uses parameterized queries (no SQL injection)
@@ -796,9 +984,9 @@ DELETE /api/recipes/:id        - Delete recipe
 
 ---
 
-## 12. Security Best Practices
+## 13. Security Best Practices
 
-### 12.1 SQL Injection Prevention
+### 13.1 SQL Injection Prevention
 ```typescript
 // NEVER do this
 const sql = `SELECT * FROM products WHERE name = '${name}'`;
@@ -808,14 +996,14 @@ const sql = 'SELECT * FROM products WHERE name = ?';
 await query(sql, [name]);
 ```
 
-### 12.2 Input Validation
+### 13.2 Input Validation
 - Validate all user inputs
 - Sanitize strings
 - Validate data types
 - Check ranges for numbers
 - Enforce maximum lengths
 
-### 12.3 Authentication & Authorization
+### 13.3 Authentication & Authorization
 ```typescript
 // Verify JWT token (when implemented)
 const token = req.headers.authorization?.split(' ')[1];
@@ -829,9 +1017,9 @@ if (!token) {
 
 ---
 
-## 13. Performance Considerations
+## 14. Performance Considerations
 
-### 13.1 Database Indexing
+### 14.1 Database Indexing
 ```sql
 -- Index frequently queried columns
 CREATE INDEX idx_products_name ON products(name);
@@ -839,13 +1027,13 @@ CREATE INDEX idx_vendors_product_id ON vendors(product_id);
 CREATE INDEX idx_recipe_ingredients_recipe_id ON recipe_ingredients(recipe_id);
 ```
 
-### 13.2 Query Optimization
+### 14.2 Query Optimization
 - Use `SELECT` with specific columns instead of `SELECT *`
 - Use JOINs efficiently
 - Implement pagination for large datasets
 - Use connection pooling
 
-### 13.3 Caching Strategy
+### 14.3 Caching Strategy
 ```typescript
 // Implement caching for frequently accessed data
 // Consider using Redis or in-memory cache
