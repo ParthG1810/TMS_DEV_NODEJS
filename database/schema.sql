@@ -450,7 +450,7 @@ DROP TABLE IF EXISTS vendors;
 DROP TABLE IF EXISTS ingredients;
 
 -- ============================================================
--- PRODUCTS TABLE
+-- INGREDIENTS TABLE
 -- Stores core ingredient/product information
 -- ============================================================
 CREATE TABLE ingredients (
@@ -477,7 +477,7 @@ CREATE TABLE vendors (
   is_default BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (ingredient_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE,
   INDEX idx_ingredient_id (ingredient_id),
   INDEX idx_vendor_name (vendor_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -498,7 +498,7 @@ CREATE TABLE
 
 -- ============================================================
 -- RECIPE_INGREDIENTS TABLE
--- Join table linking recipes to their ingredients (products)
+-- Join table linking recipes to their ingredients
 -- Stores the quantity of each ingredient needed for a recipe
 -- ============================================================
 CREATE TABLE recipe_ingredients (
@@ -508,10 +508,10 @@ CREATE TABLE recipe_ingredients (
   quantity DECIMAL(10, 2) NOT NULL CHECK (quantity > 0),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
-  FOREIGN KEY (ingredient_id) REFERENCES products(id) ON DELETE RESTRICT,
+  FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE RESTRICT,
   INDEX idx_recipe_id (recipe_id),
   INDEX idx_ingredient_id (ingredient_id),
-  UNIQUE KEY unique_recipe_product (recipe_id, ingredient_id)
+  UNIQUE KEY unique_recipe_ingredient (recipe_id, ingredient_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -599,17 +599,17 @@ INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity) VALUES
 -- ============================================================
 -- INDEXES SUMMARY
 -- ============================================================
--- products: idx_name
+-- ingredients: idx_name
 -- vendors: idx_ingredient_id, idx_vendor_name
 -- recipes: idx_name
--- recipe_ingredients: idx_recipe_id, idx_ingredient_id, unique_recipe_product
+-- recipe_ingredients: idx_recipe_id, idx_ingredient_id, unique_recipe_ingredient
 -- recipe_images: idx_recipe_id, idx_display_order
 -- ============================================================
 -- USAGE NOTES
 -- ============================================================
 -- 1. To create database: CREATE DATABASE tms_database CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- 2. To import schema: mysql -u root -p tms_database < schema.sql
--- 3. Default vendor must be set for each product for cost calculations
+-- 3. Default vendor must be set for each ingredient for cost calculations
 -- 4. Recipe images are stored in filesystem, only URLs stored in DB
--- 5. CASCADE delete on vendors when product is deleted
--- 6. RESTRICT delete on recipe_ingredients when product is deleted (protect data integrity)
+-- 5. CASCADE delete on vendors when ingredient is deleted
+-- 6. RESTRICT delete on recipe_ingredients when ingredient is deleted (protect data integrity)
