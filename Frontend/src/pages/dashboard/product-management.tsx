@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Helmet } from 'react-helmet-async';
+import Head from 'next/head';
 import { useNavigate } from 'react-router-dom';
 // @mui
 import {
@@ -175,9 +175,9 @@ export default function ProductManagementPage() {
 
   return (
     <>
-      <Helmet>
+      <Head>
         <title>Product Management | TMS</title>
-      </Helmet>
+      </Head>
 
       <Container maxWidth={false}>
         <CustomBreadcrumbs
