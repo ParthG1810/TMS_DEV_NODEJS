@@ -56,18 +56,18 @@ const STEPS = ['Ingredient Information', 'Vendor Details', 'Review'];
 
 type Props = {
   isEdit?: boolean;
-  currentProduct?: ITMSIngredient;
+  currentIngredient?: ITMSIngredient;
   onSubmit: (data: IIngredientFormValues) => Promise<void>;
 };
 
-export default function IngredientNewEditForm({ isEdit = false, currentProduct, onSubmit }: Props) {
+export default function IngredientNewEditForm({ isEdit = false, currentIngredient, onSubmit }: Props) {
   const { push } = useRouter();
 
   const { enqueueSnackbar } = useSnackbar();
 
   const [activeStep, setActiveStep] = useState(0);
 
-  const NewProductSchema = Yup.object().shape({
+  const NewIngredientSchema = Yup.object().shape({
     name: Yup.string().required('Ingredient name is required').max(255, 'Name is too long'),
     description: Yup.string(),
     vendors: Yup.array()
@@ -92,9 +92,9 @@ export default function IngredientNewEditForm({ isEdit = false, currentProduct, 
 
   const defaultValues = useMemo<IIngredientFormValues>(
     () => ({
-      name: currentProduct?.name || '',
-      description: currentProduct?.description || '',
-      vendors: currentProduct?.vendors || [
+      name: currentIngredient?.name || '',
+      description: currentIngredient?.description || '',
+      vendors: currentIngredient?.vendors || [
         {
           vendor_name: '',
           price: 0,
@@ -104,11 +104,11 @@ export default function IngredientNewEditForm({ isEdit = false, currentProduct, 
         },
       ],
     }),
-    [currentProduct]
+    [currentIngredient]
   );
 
   const methods = useForm<IIngredientFormValues>({
-    resolver: yupResolver(NewProductSchema),
+    resolver: yupResolver(NewIngredientSchema),
     defaultValues,
   });
 
@@ -123,14 +123,14 @@ export default function IngredientNewEditForm({ isEdit = false, currentProduct, 
   const values = watch();
 
   useEffect(() => {
-    if (isEdit && currentProduct) {
+    if (isEdit && currentIngredient) {
       reset(defaultValues);
     }
     if (!isEdit) {
       reset(defaultValues);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, currentProduct]);
+  }, [isEdit, currentIngredient]);
 
   const handleNext = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
