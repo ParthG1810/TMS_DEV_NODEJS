@@ -52,11 +52,11 @@ const _mock = {
   },
   image: {
     cover: (index: number) =>
-      `https://api-dev-minimal-v4.vercel.app/assets/images/covers/cover_${index + 1}.jpg`,
+      `https://via.placeholder.com/1200x800/4CAF50/FFFFFF?text=Cover+${index + 1}`,
     product: (index: number) =>
-      `https://api-dev-minimal-v4.vercel.app/assets/images/products/product_${index + 1}.jpg`,
+      `https://via.placeholder.com/600x600/2196F3/FFFFFF?text=Product+${index + 1}`,
     avatar: (index: number) =>
-      `https://api-dev-minimal-v4.vercel.app/assets/images/avatars/avatar_${index + 1}.jpg`,
+      `https://via.placeholder.com/200x200/FF9800/FFFFFF?text=Avatar+${index + 1}`,
   },
 };
 
