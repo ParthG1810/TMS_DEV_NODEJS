@@ -114,6 +114,28 @@ const navConfig = [
         path: PATH_DASHBOARD.fileManager,
         icon: ICONS.folder,
       },
+
+      // PRODUCT MANAGEMENT
+      {
+        title: 'Product Management',
+        path: PATH_DASHBOARD.product.root,
+        icon: ICONS.cart,
+        children: [
+          { title: 'list', path: PATH_DASHBOARD.product.list },
+          { title: 'create', path: PATH_DASHBOARD.product.new },
+        ],
+      },
+
+      // RECIPE MANAGEMENT
+      {
+        title: 'Recipe Management',
+        path: PATH_DASHBOARD.recipe.root,
+        icon: ICONS.booking,
+        children: [
+          { title: 'list', path: PATH_DASHBOARD.recipe.list },
+          { title: 'create', path: PATH_DASHBOARD.recipe.new },
+        ],
+      },
     ],
   },
 
