@@ -27,12 +27,14 @@ export function responsiveFontSizes({ sm, md, lg }: { sm: number; md: number; lg
 
 // Using fallback fonts directly due to network restrictions
 export const primaryFont = {
+  className: '',
   style: {
     fontFamily: 'Helvetica, Arial, sans-serif',
   },
 };
 
 export const secondaryFont = {
+  className: '',
   style: {
     fontFamily: 'Helvetica, Arial, sans-serif',
   },
