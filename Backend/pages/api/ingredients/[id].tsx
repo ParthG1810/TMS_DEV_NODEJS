@@ -2,8 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import cors from 'src/utils/cors';
 import { query, getConnection } from 'src/config/database';
 import {
-  ProductWithVendors,
-  UpdateProductRequest,
+  IngredientWithVendors,
+  UpdateIngredientRequest,
   ApiResponse,
   VendorInput,
 } from 'src/types';
@@ -22,25 +22,25 @@ export default async function handler(
     if (!id || typeof id !== 'string') {
       return res.status(400).json({
         success: false,
-        error: 'Product ID is required',
+        error: 'Ingredient ID is required',
       });
     }
 
-    const productId = parseInt(id, 10);
+    const ingredientId = parseInt(id, 10);
 
-    if (isNaN(productId)) {
+    if (isNaN(ingredientId)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid product ID',
+        error: 'Invalid ingredient ID',
       });
     }
 
     if (req.method === 'GET') {
-      return await handleGetProduct(productId, res);
+      return await handleGetIngredient(ingredientId, res);
     } else if (req.method === 'PUT') {
-      return await handleUpdateProduct(productId, req, res);
+      return await handleUpdateIngredient(ingredientId, req, res);
     } else if (req.method === 'DELETE') {
-      return await handleDeleteProduct(productId, res);
+      return await handleDeleteIngredient(ingredientId, res);
     } else {
       return res.status(405).json({
         success: false,
@@ -48,7 +48,7 @@ export default async function handler(
       });
     }
   } catch (error: any) {
-    console.error('Error in product handler:', error);
+    console.error('Error in ingredient handler:', error);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -57,33 +57,33 @@ export default async function handler(
 }
 
 /**
- * GET /api/products/:id
- * Fetch a single product with vendors
+ * GET /api/ingredients/:id
+ * Fetch a single ingredient with vendors
  */
-async function handleGetProduct(
-  productId: number,
+async function handleGetIngredient(
+  ingredientId: number,
   res: NextApiResponse<ApiResponse>
 ) {
   try {
-    // Fetch product
-    const products = (await query('SELECT * FROM products WHERE id = ?', [
-      productId,
+    // Fetch ingredient
+    const ingredients = (await query('SELECT * FROM ingredients WHERE id = ?', [
+      ingredientId,
     ])) as any[];
 
-    if (products.length === 0) {
+    if (ingredients.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'Product not found',
+        error: 'Ingredient not found',
       });
     }
 
     // Fetch vendors
-    const vendors = (await query('SELECT * FROM vendors WHERE product_id = ?', [
-      productId,
+    const vendors = (await query('SELECT * FROM vendors WHERE ingredient_id = ?', [
+      ingredientId,
     ])) as any[];
 
-    const result: ProductWithVendors = {
-      ...products[0],
+    const result: IngredientWithVendors = {
+      ...ingredients[0],
       vendors,
     };
 
@@ -92,35 +92,35 @@ async function handleGetProduct(
       data: result,
     });
   } catch (error: any) {
-    console.error('Error fetching product:', error);
+    console.error('Error fetching ingredient:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to fetch product',
+      error: 'Failed to fetch ingredient',
     });
   }
 }
 
 /**
- * PUT /api/products/:id
- * Update a product and its vendors
+ * PUT /api/ingredients/:id
+ * Update a ingredient and its vendors
  */
-async function handleUpdateProduct(
-  productId: number,
+async function handleUpdateIngredient(
+  ingredientId: number,
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
   try {
-    const { name, description, vendors } = req.body as UpdateProductRequest;
+    const { name, description, vendors } = req.body as UpdateIngredientRequest;
 
-    // Check if product exists
-    const existingProducts = (await query('SELECT * FROM products WHERE id = ?', [
-      productId,
+    // Check if ingredient exists
+    const existingIngredients = (await query('SELECT * FROM ingredients WHERE id = ?', [
+      ingredientId,
     ])) as any[];
 
-    if (existingProducts.length === 0) {
+    if (existingIngredients.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'Product not found',
+        error: 'Ingredient not found',
       });
     }
 
@@ -147,7 +147,7 @@ async function handleUpdateProduct(
     try {
       await connection.beginTransaction();
 
-      // Update product if name or description provided
+      // Update ingredient if name or description provided
       if (name !== undefined || description !== undefined) {
         const updateFields: string[] = [];
         const updateValues: any[] = [];
@@ -162,10 +162,10 @@ async function handleUpdateProduct(
           updateValues.push(description || null);
         }
 
-        updateValues.push(productId);
+        updateValues.push(ingredientId);
 
         await connection.execute(
-          `UPDATE products SET ${updateFields.join(', ')} WHERE id = ?`,
+          `UPDATE ingredients SET ${updateFields.join(', ')} WHERE id = ?`,
           updateValues
         );
       }
@@ -173,16 +173,16 @@ async function handleUpdateProduct(
       // Update vendors if provided
       if (vendors) {
         // Delete existing vendors
-        await connection.execute('DELETE FROM vendors WHERE product_id = ?', [
-          productId,
+        await connection.execute('DELETE FROM vendors WHERE ingredient_id = ?', [
+          ingredientId,
         ]);
 
         // Insert new vendors
         for (const vendor of vendors) {
           await connection.execute(
-            'INSERT INTO vendors (product_id, vendor_name, price, weight, package_size, is_default) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO vendors (ingredient_id, vendor_name, price, weight, package_size, is_default) VALUES (?, ?, ?, ?, ?, ?)',
             [
-              productId,
+              ingredientId,
               vendor.vendor_name,
               vendor.price,
               vendor.weight,
@@ -195,17 +195,17 @@ async function handleUpdateProduct(
 
       await connection.commit();
 
-      // Fetch updated product with vendors
-      const updatedProduct = (await query('SELECT * FROM products WHERE id = ?', [
-        productId,
+      // Fetch updated ingredient with vendors
+      const updatedIngredient = (await query('SELECT * FROM ingredients WHERE id = ?', [
+        ingredientId,
       ])) as any[];
 
-      const updatedVendors = (await query('SELECT * FROM vendors WHERE product_id = ?', [
-        productId,
+      const updatedVendors = (await query('SELECT * FROM vendors WHERE ingredient_id = ?', [
+        ingredientId,
       ])) as any[];
 
-      const result: ProductWithVendors = {
-        ...updatedProduct[0],
+      const result: IngredientWithVendors = {
+        ...updatedIngredient[0],
         vendors: updatedVendors,
       };
 
@@ -220,60 +220,60 @@ async function handleUpdateProduct(
       connection.release();
     }
   } catch (error: any) {
-    console.error('Error updating product:', error);
+    console.error('Error updating ingredient:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to update product',
+      error: 'Failed to update ingredient',
     });
   }
 }
 
 /**
- * DELETE /api/products/:id
- * Delete a product and its vendors (CASCADE)
+ * DELETE /api/ingredients/:id
+ * Delete a ingredient and its vendors (CASCADE)
  */
-async function handleDeleteProduct(
-  productId: number,
+async function handleDeleteIngredient(
+  ingredientId: number,
   res: NextApiResponse<ApiResponse>
 ) {
   try {
-    // Check if product exists
-    const products = (await query('SELECT * FROM products WHERE id = ?', [
-      productId,
+    // Check if ingredient exists
+    const ingredients = (await query('SELECT * FROM ingredients WHERE id = ?', [
+      ingredientId,
     ])) as any[];
 
-    if (products.length === 0) {
+    if (ingredients.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'Product not found',
+        error: 'Ingredient not found',
       });
     }
 
-    // Check if product is used in any recipes
+    // Check if ingredient is used in any recipes
     const recipeIngredients = (await query(
-      'SELECT * FROM recipe_ingredients WHERE product_id = ?',
-      [productId]
+      'SELECT * FROM recipe_ingredients WHERE ingredient_id = ?',
+      [ingredientId]
     )) as any[];
 
     if (recipeIngredients.length > 0) {
       return res.status(409).json({
         success: false,
-        error: 'Cannot delete product: it is used in one or more recipes',
+        error: 'Cannot delete ingredient: it is used in one or more recipes',
       });
     }
 
-    // Delete product (vendors will be deleted automatically due to CASCADE)
-    await query('DELETE FROM products WHERE id = ?', [productId]);
+    // Delete ingredient (vendors will be deleted automatically due to CASCADE)
+    await query('DELETE FROM ingredients WHERE id = ?', [ingredientId]);
 
     return res.status(200).json({
       success: true,
-      data: { id: productId },
+      data: { id: ingredientId },
     });
   } catch (error: any) {
-    console.error('Error deleting product:', error);
+    console.error('Error deleting ingredient:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to delete product',
+      error: 'Failed to delete ingredient',
     });
   }
 }
@@ -289,7 +289,7 @@ function validateVendorsInput(vendors: VendorInput[]): string[] {
   }
 
   if (vendors.length > 3) {
-    errors.push('Maximum of 3 vendors allowed per product');
+    errors.push('Maximum of 3 vendors allowed per ingredient');
   }
 
   vendors.forEach((vendor: VendorInput, index: number) => {
