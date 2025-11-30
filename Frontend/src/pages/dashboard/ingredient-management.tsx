@@ -214,7 +214,7 @@ export default function IngredientManagementPage() {
               onSelectAllRows={(checked) =>
                 onSelectAllRows(
                   checked,
-                  tableData.map((row) => row.id)
+                  tableData.map((row) => String(row.id))
                 )
               }
               action={
@@ -238,7 +238,7 @@ export default function IngredientManagementPage() {
                   onSelectAllRows={(checked) =>
                     onSelectAllRows(
                       checked,
-                      tableData.map((row) => row.id)
+                      tableData.map((row) => String(row.id))
                     )
                   }
                 />
@@ -250,8 +250,8 @@ export default function IngredientManagementPage() {
                       <IngredientTableRow
                         key={row.id}
                         row={row}
-                        selected={selected.includes(row.id)}
-                        onSelectRow={() => onSelectRow(row.id)}
+                        selected={selected.includes(String(row.id))}
+                        onSelectRow={() => onSelectRow(String(row.id))}
                         onDeleteRow={() => handleDeleteRow(row.id)}
                         onEditRow={() => handleEditRow(row.id)}
                       />
@@ -295,7 +295,7 @@ export default function IngredientManagementPage() {
             variant="contained"
             color="error"
             onClick={() => {
-              handleDeleteRows(selected);
+              handleDeleteRows(selected.map((id) => Number(id)));
               handleCloseConfirm();
             }}
           >
