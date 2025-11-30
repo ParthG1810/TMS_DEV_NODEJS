@@ -19,12 +19,12 @@ export type PackageSize =
   | 'pcs';   // Pieces
 
 // ----------------------------------------------------------------------
-// Product Types
+// Ingredient Types
 // ----------------------------------------------------------------------
 
 export type IVendor = {
   id?: number;
-  product_id?: number;
+  ingredient_id?: number;
   vendor_name: string;
   price: number;
   weight: number;
@@ -34,7 +34,7 @@ export type IVendor = {
   updated_at?: Date | string;
 };
 
-export type ITMSProduct = {
+export type ITMSIngredient = {
   id: number;
   name: string;
   description?: string;
@@ -43,7 +43,7 @@ export type ITMSProduct = {
   updated_at: Date | string;
 };
 
-export type IProductFormValues = {
+export type IIngredientFormValues = {
   name: string;
   description: string;
   vendors: IVendor[];
@@ -65,10 +65,10 @@ export type IRecipeImage = {
 export type IRecipeIngredient = {
   id?: number;
   recipe_id?: number;
-  product_id: number;
+  ingredient_id: number;
   quantity: number;
-  product_name?: string;
-  product_description?: string;
+  ingredient_name?: string;
+  ingredient_description?: string;
   unit_price?: number;
   weight?: number;
   package_size?: PackageSize;
@@ -98,11 +98,11 @@ export type IRecipeFormValues = {
 // Redux State Types
 // ----------------------------------------------------------------------
 
-export type ITMSProductState = {
+export type ITMSIngredientState = {
   isLoading: boolean;
   error: Error | string | null;
-  products: ITMSProduct[];
-  product: ITMSProduct | null;
+  ingredients: ITMSIngredient[];
+  ingredient: ITMSIngredient | null;
 };
 
 export type ITMSRecipeState = {

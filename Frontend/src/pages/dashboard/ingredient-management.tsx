@@ -16,9 +16,9 @@ import {
 import { PATH_DASHBOARD } from '../../routes/paths';
 // redux
 import { useDispatch, useSelector } from '../../redux/store';
-import { getTMSProducts, deleteTMSProduct } from '../../redux/slices/tmsProduct';
+import { getTMSIngredients, deleteTMSIngredient } from '../../redux/slices/tmsIngredient';
 // @types
-import { ITMSProduct } from '../../@types/tms';
+import { ITMSIngredient } from '../../@types/tms';
 // components
 import Iconify from '../../components/iconify';
 import Scrollbar from '../../components/scrollbar';
@@ -36,13 +36,13 @@ import {
   TablePaginationCustom,
 } from '../../components/table';
 // sections
-import { ProductTableRow, ProductTableToolbar } from '../../sections/@dashboard/tms/product/list';
+import { IngredientTableRow, IngredientTableToolbar } from '../../sections/@dashboard/tms/ingredient/list';
 import DashboardLayout from '../../layouts/dashboard';
 
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
-  { id: 'name', label: 'Product', align: 'left' },
+  { id: 'name', label: 'Ingredient', align: 'left' },
   { id: 'vendors', label: 'Vendors', align: 'left' },
   { id: 'defaultVendor', label: 'Default Vendor', align: 'left' },
   { id: '' },
@@ -50,9 +50,9 @@ const TABLE_HEAD = [
 
 // ----------------------------------------------------------------------
 
-ProductManagementPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page}</DashboardLayout>;
+IngredientManagementPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page}</DashboardLayout>;
 
-export default function ProductManagementPage() {
+export default function IngredientManagementPage() {
   const {
     dense,
     page,
@@ -78,16 +78,16 @@ export default function ProductManagementPage() {
 
   const { enqueueSnackbar } = useSnackbar();
 
-  const { products, isLoading } = useSelector((state) => state.tmsProduct);
+  const { products, isLoading } = useSelector((state) => state.tmsIngredient);
 
-  const [tableData, setTableData] = useState<ITMSProduct[]>([]);
+  const [tableData, setTableData] = useState<ITMSIngredient[]>([]);
 
   const [filterName, setFilterName] = useState('');
 
   const [openConfirm, setOpenConfirm] = useState(false);
 
   useEffect(() => {
-    dispatch(getTMSProducts());
+    dispatch(getTMSIngredients());
   }, [dispatch]);
 
   useEffect(() => {
@@ -125,7 +125,7 @@ export default function ProductManagementPage() {
 
   const handleDeleteRow = async (id: number) => {
     try {
-      await dispatch(deleteTMSProduct(id));
+      await dispatch(deleteTMSIngredient(id));
       const deleteRow = tableData.filter((row) => row.id !== id);
       setTableData(deleteRow);
       enqueueSnackbar('Delete success!');
@@ -143,7 +143,7 @@ export default function ProductManagementPage() {
 
   const handleDeleteRows = async (selectedRows: number[]) => {
     try {
-      await Promise.all(selectedRows.map((id) => dispatch(deleteTMSProduct(id))));
+      await Promise.all(selectedRows.map((id) => dispatch(deleteTMSIngredient(id))));
       const deleteRows = tableData.filter((row) => !selectedRows.includes(row.id));
       setTableData(deleteRows);
       setSelected([]);
@@ -166,7 +166,7 @@ export default function ProductManagementPage() {
   };
 
   const handleEditRow = (id: number) => {
-    push(PATH_DASHBOARD.product.edit(String(id)));
+    push(PATH_DASHBOARD.ingredient.edit(String(id)));
   };
 
   const handleResetFilter = () => {
@@ -176,30 +176,30 @@ export default function ProductManagementPage() {
   return (
     <>
       <Head>
-        <title>Product Management | TMS</title>
+        <title>Ingredient Management | TMS</title>
       </Head>
 
       <Container maxWidth={false}>
         <CustomBreadcrumbs
-          heading="Product List"
+          heading="Ingredient List"
           links={[
             { name: 'Dashboard', href: PATH_DASHBOARD.root },
-            { name: 'Product', href: PATH_DASHBOARD.product.root },
+            { name: 'Ingredient', href: PATH_DASHBOARD.ingredient.root },
             { name: 'List' },
           ]}
           action={
             <Button
               variant="contained"
               startIcon={<Iconify icon="eva:plus-fill" />}
-              onClick={() => push(PATH_DASHBOARD.product.new)}
+              onClick={() => push(PATH_DASHBOARD.ingredient.new)}
             >
-              New Product
+              New Ingredient
             </Button>
           }
         />
 
         <Card>
-          <ProductTableToolbar
+          <IngredientTableToolbar
             isFiltered={isFiltered}
             filterName={filterName}
             onFilterName={handleFilterName}
@@ -247,7 +247,7 @@ export default function ProductManagementPage() {
                   {dataFiltered
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((row) => (
-                      <ProductTableRow
+                      <IngredientTableRow
                         key={row.id}
                         row={row}
                         selected={selected.includes(row.id)}
@@ -314,7 +314,7 @@ function applyFilter({
   comparator,
   filterName,
 }: {
-  inputData: ITMSProduct[];
+  inputData: ITMSIngredient[];
   comparator: (a: any, b: any) => number;
   filterName: string;
 }) {

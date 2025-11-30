@@ -28,7 +28,7 @@ import {
 import { PATH_DASHBOARD } from '../../../../routes/paths';
 // redux
 import { useDispatch, useSelector } from '../../../../redux/store';
-import { getTMSProducts } from '../../../../redux/slices/tmsProduct';
+import { getTMSIngredients } from '../../../../redux/slices/tmsIngredient';
 // @types
 import { ITMSRecipe, IRecipeFormValues, IRecipeIngredient } from '../../../../@types/tms';
 // utils
@@ -53,12 +53,12 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
 
   const { enqueueSnackbar } = useSnackbar();
 
-  const { products } = useSelector((state) => state.tmsProduct);
+  const { products } = useSelector((state) => state.tmsIngredient);
 
   const [ingredientInput, setIngredientInput] = useState<{ [key: number]: string }>({});
 
   useEffect(() => {
-    dispatch(getTMSProducts());
+    dispatch(getTMSIngredients());
   }, [dispatch]);
 
   const NewRecipeSchema = Yup.object().shape({
@@ -67,7 +67,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
     ingredients: Yup.array()
       .of(
         Yup.object().shape({
-          product_id: Yup.number().required('Product is required'),
+          ingredient_id: Yup.number().required('Product is required'),
           quantity: Yup.number()
             .required('Quantity is required')
             .positive('Quantity must be positive')
@@ -82,7 +82,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
     () => ({
       name: currentRecipe?.name || '',
       description: currentRecipe?.description || '',
-      ingredients: currentRecipe?.ingredients || [{ product_id: 0, quantity: 0 }],
+      ingredients: currentRecipe?.ingredients || [{ ingredient_id: 0, quantity: 0 }],
       images: currentRecipe?.images?.map((img) => img.image_url) || [],
     }),
     [currentRecipe]
@@ -120,7 +120,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
   }, [isEdit, currentRecipe]);
 
   const handleAddIngredient = () => {
-    append({ product_id: 0, quantity: 0 });
+    append({ ingredient_id: 0, quantity: 0 });
   };
 
   const handleRemoveIngredient = (index: number) => {
@@ -154,7 +154,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
   const calculateTotalCost = () => {
     let total = 0;
     values.ingredients?.forEach((ingredient) => {
-      const product = products.find((p) => p.id === ingredient.product_id);
+      const product = products.find((p) => p.id === ingredient.ingredient_id);
       if (product) {
         const defaultVendor = product.vendors.find((v) => v.is_default);
         if (defaultVendor) {
@@ -168,7 +168,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
   };
 
   const getIngredientCost = (ingredient: IRecipeIngredient) => {
-    const product = products.find((p) => p.id === ingredient.product_id);
+    const product = products.find((p) => p.id === ingredient.ingredient_id);
     if (product) {
       const defaultVendor = product.vendors.find((v) => v.is_default);
       if (defaultVendor) {
@@ -228,7 +228,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
                 <TableBody>
                   {fields.map((field, index) => {
                     const ingredient = values.ingredients?.[index];
-                    const product = products.find((p) => p.id === ingredient?.product_id);
+                    const product = products.find((p) => p.id === ingredient?.ingredient_id);
                     const defaultVendor = product?.vendors.find((v) => v.is_default);
 
                     return (
@@ -244,7 +244,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
                             }
                             value={product || null}
                             onChange={(event, newValue) => {
-                              setValue(`ingredients.${index}.product_id`, newValue?.id || 0);
+                              setValue(`ingredients.${index}.ingredient_id`, newValue?.id || 0);
                             }}
                             inputValue={ingredientInput[index] || ''}
                             onInputChange={(event, newInputValue) => {
