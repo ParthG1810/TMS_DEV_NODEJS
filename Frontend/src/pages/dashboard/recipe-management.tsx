@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 // @mui
 import {
   Card,
@@ -73,7 +73,7 @@ export default function RecipeManagementPage() {
     onChangeRowsPerPage,
   } = useTable();
 
-  const navigate = useNavigate();
+  const { push } = useRouter();
 
   const dispatch = useDispatch();
 
@@ -167,7 +167,7 @@ export default function RecipeManagementPage() {
   };
 
   const handleEditRow = (id: number) => {
-    navigate(PATH_DASHBOARD.recipe.edit(String(id)));
+    push(PATH_DASHBOARD.recipe.edit(String(id)));
   };
 
   const handleResetFilter = () => {
@@ -192,7 +192,7 @@ export default function RecipeManagementPage() {
             <Button
               variant="contained"
               startIcon={<Iconify icon="eva:plus-fill" />}
-              onClick={() => navigate(PATH_DASHBOARD.recipe.new)}
+              onClick={() => push(PATH_DASHBOARD.recipe.new)}
             >
               New Recipe
             </Button>

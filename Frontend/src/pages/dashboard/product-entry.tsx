@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import Head from 'next/head';
-import { useParams, useLocation } from 'react-router-dom';
+import { useRouter } from 'next/router';
 // @mui
 import { Container } from '@mui/material';
 // routes
@@ -27,11 +27,9 @@ ProductEntryPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{pag
 export default function ProductEntryPage() {
   const dispatch = useDispatch();
 
-  const { pathname, search } = useLocation();
+  const { pathname, query } = useRouter();
 
-  const params = new URLSearchParams(search);
-
-  const id = params.get('id');
+  const id = query.id as string;
 
   const { product } = useSelector((state) => state.tmsProduct);
 

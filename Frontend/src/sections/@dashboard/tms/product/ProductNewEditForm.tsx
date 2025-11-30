@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import * as Yup from 'yup';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 // form
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -61,7 +61,7 @@ type Props = {
 };
 
 export default function ProductNewEditForm({ isEdit = false, currentProduct, onSubmit }: Props) {
-  const navigate = useNavigate();
+  const { push } = useRouter();
 
   const { enqueueSnackbar } = useSnackbar();
 
@@ -174,7 +174,7 @@ export default function ProductNewEditForm({ isEdit = false, currentProduct, onS
     try {
       await onSubmit(data);
       enqueueSnackbar(!isEdit ? 'Create success!' : 'Update success!');
-      navigate(PATH_DASHBOARD.product.list);
+      push(PATH_DASHBOARD.product.list);
     } catch (error) {
       console.error(error);
       enqueueSnackbar(error.message || 'Something went wrong!', { variant: 'error' });
