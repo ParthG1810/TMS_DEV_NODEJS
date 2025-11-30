@@ -100,7 +100,7 @@ export function getTMSIngredient(id: number) {
 // ----------------------------------------------------------------------
 
 export function createTMSIngredient(ingredientData: IIngredientFormValues) {
-  return async (dispatch: Dispatch) {
+  return async (dispatch: Dispatch) => {
     dispatch(slice.actions.startLoading());
     try {
       const response = await axios.post('/api/ingredients', ingredientData);
@@ -117,7 +117,7 @@ export function createTMSIngredient(ingredientData: IIngredientFormValues) {
 // ----------------------------------------------------------------------
 
 export function updateTMSIngredient(id: number, ingredientData: Partial<IIngredientFormValues>) {
-  return async (dispatch: Dispatch) {
+  return async (dispatch: Dispatch) => {
     dispatch(slice.actions.startLoading());
     try {
       const response = await axios.put(`/api/ingredients/${id}`, ingredientData);
@@ -134,7 +134,7 @@ export function updateTMSIngredient(id: number, ingredientData: Partial<IIngredi
 // ----------------------------------------------------------------------
 
 export function deleteTMSIngredient(id: number) {
-  return async (dispatch: Dispatch) {
+  return async (dispatch: Dispatch) => {
     dispatch(slice.actions.startLoading());
     try {
       await axios.delete(`/api/ingredients/${id}`);
