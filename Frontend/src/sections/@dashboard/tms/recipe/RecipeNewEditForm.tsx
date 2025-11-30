@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useCallback, useState } from 'react';
 import * as Yup from 'yup';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 // form
 import { useForm, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -47,7 +47,7 @@ type Props = {
 };
 
 export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSubmit }: Props) {
-  const navigate = useNavigate();
+  const { push } = useRouter();
 
   const dispatch = useDispatch();
 
@@ -183,7 +183,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
     try {
       await onSubmit(data);
       enqueueSnackbar(!isEdit ? 'Create success!' : 'Update success!');
-      navigate(PATH_DASHBOARD.recipe.list);
+      push(PATH_DASHBOARD.recipe.list);
     } catch (error) {
       console.error(error);
       enqueueSnackbar(error.message || 'Something went wrong!', { variant: 'error' });
@@ -377,7 +377,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
               color="inherit"
               variant="outlined"
               size="large"
-              onClick={() => navigate(PATH_DASHBOARD.recipe.list)}
+              onClick={() => push(PATH_DASHBOARD.recipe.list)}
               fullWidth
             >
               Cancel

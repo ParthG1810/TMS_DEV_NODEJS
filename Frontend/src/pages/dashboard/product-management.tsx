@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 // @mui
 import {
   Card,
@@ -72,7 +72,7 @@ export default function ProductManagementPage() {
     onChangeRowsPerPage,
   } = useTable();
 
-  const navigate = useNavigate();
+  const { push } = useRouter();
 
   const dispatch = useDispatch();
 
@@ -166,7 +166,7 @@ export default function ProductManagementPage() {
   };
 
   const handleEditRow = (id: number) => {
-    navigate(PATH_DASHBOARD.product.edit(String(id)));
+    push(PATH_DASHBOARD.product.edit(String(id)));
   };
 
   const handleResetFilter = () => {
@@ -191,7 +191,7 @@ export default function ProductManagementPage() {
             <Button
               variant="contained"
               startIcon={<Iconify icon="eva:plus-fill" />}
-              onClick={() => navigate(PATH_DASHBOARD.product.new)}
+              onClick={() => push(PATH_DASHBOARD.product.new)}
             >
               New Product
             </Button>
