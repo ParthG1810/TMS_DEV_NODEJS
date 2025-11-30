@@ -31,7 +31,7 @@ export default function IngredientEntryPage() {
 
   const id = query.id as string;
 
-  const { product } = useSelector((state) => state.tmsIngredient);
+  const { ingredient } = useSelector((state) => state.tmsIngredient);
 
   const isEdit = pathname.includes('edit') || !!id;
 
@@ -67,13 +67,13 @@ export default function IngredientEntryPage() {
               name: 'Ingredient',
               href: PATH_DASHBOARD.ingredient.list,
             },
-            { name: !isEdit ? 'New product' : product?.name || '' },
+            { name: !isEdit ? 'New ingredient' : ingredient?.name || '' },
           ]}
         />
 
         <IngredientNewEditForm
           isEdit={isEdit}
-          currentIngredient={isEdit ? product || undefined : undefined}
+          currentIngredient={isEdit ? ingredient || undefined : undefined}
           onSubmit={handleSubmit}
         />
       </Container>

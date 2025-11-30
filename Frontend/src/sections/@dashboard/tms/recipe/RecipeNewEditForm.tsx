@@ -53,7 +53,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
 
   const { enqueueSnackbar } = useSnackbar();
 
-  const { products } = useSelector((state) => state.tmsIngredient);
+  const { ingredients } = useSelector((state) => state.tmsIngredient);
 
   const [ingredientInput, setIngredientInput] = useState<{ [key: number]: string }>({});
 
@@ -154,9 +154,9 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
   const calculateTotalCost = () => {
     let total = 0;
     values.ingredients?.forEach((ingredient) => {
-      const product = products.find((p) => p.id === ingredient.ingredient_id);
-      if (product) {
-        const defaultVendor = product.vendors.find((v) => v.is_default);
+      const ingredientData = ingredients.find((ing) => ing.id === ingredient.ingredient_id);
+      if (ingredientData) {
+        const defaultVendor = ingredientData.vendors.find((v) => v.is_default);
         if (defaultVendor) {
           const unitPrice = defaultVendor.price / defaultVendor.weight;
           const cost = unitPrice * ingredient.quantity;
@@ -168,9 +168,9 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
   };
 
   const getIngredientCost = (ingredient: IRecipeIngredient) => {
-    const product = products.find((p) => p.id === ingredient.ingredient_id);
-    if (product) {
-      const defaultVendor = product.vendors.find((v) => v.is_default);
+    const ingredientData = ingredients.find((ing) => ing.id === ingredient.ingredient_id);
+    if (ingredientData) {
+      const defaultVendor = ingredientData.vendors.find((v) => v.is_default);
       if (defaultVendor) {
         const unitPrice = defaultVendor.price / defaultVendor.weight;
         return unitPrice * ingredient.quantity;
@@ -218,31 +218,31 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Product</TableCell>
+                    <TableCell>Ingredient</TableCell>
                     <TableCell align="center">Quantity</TableCell>
                     <TableCell align="right">Unit Cost</TableCell>
                     <TableCell align="right">Total</TableCell>
-                    <TableCell align="right"></TableCell>
+                    <TableCell align="right" />
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {fields.map((field, index) => {
                     const ingredient = values.ingredients?.[index];
-                    const product = products.find((p) => p.id === ingredient?.ingredient_id);
-                    const defaultVendor = product?.vendors.find((v) => v.is_default);
+                    const ingredientData = ingredients.find((ing) => ing.id === ingredient?.ingredient_id);
+                    const defaultVendor = ingredientData?.vendors.find((v) => v.is_default);
 
                     return (
                       <TableRow key={field.id}>
                         <TableCell>
                           <Autocomplete
                             fullWidth
-                            options={products}
+                            options={ingredients}
                             getOptionLabel={(option) =>
                               typeof option === 'number'
-                                ? products.find((p) => p.id === option)?.name || ''
+                                ? ingredients.find((ing) => ing.id === option)?.name || ''
                                 : option.name
                             }
-                            value={product || null}
+                            value={ingredientData || null}
                             onChange={(event, newValue) => {
                               setValue(`ingredients.${index}.ingredient_id`, newValue?.id || 0);
                             }}
@@ -254,7 +254,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
                               }));
                             }}
                             renderInput={(params) => (
-                              <TextField {...params} placeholder="Select product" />
+                              <TextField {...params} placeholder="Select ingredient" />
                             )}
                           />
                         </TableCell>
