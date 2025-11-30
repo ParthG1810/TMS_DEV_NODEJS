@@ -78,7 +78,7 @@ export default function IngredientManagementPage() {
 
   const { enqueueSnackbar } = useSnackbar();
 
-  const { products, isLoading } = useSelector((state) => state.tmsIngredient);
+  const { ingredients, isLoading } = useSelector((state) => state.tmsIngredient);
 
   const [tableData, setTableData] = useState<ITMSIngredient[]>([]);
 
@@ -91,10 +91,10 @@ export default function IngredientManagementPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (products.length) {
-      setTableData(products);
+    if (ingredients.length) {
+      setTableData(ingredients);
     }
-  }, [products]);
+  }, [ingredients]);
 
   const dataFiltered = applyFilter({
     inputData: tableData,
@@ -137,7 +137,7 @@ export default function IngredientManagementPage() {
       }
     } catch (error) {
       console.error(error);
-      enqueueSnackbar(error.message || 'Failed to delete product', { variant: 'error' });
+      enqueueSnackbar(error.message || 'Failed to delete ingredient', { variant: 'error' });
     }
   };
 
@@ -161,7 +161,7 @@ export default function IngredientManagementPage() {
       }
     } catch (error) {
       console.error(error);
-      enqueueSnackbar('Failed to delete products', { variant: 'error' });
+      enqueueSnackbar('Failed to delete ingredients', { variant: 'error' });
     }
   };
 
@@ -330,9 +330,9 @@ function applyFilter({
 
   if (filterName) {
     inputData = inputData.filter(
-      (product) =>
-        product.name.toLowerCase().indexOf(filterName.toLowerCase()) !== -1 ||
-        product.description?.toLowerCase().indexOf(filterName.toLowerCase()) !== -1
+      (ingredient) =>
+        ingredient.name.toLowerCase().indexOf(filterName.toLowerCase()) !== -1 ||
+        ingredient.description?.toLowerCase().indexOf(filterName.toLowerCase()) !== -1
     );
   }
 
