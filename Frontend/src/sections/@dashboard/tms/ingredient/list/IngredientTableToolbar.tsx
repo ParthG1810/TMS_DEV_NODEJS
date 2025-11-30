@@ -11,7 +11,7 @@ type Props = {
   onResetFilter: VoidFunction;
 };
 
-export default function ProductTableToolbar({
+export default function IngredientTableToolbar({
   isFiltered,
   filterName,
   onFilterName,
@@ -31,7 +31,7 @@ export default function ProductTableToolbar({
         fullWidth
         value={filterName}
         onChange={onFilterName}
-        placeholder="Search product..."
+        placeholder="Search ingredient..."
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">

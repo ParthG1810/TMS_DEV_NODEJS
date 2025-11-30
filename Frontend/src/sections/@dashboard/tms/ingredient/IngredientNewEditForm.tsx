@@ -23,7 +23,7 @@ import {
 // routes
 import { PATH_DASHBOARD } from '../../../../routes/paths';
 // @types
-import { ITMSProduct, IProductFormValues, IVendor, PackageSize } from '../../../../@types/tms';
+import { ITMSIngredient, IIngredientFormValues, IVendor, PackageSize } from '../../../../@types/tms';
 // components
 import { useSnackbar } from '../../../../components/snackbar';
 import FormProvider, {
@@ -52,15 +52,15 @@ const PACKAGE_SIZES: { value: PackageSize; label: string }[] = [
   { value: 'pcs', label: 'Pieces (pcs)' },
 ];
 
-const STEPS = ['Product Information', 'Vendor Details', 'Review'];
+const STEPS = ['Ingredient Information', 'Vendor Details', 'Review'];
 
 type Props = {
   isEdit?: boolean;
-  currentProduct?: ITMSProduct;
-  onSubmit: (data: IProductFormValues) => Promise<void>;
+  currentProduct?: ITMSIngredient;
+  onSubmit: (data: IIngredientFormValues) => Promise<void>;
 };
 
-export default function ProductNewEditForm({ isEdit = false, currentProduct, onSubmit }: Props) {
+export default function IngredientNewEditForm({ isEdit = false, currentProduct, onSubmit }: Props) {
   const { push } = useRouter();
 
   const { enqueueSnackbar } = useSnackbar();
@@ -68,7 +68,7 @@ export default function ProductNewEditForm({ isEdit = false, currentProduct, onS
   const [activeStep, setActiveStep] = useState(0);
 
   const NewProductSchema = Yup.object().shape({
-    name: Yup.string().required('Product name is required').max(255, 'Name is too long'),
+    name: Yup.string().required('Ingredient name is required').max(255, 'Name is too long'),
     description: Yup.string(),
     vendors: Yup.array()
       .of(
@@ -90,7 +90,7 @@ export default function ProductNewEditForm({ isEdit = false, currentProduct, onS
       .max(3, 'Maximum 3 vendors allowed'),
   });
 
-  const defaultValues = useMemo<IProductFormValues>(
+  const defaultValues = useMemo<IIngredientFormValues>(
     () => ({
       name: currentProduct?.name || '',
       description: currentProduct?.description || '',
@@ -107,7 +107,7 @@ export default function ProductNewEditForm({ isEdit = false, currentProduct, onS
     [currentProduct]
   );
 
-  const methods = useForm<IProductFormValues>({
+  const methods = useForm<IIngredientFormValues>({
     resolver: yupResolver(NewProductSchema),
     defaultValues,
   });
@@ -170,11 +170,11 @@ export default function ProductNewEditForm({ isEdit = false, currentProduct, onS
     setValue('vendors', updatedVendors);
   };
 
-  const onSubmitForm = async (data: IProductFormValues) => {
+  const onSubmitForm = async (data: IIngredientFormValues) => {
     try {
       await onSubmit(data);
       enqueueSnackbar(!isEdit ? 'Create success!' : 'Update success!');
-      push(PATH_DASHBOARD.product.list);
+      push(PATH_DASHBOARD.ingredient.list);
     } catch (error) {
       console.error(error);
       enqueueSnackbar(error.message || 'Something went wrong!', { variant: 'error' });
@@ -187,11 +187,11 @@ export default function ProductNewEditForm({ isEdit = false, currentProduct, onS
         return (
           <Box sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ mb: 3 }}>
-              Product Information
+              Ingredient Information
             </Typography>
 
             <Stack spacing={3}>
-              <RHFTextField name="name" label="Product Name" />
+              <RHFTextField name="name" label="Ingredient Name" />
               <RHFTextField name="description" label="Description" multiline rows={4} />
             </Stack>
           </Box>
@@ -294,7 +294,7 @@ export default function ProductNewEditForm({ isEdit = false, currentProduct, onS
             <Stack spacing={3}>
               <Card sx={{ p: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Product Name
+                  Ingredient Name
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {values.name}

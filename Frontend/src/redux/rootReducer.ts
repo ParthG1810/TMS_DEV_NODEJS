@@ -7,7 +7,7 @@ import chatReducer from './slices/chat';
 import productReducer from './slices/product';
 import calendarReducer from './slices/calendar';
 import kanbanReducer from './slices/kanban';
-import tmsProductReducer from './slices/tmsProduct';
+import tmsIngredientReducer from './slices/tmsIngredient';
 import tmsRecipeReducer from './slices/tmsRecipe';
 
 // ----------------------------------------------------------------------
@@ -47,7 +47,7 @@ const rootReducer = combineReducers({
   calendar: calendarReducer,
   kanban: kanbanReducer,
   product: persistReducer(productPersistConfig, productReducer),
-  tmsProduct: tmsProductReducer,
+  tmsIngredient: tmsIngredientReducer,
   tmsRecipe: tmsRecipeReducer,
 });
 

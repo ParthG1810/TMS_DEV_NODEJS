@@ -12,7 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 // @types
-import { ITMSProduct } from '../../../../../@types/tms';
+import { ITMSIngredient } from '../../../../../@types/tms';
 // components
 import Label from '../../../../../components/label';
 import Iconify from '../../../../../components/iconify';
@@ -22,14 +22,14 @@ import ConfirmDialog from '../../../../../components/confirm-dialog';
 // ----------------------------------------------------------------------
 
 type Props = {
-  row: ITMSProduct;
+  row: ITMSIngredient;
   selected: boolean;
   onEditRow: VoidFunction;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
 };
 
-export default function ProductTableRow({
+export default function IngredientTableRow({
   row,
   selected,
   onEditRow,
