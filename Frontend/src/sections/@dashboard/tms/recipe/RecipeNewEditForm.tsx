@@ -222,7 +222,7 @@ export default function RecipeNewEditForm({ isEdit = false, currentRecipe, onSub
                     <TableCell align="center">Quantity</TableCell>
                     <TableCell align="right">Unit Cost</TableCell>
                     <TableCell align="right">Total</TableCell>
-                    <TableCell align="right"></TableCell>
+                    <TableCell align="right" />
                   </TableRow>
                 </TableHead>
                 <TableBody>
