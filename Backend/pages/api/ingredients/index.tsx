@@ -2,8 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import cors from 'src/utils/cors';
 import { query, getConnection } from 'src/config/database';
 import {
-  ProductWithVendors,
-  CreateProductRequest,
+  IngredientWithVendors,
+  CreateIngredientRequest,
   ApiResponse,
   VendorInput,
 } from 'src/types';
@@ -18,9 +18,9 @@ export default async function handler(
     await cors(req, res);
 
     if (req.method === 'GET') {
-      return await handleGetProducts(req, res);
+      return await handleGetIngredients(req, res);
     } else if (req.method === 'POST') {
-      return await handleCreateProduct(req, res);
+      return await handleCreateIngredient(req, res);
     } else {
       return res.status(405).json({
         success: false,
@@ -28,7 +28,7 @@ export default async function handler(
       });
     }
   } catch (error: any) {
-    console.error('Error in products handler:', error);
+    console.error('Error in ingredients handler:', error);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -37,57 +37,57 @@ export default async function handler(
 }
 
 /**
- * GET /api/products
- * Fetch all products with their vendors
+ * GET /api/ingredients
+ * Fetch all ingredients with their vendors
  */
-async function handleGetProducts(
+async function handleGetIngredients(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
   try {
-    // Fetch all products
-    const products = (await query('SELECT * FROM products ORDER BY created_at DESC')) as any[];
+    // Fetch all ingredients
+    const ingredients = (await query('SELECT * FROM ingredients ORDER BY created_at DESC')) as any[];
 
-    // Fetch vendors for each product
-    const productsWithVendors: ProductWithVendors[] = [];
+    // Fetch vendors for each ingredient
+    const ingredientsWithVendors: IngredientWithVendors[] = [];
 
-    for (const product of products) {
-      const vendors = (await query('SELECT * FROM vendors WHERE product_id = ?', [
-        product.id,
+    for (const ingredient of ingredients) {
+      const vendors = (await query('SELECT * FROM vendors WHERE ingredient_id = ?', [
+        ingredient.id,
       ])) as any[];
 
-      productsWithVendors.push({
-        ...product,
+      ingredientsWithVendors.push({
+        ...ingredient,
         vendors,
       });
     }
 
     return res.status(200).json({
       success: true,
-      data: productsWithVendors,
+      data: ingredientsWithVendors,
     });
   } catch (error: any) {
-    console.error('Error fetching products:', error);
+    console.error('Error fetching ingredients:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to fetch products',
+      error: 'Failed to fetch ingredients',
     });
   }
 }
 
 /**
- * POST /api/products
- * Create a new product with vendors
+ * POST /api/ingredients
+ * Create a new ingredient with vendors
  */
-async function handleCreateProduct(
+async function handleCreateIngredient(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
   try {
-    const { name, description, vendors } = req.body as CreateProductRequest;
+    const { name, description, vendors } = req.body as CreateIngredientRequest;
 
     // Validation
-    const errors = validateProductInput({ name, description, vendors });
+    const errors = validateIngredientInput({ name, description, vendors });
     if (errors.length > 0) {
       return res.status(400).json({
         success: false,
@@ -107,19 +107,19 @@ async function handleCreateProduct(
     try {
       await connection.beginTransaction();
 
-      // Insert product
-      const [productResult] = await connection.execute(
-        'INSERT INTO products (name, description) VALUES (?, ?)',
+      // Insert ingredient
+      const [ingredientResult] = await connection.execute(
+        'INSERT INTO ingredients (name, description) VALUES (?, ?)',
         [name, description || null]
       );
-      const productId = (productResult as any).insertId;
+      const ingredientId = (ingredientResult as any).insertId;
 
       // Insert vendors
       for (const vendor of vendors) {
         await connection.execute(
-          'INSERT INTO vendors (product_id, vendor_name, price, weight, package_size, is_default) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO vendors (ingredient_id, vendor_name, price, weight, package_size, is_default) VALUES (?, ?, ?, ?, ?, ?)',
           [
-            productId,
+            ingredientId,
             vendor.vendor_name,
             vendor.price,
             vendor.weight,
@@ -131,17 +131,17 @@ async function handleCreateProduct(
 
       await connection.commit();
 
-      // Fetch the created product with vendors
-      const createdProduct = (await query('SELECT * FROM products WHERE id = ?', [
-        productId,
+      // Fetch the created ingredient with vendors
+      const createdIngredient = (await query('SELECT * FROM ingredients WHERE id = ?', [
+        ingredientId,
       ])) as any[];
 
-      const createdVendors = (await query('SELECT * FROM vendors WHERE product_id = ?', [
-        productId,
+      const createdVendors = (await query('SELECT * FROM vendors WHERE ingredient_id = ?', [
+        ingredientId,
       ])) as any[];
 
-      const result: ProductWithVendors = {
-        ...createdProduct[0],
+      const result: IngredientWithVendors = {
+        ...createdIngredient[0],
         vendors: createdVendors,
       };
 
@@ -156,36 +156,36 @@ async function handleCreateProduct(
       connection.release();
     }
   } catch (error: any) {
-    console.error('Error creating product:', error);
+    console.error('Error creating ingredient:', error);
 
     // Handle duplicate entry error
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
         success: false,
-        error: 'Product with this name already exists',
+        error: 'Ingredient with this name already exists',
       });
     }
 
     return res.status(500).json({
       success: false,
-      error: 'Failed to create product',
+      error: 'Failed to create ingredient',
     });
   }
 }
 
 /**
- * Validate product input data
+ * Validate ingredient input data
  */
-function validateProductInput(data: CreateProductRequest): string[] {
+function validateIngredientInput(data: CreateIngredientRequest): string[] {
   const errors: string[] = [];
 
   // Validate name
   if (!data.name || data.name.trim() === '') {
-    errors.push('Product name is required');
+    errors.push('Ingredient name is required');
   }
 
   if (data.name && data.name.length > 255) {
-    errors.push('Product name must be less than 255 characters');
+    errors.push('Ingredient name must be less than 255 characters');
   }
 
   // Validate vendors
@@ -194,7 +194,7 @@ function validateProductInput(data: CreateProductRequest): string[] {
   }
 
   if (data.vendors && data.vendors.length > 3) {
-    errors.push('Maximum of 3 vendors allowed per product');
+    errors.push('Maximum of 3 vendors allowed per ingredient');
   }
 
   // Validate each vendor

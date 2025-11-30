@@ -115,14 +115,14 @@ const navConfig = [
         icon: ICONS.folder,
       },
 
-      // PRODUCT MANAGEMENT
+      // INGREDIENT MANAGEMENT
       {
-        title: 'Product Management',
-        path: PATH_DASHBOARD.product.root,
+        title: 'Ingredient Management',
+        path: PATH_DASHBOARD.ingredient.root,
         icon: ICONS.cart,
         children: [
-          { title: 'list', path: PATH_DASHBOARD.product.list },
-          { title: 'create', path: PATH_DASHBOARD.product.new },
+          { title: 'list', path: PATH_DASHBOARD.ingredient.list },
+          { title: 'create', path: PATH_DASHBOARD.ingredient.new },
         ],
       },
 
