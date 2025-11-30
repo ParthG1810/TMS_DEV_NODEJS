@@ -59,13 +59,13 @@ async function handleGetRecipes(
     const recipesWithDetails: RecipeWithDetails[] = [];
 
     for (const recipe of recipes) {
-      // Fetch ingredients with product details
+      // Fetch ingredients with ingredient details
       const ingredients = (await query(
-        `SELECT ri.*, p.name as product_name, p.description as product_description,
+        `SELECT ri.*, i.name as ingredient_name, i.description as ingredient_description,
                 v.price as unit_price, v.weight, v.package_size
          FROM recipe_ingredients ri
-         JOIN products p ON ri.product_id = p.id
-         LEFT JOIN vendors v ON p.id = v.product_id AND v.is_default = true
+         JOIN ingredients i ON ri.ingredient_id = i.id
+         LEFT JOIN vendors v ON i.id = v.ingredient_id AND v.is_default = true
          WHERE ri.recipe_id = ?`,
         [recipe.id]
       )) as any[];
@@ -180,8 +180,8 @@ async function handleCreateRecipe(
       // Insert ingredients
       for (const ingredient of ingredients) {
         await connection.execute(
-          'INSERT INTO recipe_ingredients (recipe_id, product_id, quantity) VALUES (?, ?, ?)',
-          [recipeId, ingredient.product_id, ingredient.quantity]
+          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity) VALUES (?, ?, ?)',
+          [recipeId, ingredient.ingredient_id, ingredient.quantity]
         );
       }
 
@@ -202,9 +202,9 @@ async function handleCreateRecipe(
       ])) as any[];
 
       const createdIngredients = (await query(
-        `SELECT ri.*, p.name as product_name
+        `SELECT ri.*, i.name as ingredient_name
          FROM recipe_ingredients ri
-         JOIN products p ON ri.product_id = p.id
+         JOIN ingredients i ON ri.ingredient_id = i.id
          WHERE ri.recipe_id = ?`,
         [recipeId]
       )) as any[];
@@ -237,7 +237,7 @@ async function handleCreateRecipe(
     if (error.code === 'ER_NO_REFERENCED_ROW_2') {
       return res.status(400).json({
         success: false,
-        error: 'Invalid product ID in ingredients',
+        error: 'Invalid ingredient ID in ingredients',
       });
     }
 
@@ -275,8 +275,8 @@ function validateRecipeInput(data: {
   // Validate each ingredient
   if (data.ingredients) {
     data.ingredients.forEach((ingredient: RecipeIngredientInput, index: number) => {
-      if (!ingredient.product_id) {
-        errors.push(`Ingredient ${index + 1}: product ID is required`);
+      if (!ingredient.ingredient_id) {
+        errors.push(`Ingredient ${index + 1}: ingredient ID is required`);
       }
 
       if (!ingredient.quantity || ingredient.quantity <= 0) {
