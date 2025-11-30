@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Helmet } from 'react-helmet-async';
+import Head from 'next/head';
 import { useParams, useLocation } from 'react-router-dom';
 // @mui
 import { Container } from '@mui/material';
@@ -53,9 +53,9 @@ export default function ProductEntryPage() {
 
   return (
     <>
-      <Helmet>
+      <Head>
         <title>{!isEdit ? 'Create a new product' : 'Edit product'} | TMS</title>
-      </Helmet>
+      </Head>
 
       <Container maxWidth={false}>
         <CustomBreadcrumbs
