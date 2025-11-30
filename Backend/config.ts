@@ -1,7 +1,4 @@
-import dotenv from 'dotenv';
-
-// Load environment variables from .env file
-dotenv.config();
+// Next.js automatically loads .env files, no need for dotenv.config()
 
 // ----------------------------------------------------------------------
 // API Configuration
