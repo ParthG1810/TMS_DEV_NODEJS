@@ -30,9 +30,9 @@ export type PackageSize =
 // ----------------------------------------------------------------------
 
 /**
- * Product entity from database
+ * Ingredient entity from database
  */
-export interface Product {
+export interface Ingredient {
   id: number;
   name: string;
   description?: string;
@@ -45,7 +45,7 @@ export interface Product {
  */
 export interface Vendor {
   id: number;
-  product_id: number;
+  ingredient_id: number;
   vendor_name: string;
   price: number;
   weight: number;
@@ -72,7 +72,7 @@ export interface Recipe {
 export interface RecipeIngredient {
   id: number;
   recipe_id: number;
-  product_id: number;
+  ingredient_id: number;
   quantity: number;
   created_at: Date;
 }
@@ -94,7 +94,7 @@ export interface RecipeImage {
 // ----------------------------------------------------------------------
 
 /**
- * Vendor input for creating/updating products
+ * Vendor input for creating/updating ingredients
  */
 export interface VendorInput {
   id?: number; // Optional for updates
@@ -106,18 +106,18 @@ export interface VendorInput {
 }
 
 /**
- * Request body for creating a product
+ * Request body for creating an ingredient
  */
-export interface CreateProductRequest {
+export interface CreateIngredientRequest {
   name: string;
   description?: string;
   vendors: VendorInput[];
 }
 
 /**
- * Request body for updating a product
+ * Request body for updating an ingredient
  */
-export interface UpdateProductRequest {
+export interface UpdateIngredientRequest {
   name?: string;
   description?: string;
   vendors?: VendorInput[];
@@ -127,7 +127,7 @@ export interface UpdateProductRequest {
  * Recipe ingredient input for creating/updating recipes
  */
 export interface RecipeIngredientInput {
-  product_id: number;
+  ingredient_id: number;
   quantity: number;
 }
 
@@ -156,9 +156,9 @@ export interface UpdateRecipeRequest {
 // ----------------------------------------------------------------------
 
 /**
- * Product with vendors (joined data)
+ * Ingredient with vendors (joined data)
  */
-export interface ProductWithVendors extends Product {
+export interface IngredientWithVendors extends Ingredient {
   vendors: Vendor[];
 }
 
@@ -166,17 +166,17 @@ export interface ProductWithVendors extends Product {
  * Recipe with ingredients and images (joined data)
  */
 export interface RecipeWithDetails extends Recipe {
-  ingredients: RecipeIngredientWithProduct[];
+  ingredients: RecipeIngredientWithDetails[];
   images: RecipeImage[];
   total_cost?: number; // Calculated field
 }
 
 /**
- * Recipe ingredient with product details
+ * Recipe ingredient with ingredient details
  */
-export interface RecipeIngredientWithProduct extends RecipeIngredient {
-  product_name: string;
-  product_description?: string;
+export interface RecipeIngredientWithDetails extends RecipeIngredient {
+  ingredient_name: string;
+  ingredient_description?: string;
   unit_price?: number; // From default vendor
   total_price?: number; // quantity * unit_price
 }
