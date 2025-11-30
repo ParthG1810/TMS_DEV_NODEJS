@@ -95,11 +95,11 @@ export const PATH_DASHBOARD = {
     view: (title: string) => path(ROOTS_DASHBOARD, `/blog/post/${title}`),
     demoView: path(ROOTS_DASHBOARD, '/blog/post/apply-these-7-secret-techniques-to-improve-event'),
   },
-  product: {
-    root: path(ROOTS_DASHBOARD, '/product-management'),
-    list: path(ROOTS_DASHBOARD, '/product-management'),
-    new: path(ROOTS_DASHBOARD, '/product-entry'),
-    edit: (id: string) => path(ROOTS_DASHBOARD, `/product-entry?id=${id}`),
+  ingredient: {
+    root: path(ROOTS_DASHBOARD, '/ingredient-management'),
+    list: path(ROOTS_DASHBOARD, '/ingredient-management'),
+    new: path(ROOTS_DASHBOARD, '/ingredient-entry'),
+    edit: (id: string) => path(ROOTS_DASHBOARD, `/ingredient-entry?id=${id}`),
   },
   recipe: {
     root: path(ROOTS_DASHBOARD, '/recipe-management'),
