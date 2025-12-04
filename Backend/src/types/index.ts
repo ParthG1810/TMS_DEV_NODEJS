@@ -248,3 +248,161 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
+
+// ----------------------------------------------------------------------
+// TIFFIN MANAGEMENT SYSTEM TYPES
+// ----------------------------------------------------------------------
+
+/**
+ * Meal plan frequency enum
+ */
+export type MealFrequency = 'Daily' | 'Weekly' | 'Monthly';
+
+/**
+ * Days enum
+ */
+export type MealDays = 'Mon-Fri' | 'Mon-Sat' | 'Single';
+
+/**
+ * Day names for order selection
+ */
+export type DayName = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+
+/**
+ * Meal Plan entity from database
+ */
+export interface MealPlan {
+  id: number;
+  meal_name: string;
+  description?: string;
+  frequency: MealFrequency;
+  days: MealDays;
+  price: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Customer entity from database
+ */
+export interface Customer {
+  id: number;
+  name: string;
+  phone?: string;
+  address: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Customer Order entity from database
+ */
+export interface CustomerOrder {
+  id: number;
+  customer_id: number;
+  meal_plan_id: number;
+  quantity: number;
+  selected_days: DayName[];
+  price: number;
+  start_date: string; // YYYY-MM-DD format
+  end_date: string; // YYYY-MM-DD format
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Request body for creating a meal plan
+ */
+export interface CreateMealPlanRequest {
+  meal_name: string;
+  description?: string;
+  frequency: MealFrequency;
+  days?: MealDays;
+  price: number;
+}
+
+/**
+ * Request body for updating a meal plan
+ */
+export interface UpdateMealPlanRequest {
+  meal_name?: string;
+  description?: string;
+  frequency?: MealFrequency;
+  days?: MealDays;
+  price?: number;
+}
+
+/**
+ * Request body for creating a customer
+ */
+export interface CreateCustomerRequest {
+  name: string;
+  phone?: string;
+  address: string;
+}
+
+/**
+ * Request body for updating a customer
+ */
+export interface UpdateCustomerRequest {
+  name?: string;
+  phone?: string;
+  address?: string;
+}
+
+/**
+ * Request body for creating a customer order
+ */
+export interface CreateCustomerOrderRequest {
+  customer_id: number;
+  meal_plan_id: number;
+  quantity: number;
+  selected_days: DayName[];
+  price: number;
+  start_date: string; // YYYY-MM-DD format
+  end_date: string; // YYYY-MM-DD format
+}
+
+/**
+ * Request body for updating a customer order
+ */
+export interface UpdateCustomerOrderRequest {
+  customer_id?: number;
+  meal_plan_id?: number;
+  quantity?: number;
+  selected_days?: DayName[];
+  price?: number;
+  start_date?: string;
+  end_date?: string;
+}
+
+/**
+ * Customer order with customer and meal plan details (joined data)
+ */
+export interface CustomerOrderWithDetails extends CustomerOrder {
+  customer_name: string;
+  customer_phone?: string;
+  customer_address: string;
+  meal_plan_name: string;
+  meal_plan_description?: string;
+  meal_plan_frequency: MealFrequency;
+  meal_plan_days: MealDays;
+}
+
+/**
+ * Daily tiffin count item
+ */
+export interface DailyTiffinCount {
+  customer_name: string;
+  quantity: number;
+  meal_plan_name: string;
+}
+
+/**
+ * Daily tiffin summary
+ */
+export interface DailyTiffinSummary {
+  date: string; // YYYY-MM-DD format
+  orders: DailyTiffinCount[];
+  total_count: number;
+}
