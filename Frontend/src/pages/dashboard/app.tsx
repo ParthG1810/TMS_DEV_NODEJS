@@ -80,12 +80,14 @@ export default function GeneralAppPage() {
   }, [dispatch]);
 
   // Calculate statistics
-  const totalMealPlans = mealPlans.length;
-  const totalCustomers = customers.length;
-  const activeOrders = customerOrders.filter((order) => {
-    const endDate = new Date(order.end_date);
-    return endDate >= new Date();
-  }).length;
+  const totalMealPlans = mealPlans?.length || 0;
+  const totalCustomers = customers?.length || 0;
+  const activeOrders = customerOrders
+    ? customerOrders.filter((order) => {
+        const endDate = new Date(order.end_date);
+        return endDate >= new Date();
+      }).length
+    : 0;
   const todayTiffinCount = dailySummary?.total_count || 0;
 
   return (
