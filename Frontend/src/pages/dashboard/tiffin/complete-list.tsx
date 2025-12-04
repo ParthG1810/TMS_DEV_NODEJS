@@ -186,7 +186,7 @@ export default function CompleteTiffinListPage() {
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell align="right">₹{row.price.toFixed(2)}</TableCell>
+                        <TableCell align="right">₹{Number(row.price).toFixed(2)}</TableCell>
                         <TableCell>
                           {format(new Date(row.start_date), 'dd MMM yyyy')} -{' '}
                           {format(new Date(row.end_date), 'dd MMM yyyy')}
