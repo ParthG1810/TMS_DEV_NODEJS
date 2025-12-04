@@ -118,7 +118,7 @@ export default function MonthlyTiffinListPage() {
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell align="right">₹{order.price.toFixed(2)}</TableCell>
+                        <TableCell align="right">₹{Number(order.price).toFixed(2)}</TableCell>
                         <TableCell>
                           {format(new Date(order.start_date), 'dd MMM yyyy')} -{' '}
                           {format(new Date(order.end_date), 'dd MMM yyyy')}
