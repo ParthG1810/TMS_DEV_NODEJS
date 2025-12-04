@@ -1,12 +1,29 @@
 // next
 import Head from 'next/head';
+import { useEffect } from 'react';
 // @mui
 import { useTheme } from '@mui/material/styles';
-import { Container, Grid, Stack, Button } from '@mui/material';
+import {
+  Container,
+  Grid,
+  Stack,
+  Button,
+  Card,
+  CardActionArea,
+  CardContent,
+  Typography,
+  Box,
+  alpha,
+} from '@mui/material';
 // auth
 import { useAuthContext } from '../../auth/useAuthContext';
 // layouts
 import DashboardLayout from '../../layouts/dashboard';
+// redux
+import { useDispatch, useSelector } from '../../redux/store';
+import { getMealPlans } from '../../redux/slices/mealPlan';
+import { getCustomers } from '../../redux/slices/customer';
+import { getCustomerOrders, getDailyTiffinCount } from '../../redux/slices/customerOrder';
 // _mock_
 import {
   _appFeatured,
@@ -17,6 +34,7 @@ import {
 } from '../../_mock/arrays';
 // components
 import { useSettingsContext } from '../../components/settings';
+import Iconify from '../../components/iconify';
 // sections
 import {
   AppWidget,
@@ -32,6 +50,9 @@ import {
 } from '../../sections/@dashboard/general/app';
 // assets
 import { SeoIllustration } from '../../assets/illustrations';
+// routes
+import { PATH_DASHBOARD } from '../../routes/paths';
+import { useRouter } from 'next/router';
 
 // ----------------------------------------------------------------------
 
@@ -41,15 +62,36 @@ GeneralAppPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page}
 
 export default function GeneralAppPage() {
   const { user } = useAuthContext();
-
+  const dispatch = useDispatch();
+  const router = useRouter();
   const theme = useTheme();
-
   const { themeStretch } = useSettingsContext();
+
+  // Fetch tiffin management data
+  const { mealPlans } = useSelector((state) => state.mealPlan);
+  const { customers } = useSelector((state) => state.customer);
+  const { customerOrders, dailySummary } = useSelector((state) => state.customerOrder);
+
+  useEffect(() => {
+    dispatch(getMealPlans());
+    dispatch(getCustomers());
+    dispatch(getCustomerOrders());
+    dispatch(getDailyTiffinCount());
+  }, [dispatch]);
+
+  // Calculate statistics
+  const totalMealPlans = mealPlans.length;
+  const totalCustomers = customers.length;
+  const activeOrders = customerOrders.filter((order) => {
+    const endDate = new Date(order.end_date);
+    return endDate >= new Date();
+  }).length;
+  const todayTiffinCount = dailySummary?.total_count || 0;
 
   return (
     <>
       <Head>
-        <title> General: App | Minimal UI</title>
+        <title> Dashboard | TMS</title>
       </Head>
 
       <Container maxWidth={themeStretch ? false : 'xl'}>
@@ -57,7 +99,7 @@ export default function GeneralAppPage() {
           <Grid item xs={12} md={8}>
             <AppWelcome
               title={`Welcome back! \n ${user?.displayName}`}
-              description="If you are going to use a passage of Lorem Ipsum, you need to be sure there isn't anything."
+              description="Manage your tiffin service with ease. Track meal plans, customers, and daily operations."
               img={
                 <SeoIllustration
                   sx={{
@@ -67,19 +109,36 @@ export default function GeneralAppPage() {
                   }}
                 />
               }
-              action={<Button variant="contained">Go Now</Button>}
+              action={
+                <Button
+                  variant="contained"
+                  onClick={() => router.push(PATH_DASHBOARD.tiffin.orders)}
+                >
+                  Manage Tiffin Orders
+                </Button>
+              }
             />
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <AppFeatured list={_appFeatured} />
+            <Stack spacing={3}>
+              <AppWidget
+                title="Today's Tiffin Count"
+                total={todayTiffinCount}
+                icon="eva:shopping-bag-fill"
+                color="success"
+                chart={{
+                  series: 100,
+                }}
+              />
+            </Stack>
           </Grid>
 
           <Grid item xs={12} md={4}>
             <AppWidgetSummary
-              title="Total Active Users"
-              percent={2.6}
-              total={18765}
+              title="Total Meal Plans"
+              percent={0}
+              total={totalMealPlans}
               chart={{
                 colors: [theme.palette.primary.main],
                 series: [5, 18, 12, 51, 68, 11, 39, 37, 27, 20],
@@ -89,9 +148,9 @@ export default function GeneralAppPage() {
 
           <Grid item xs={12} md={4}>
             <AppWidgetSummary
-              title="Total Installed"
-              percent={0.2}
-              total={4876}
+              title="Total Customers"
+              percent={0}
+              total={totalCustomers}
               chart={{
                 colors: [theme.palette.info.main],
                 series: [20, 41, 63, 33, 28, 35, 50, 46, 11, 26],
@@ -101,9 +160,9 @@ export default function GeneralAppPage() {
 
           <Grid item xs={12} md={4}>
             <AppWidgetSummary
-              title="Total Downloads"
-              percent={-0.1}
-              total={678}
+              title="Active Orders"
+              percent={0}
+              total={activeOrders}
               chart={{
                 colors: [theme.palette.warning.main],
                 series: [8, 9, 31, 8, 16, 37, 8, 33, 46, 31],
@@ -111,50 +170,237 @@ export default function GeneralAppPage() {
             />
           </Grid>
 
-          <Grid item xs={12} md={6} lg={4}>
-            <AppCurrentDownload
-              title="Current Download"
-              chart={{
-                colors: [
-                  theme.palette.primary.main,
-                  theme.palette.info.main,
-                  theme.palette.error.main,
-                  theme.palette.warning.main,
-                ],
-                series: [
-                  { label: 'Mac', value: 12244 },
-                  { label: 'Window', value: 53345 },
-                  { label: 'iOS', value: 44313 },
-                  { label: 'Android', value: 78343 },
-                ],
-              }}
-            />
+          {/* Tiffin Management Quick Actions */}
+          <Grid item xs={12}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Tiffin Management
+            </Typography>
           </Grid>
 
-          <Grid item xs={12} md={6} lg={8}>
-            <AppAreaInstalled
-              title="Area Installed"
-              subheader="(+43%) than last year"
-              chart={{
-                categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
-                series: [
-                  {
-                    year: '2019',
-                    data: [
-                      { name: 'Asia', data: [10, 41, 35, 51, 49, 62, 69, 91, 148] },
-                      { name: 'America', data: [10, 34, 13, 56, 77, 88, 99, 77, 45] },
-                    ],
-                  },
-                  {
-                    year: '2020',
-                    data: [
-                      { name: 'Asia', data: [148, 91, 69, 62, 49, 51, 35, 41, 10] },
-                      { name: 'America', data: [45, 77, 99, 88, 77, 56, 13, 34, 10] },
-                    ],
-                  },
-                ],
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.16) },
               }}
-            />
+            >
+              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.mealPlans)}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 2,
+                        bgcolor: alpha(theme.palette.primary.main, 0.24),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Iconify icon="eva:menu-fill" width={32} color={theme.palette.primary.main} />
+                    </Box>
+                    <Box>
+                      <Typography variant="h4">{totalMealPlans}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Meal Plans
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.info.main, 0.08),
+                '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.16) },
+              }}
+            >
+              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.customers)}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 2,
+                        bgcolor: alpha(theme.palette.info.main, 0.24),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Iconify icon="eva:people-fill" width={32} color={theme.palette.info.main} />
+                    </Box>
+                    <Box>
+                      <Typography variant="h4">{totalCustomers}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Customers
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.success.main, 0.08),
+                '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.16) },
+              }}
+            >
+              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.orders)}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 2,
+                        bgcolor: alpha(theme.palette.success.main, 0.24),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Iconify
+                        icon="eva:shopping-cart-fill"
+                        width={32}
+                        color={theme.palette.success.main}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography variant="h4">{activeOrders}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Active Orders
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.warning.main, 0.08),
+                '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.16) },
+              }}
+            >
+              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.dailyCount)}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 2,
+                        bgcolor: alpha(theme.palette.warning.main, 0.24),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Iconify
+                        icon="eva:calendar-fill"
+                        width={32}
+                        color={theme.palette.warning.main}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography variant="h4">{todayTiffinCount}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Today's Count
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.16) },
+              }}
+            >
+              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.monthlyList)}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 2,
+                        bgcolor: alpha(theme.palette.secondary.main, 0.24),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Iconify
+                        icon="eva:list-fill"
+                        width={32}
+                        color={theme.palette.secondary.main}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle1">Monthly List</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        View this month
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.error.main, 0.08),
+                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.16) },
+              }}
+            >
+              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.completeList)}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 2,
+                        bgcolor: alpha(theme.palette.error.main, 0.24),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Iconify
+                        icon="eva:archive-fill"
+                        width={32}
+                        color={theme.palette.error.main}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle1">Complete List</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        All orders
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </CardActionArea>
+            </Card>
           </Grid>
 
           <Grid item xs={12} lg={8}>
