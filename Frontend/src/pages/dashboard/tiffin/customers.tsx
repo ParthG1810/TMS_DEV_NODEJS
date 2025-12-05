@@ -85,7 +85,7 @@ export default function CustomersPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (customers.length) {
+    if (customers && customers.length) {
       setTableData(customers);
     }
   }, [customers]);

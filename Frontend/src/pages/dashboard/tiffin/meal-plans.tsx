@@ -86,7 +86,7 @@ export default function MealPlansPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (mealPlans.length) {
+    if (mealPlans && mealPlans.length) {
       setTableData(mealPlans);
     }
   }, [mealPlans]);
