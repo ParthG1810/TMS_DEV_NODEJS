@@ -97,8 +97,10 @@ export default function MealPlanNewEditForm({ isEdit = false, currentMealPlan, o
       await onSubmit(data);
       enqueueSnackbar(!isEdit ? 'Create success!' : 'Update success!');
       push(PATH_DASHBOARD.tiffin.mealPlans);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMessage = error?.message || error?.error || 'Failed to save meal plan';
+      enqueueSnackbar(errorMessage, { variant: 'error' });
     }
   };
 
