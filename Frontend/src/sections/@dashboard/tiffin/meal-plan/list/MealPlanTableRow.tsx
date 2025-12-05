@@ -65,7 +65,7 @@ export default function MealPlanTableRow({
 
         <TableCell>{days}</TableCell>
 
-        <TableCell align="right">₹{price.toFixed(2)}</TableCell>
+        <TableCell align="right">₹{Number(price).toFixed(2)}</TableCell>
 
         <TableCell align="right">
           <IconButton color={openPopover ? 'inherit' : 'default'} onClick={handleOpenPopover}>

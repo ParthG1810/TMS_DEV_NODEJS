@@ -14,6 +14,7 @@ import {
   Stack,
   Chip,
   Box,
+  TextField,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 // routes
@@ -67,11 +68,7 @@ export default function MonthlyTiffinListPage() {
               value={selectedMonth}
               onChange={(newDate) => newDate && setSelectedMonth(newDate)}
               views={['year', 'month']}
-              slotProps={{
-                textField: {
-                  fullWidth: false,
-                },
-              }}
+              renderInput={(params) => <TextField {...params} />}
             />
           </Stack>
 
@@ -95,7 +92,7 @@ export default function MonthlyTiffinListPage() {
                   </TableHead>
 
                   <TableBody>
-                    {monthlyOrders.map((order, index) => (
+                    {monthlyOrders && monthlyOrders.map((order, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{order.meal_plan_name}</TableCell>
@@ -118,7 +115,7 @@ export default function MonthlyTiffinListPage() {
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell align="right">₹{order.price.toFixed(2)}</TableCell>
+                        <TableCell align="right">₹{Number(order.price).toFixed(2)}</TableCell>
                         <TableCell>
                           {format(new Date(order.start_date), 'dd MMM yyyy')} -{' '}
                           {format(new Date(order.end_date), 'dd MMM yyyy')}
@@ -126,7 +123,7 @@ export default function MonthlyTiffinListPage() {
                       </TableRow>
                     ))}
 
-                    {!monthlyOrders.length && (
+                    {(!monthlyOrders || !monthlyOrders.length) && (
                       <TableRow>
                         <TableCell colSpan={6} align="center">
                           No orders for this month
