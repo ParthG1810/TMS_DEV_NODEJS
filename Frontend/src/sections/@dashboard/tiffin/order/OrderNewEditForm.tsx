@@ -164,7 +164,7 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
               <RHFAutocomplete
                 name="customer_id"
                 label="Customer *"
-                options={customers || []}
+                options={customers?.map((c) => c.id) || []}
                 getOptionLabel={(option: any) => {
                   if (!customers) return '';
                   const customer = customers.find((c) => c.id === option);
@@ -175,7 +175,7 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
                   if (!customers) return null;
                   const customer = customers.find((c) => c.id === option);
                   return (
-                    <li {...props} key={option}>
+                    <li {...props} key={`customer-${option}`}>
                       <Box>
                         <Typography variant="body2">{customer?.name}</Typography>
                         <Typography variant="caption" color="text.secondary">
@@ -194,7 +194,7 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
               <RHFAutocomplete
                 name="meal_plan_id"
                 label="Meal Plan *"
-                options={mealPlans || []}
+                options={mealPlans?.map((p) => p.id) || []}
                 getOptionLabel={(option: any) => {
                   if (!mealPlans) return '';
                   const plan = mealPlans.find((p) => p.id === option);
@@ -205,7 +205,7 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
                   if (!mealPlans) return null;
                   const plan = mealPlans.find((p) => p.id === option);
                   return (
-                    <li {...props} key={option}>
+                    <li {...props} key={`meal-plan-${option}`}>
                       <Box>
                         <Typography variant="body2">{plan?.meal_name}</Typography>
                         <Typography variant="caption" color="text.secondary">
