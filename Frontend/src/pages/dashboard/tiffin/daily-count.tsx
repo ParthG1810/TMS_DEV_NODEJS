@@ -14,6 +14,7 @@ import {
   Typography,
   Box,
   Stack,
+  TextField,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 // routes
@@ -64,6 +65,7 @@ export default function DailyTiffinCountPage() {
               label="Select Date"
               value={selectedDate}
               onChange={(newDate) => newDate && setSelectedDate(newDate)}
+              renderInput={(params) => <TextField {...params} />}
             />
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
               Total Count: {dailySummary?.total_count || 0}
