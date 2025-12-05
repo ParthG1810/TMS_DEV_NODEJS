@@ -14,6 +14,7 @@ import {
   Stack,
   Chip,
   Box,
+  TextField,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 // routes
@@ -67,11 +68,7 @@ export default function MonthlyTiffinListPage() {
               value={selectedMonth}
               onChange={(newDate) => newDate && setSelectedMonth(newDate)}
               views={['year', 'month']}
-              slotProps={{
-                textField: {
-                  fullWidth: false,
-                },
-              }}
+              renderInput={(params) => <TextField {...params} />}
             />
           </Stack>
 

@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 // @mui
 import { LoadingButton } from '@mui/lab';
-import { Box, Card, Grid, Stack, Typography, Chip } from '@mui/material';
+import { Box, Card, Grid, Stack, Typography, Chip, TextField } from '@mui/material';
 // routes
 import { PATH_DASHBOARD } from '../../../../routes/paths';
 // redux
@@ -229,13 +229,9 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
                     onChange={(newValue) => {
                       field.onChange(newValue);
                     }}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        error: !!error,
-                        helperText: error?.message,
-                      },
-                    }}
+                    renderInput={(params) => (
+                      <TextField {...params} fullWidth error={!!error} helperText={error?.message} />
+                    )}
                   />
                 )}
               />
@@ -250,13 +246,9 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
                     onChange={(newValue) => {
                       field.onChange(newValue);
                     }}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        error: !!error,
-                        helperText: error?.message,
-                      },
-                    }}
+                    renderInput={(params) => (
+                      <TextField {...params} fullWidth error={!!error} helperText={error?.message} />
+                    )}
                   />
                 )}
               />

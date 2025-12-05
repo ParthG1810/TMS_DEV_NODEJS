@@ -88,7 +88,7 @@ export default function OrdersPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (customerOrders.length) {
+    if (customerOrders && customerOrders.length) {
       setTableData(customerOrders);
     }
   }, [customerOrders]);
