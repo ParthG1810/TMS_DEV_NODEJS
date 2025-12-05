@@ -22,7 +22,10 @@ export default function CustomerNewPage() {
   const dispatch = useDispatch();
 
   const handleSubmit = async (data: ICustomerFormValues) => {
-    await dispatch(createCustomer(data));
+    const result: any = await dispatch(createCustomer(data));
+    if (result && !result.success) {
+      throw new Error(result.error);
+    }
   };
 
   return (

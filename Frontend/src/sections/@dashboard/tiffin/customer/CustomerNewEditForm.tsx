@@ -67,8 +67,10 @@ export default function CustomerNewEditForm({ isEdit = false, currentCustomer, o
       await onSubmit(data);
       enqueueSnackbar(!isEdit ? 'Create success!' : 'Update success!');
       push(PATH_DASHBOARD.tiffin.customers);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMessage = error?.message || error?.error || 'Failed to save customer';
+      enqueueSnackbar(errorMessage, { variant: 'error' });
     }
   };
 

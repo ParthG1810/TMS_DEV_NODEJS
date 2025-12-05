@@ -37,7 +37,10 @@ export default function OrderEditPage() {
 
   const handleSubmit = async (data: ICustomerOrderFormValues) => {
     if (id) {
-      await dispatch(updateCustomerOrder(Number(id), data));
+      const result: any = await dispatch(updateCustomerOrder(Number(id), data));
+      if (result && !result.success) {
+        throw new Error(result.error);
+      }
     }
   };
 
