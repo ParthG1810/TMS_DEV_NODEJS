@@ -22,7 +22,10 @@ export default function MealPlanNewPage() {
   const dispatch = useDispatch();
 
   const handleSubmit = async (data: IMealPlanFormValues) => {
-    await dispatch(createMealPlan(data));
+    const result: any = await dispatch(createMealPlan(data));
+    if (result && !result.success) {
+      throw new Error(result.error);
+    }
   };
 
   return (

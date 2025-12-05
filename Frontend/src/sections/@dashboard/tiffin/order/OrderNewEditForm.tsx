@@ -139,8 +139,10 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
       await onSubmit(data);
       enqueueSnackbar(!isEdit ? 'Create success!' : 'Update success!');
       push(PATH_DASHBOARD.tiffin.orders);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMessage = error?.message || error?.error || 'Failed to save order';
+      enqueueSnackbar(errorMessage, { variant: 'error' });
     }
   };
 

@@ -22,7 +22,10 @@ export default function OrderNewPage() {
   const dispatch = useDispatch();
 
   const handleSubmit = async (data: ICustomerOrderFormValues) => {
-    await dispatch(createCustomerOrder(data));
+    const result: any = await dispatch(createCustomerOrder(data));
+    if (result && !result.success) {
+      throw new Error(result.error);
+    }
   };
 
   return (
