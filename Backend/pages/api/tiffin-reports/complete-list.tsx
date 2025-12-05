@@ -107,9 +107,9 @@ async function handleGetCompleteTiffinList(
       INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
       ${searchCondition}
       ORDER BY ${finalSortBy === 'customer_name' ? 'c.name' : finalSortBy === 'meal_plan_name' ? 'mp.meal_name' : 'co.' + finalSortBy} ${finalSortOrder}
-      LIMIT ? OFFSET ?
+      LIMIT ${limitNum} OFFSET ${offset}
       `,
-      [...params, limitNum, offset]
+      params
     )) as any[];
 
     // Parse JSON selected_days
