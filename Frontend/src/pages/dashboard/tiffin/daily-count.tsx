@@ -89,7 +89,7 @@ export default function DailyTiffinCountPage() {
                   </TableHead>
 
                   <TableBody>
-                    {dailySummary?.orders.map((order, index) => (
+                    {dailySummary?.orders && dailySummary.orders.map((order, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell align="center">
@@ -99,7 +99,7 @@ export default function DailyTiffinCountPage() {
                       </TableRow>
                     ))}
 
-                    {!dailySummary?.orders.length && (
+                    {(!dailySummary?.orders || !dailySummary.orders.length) && (
                       <TableRow>
                         <TableCell colSpan={3} align="center">
                           <Typography variant="body2" color="text.secondary">
