@@ -89,7 +89,7 @@ export default function CompleteTiffinListPage() {
   }, [dispatch, filterName, page, rowsPerPage, orderBy, order]);
 
   useEffect(() => {
-    if (completeOrders.length) {
+    if (completeOrders && completeOrders.length) {
       setTableData(completeOrders);
     }
   }, [completeOrders]);
@@ -186,7 +186,7 @@ export default function CompleteTiffinListPage() {
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell align="right">₹{row.price.toFixed(2)}</TableCell>
+                        <TableCell align="right">₹{Number(row.price).toFixed(2)}</TableCell>
                         <TableCell>
                           {format(new Date(row.start_date), 'dd MMM yyyy')} -{' '}
                           {format(new Date(row.end_date), 'dd MMM yyyy')}

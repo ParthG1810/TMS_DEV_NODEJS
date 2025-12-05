@@ -91,7 +91,7 @@ export default function OrderTableRow({
           </Box>
         </TableCell>
 
-        <TableCell align="right">₹{price.toFixed(2)}</TableCell>
+        <TableCell align="right">₹{Number(price).toFixed(2)}</TableCell>
 
         <TableCell>
           {format(new Date(start_date), 'dd MMM yyyy')} - {format(new Date(end_date), 'dd MMM yyyy')}
