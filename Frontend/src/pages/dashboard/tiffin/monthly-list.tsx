@@ -92,7 +92,7 @@ export default function MonthlyTiffinListPage() {
                   </TableHead>
 
                   <TableBody>
-                    {monthlyOrders.map((order, index) => (
+                    {monthlyOrders && monthlyOrders.map((order, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{order.meal_plan_name}</TableCell>
@@ -123,7 +123,7 @@ export default function MonthlyTiffinListPage() {
                       </TableRow>
                     ))}
 
-                    {!monthlyOrders.length && (
+                    {(!monthlyOrders || !monthlyOrders.length) && (
                       <TableRow>
                         <TableCell colSpan={6} align="center">
                           No orders for this month

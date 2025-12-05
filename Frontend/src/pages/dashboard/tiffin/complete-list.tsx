@@ -89,7 +89,7 @@ export default function CompleteTiffinListPage() {
   }, [dispatch, filterName, page, rowsPerPage, orderBy, order]);
 
   useEffect(() => {
-    if (completeOrders.length) {
+    if (completeOrders && completeOrders.length) {
       setTableData(completeOrders);
     }
   }, [completeOrders]);
