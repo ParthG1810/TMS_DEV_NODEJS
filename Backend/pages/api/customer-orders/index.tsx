@@ -84,9 +84,9 @@ async function handleGetCustomerOrders(
       INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
       ${whereClause}
       ORDER BY co.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${limitNum} OFFSET ${offset}
       `,
-      [...params, limitNum, offset]
+      params
     )) as any[];
 
     // Parse JSON selected_days
