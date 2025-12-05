@@ -110,6 +110,8 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
 
   // Business Logic: When meal plan changes, update price and selected_days
   useEffect(() => {
+    if (!mealPlans || !mealPlans.length) return;
+
     const selectedPlan = mealPlans.find((p) => p.id === values.meal_plan_id);
     if (selectedPlan && !isEdit) {
       setValue('price', selectedPlan.price);
@@ -142,8 +144,8 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
     }
   };
 
-  const selectedCustomer = customers.find((c) => c.id === values.customer_id);
-  const selectedMealPlan = mealPlans.find((m) => m.id === values.meal_plan_id);
+  const selectedCustomer = customers && customers.find((c) => c.id === values.customer_id);
+  const selectedMealPlan = mealPlans && mealPlans.find((m) => m.id === values.meal_plan_id);
 
   return (
     <FormProvider methods={methods} onSubmit={handleSubmit(handleFormSubmit)}>
@@ -162,13 +164,15 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
               <RHFAutocomplete
                 name="customer_id"
                 label="Customer *"
-                options={customers}
+                options={customers || []}
                 getOptionLabel={(option: any) => {
+                  if (!customers) return '';
                   const customer = customers.find((c) => c.id === option);
                   return customer ? customer.name : '';
                 }}
                 isOptionEqualToValue={(option: any, value: any) => option === value}
                 renderOption={(props, option: any) => {
+                  if (!customers) return null;
                   const customer = customers.find((c) => c.id === option);
                   return (
                     <li {...props} key={option}>
@@ -190,13 +194,15 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
               <RHFAutocomplete
                 name="meal_plan_id"
                 label="Meal Plan *"
-                options={mealPlans}
+                options={mealPlans || []}
                 getOptionLabel={(option: any) => {
+                  if (!mealPlans) return '';
                   const plan = mealPlans.find((p) => p.id === option);
                   return plan ? plan.meal_name : '';
                 }}
                 isOptionEqualToValue={(option: any, value: any) => option === value}
                 renderOption={(props, option: any) => {
+                  if (!mealPlans) return null;
                   const plan = mealPlans.find((p) => p.id === option);
                   return (
                     <li {...props} key={option}>
