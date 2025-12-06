@@ -109,7 +109,7 @@ export function createMealPlan(mealPlanData: IMealPlanFormValues) {
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || 'Failed to create meal plan' };
+      return { success: false, error: error.response?.data?.error || error.message || 'Failed to create meal plan' };
     }
   };
 }
@@ -126,7 +126,7 @@ export function updateMealPlan(id: number, mealPlanData: Partial<IMealPlanFormVa
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || 'Failed to update meal plan' };
+      return { success: false, error: error.response?.data?.error || error.message || 'Failed to update meal plan' };
     }
   };
 }
@@ -143,7 +143,7 @@ export function deleteMealPlan(id: number) {
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || 'Failed to delete meal plan' };
+      return { success: false, error: error.response?.data?.error || error.message || 'Failed to delete meal plan' };
     }
   };
 }
