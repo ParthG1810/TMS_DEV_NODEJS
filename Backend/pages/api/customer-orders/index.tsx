@@ -140,7 +140,7 @@ async function handleCreateCustomerOrder(
   res: NextApiResponse<ApiResponse>
 ) {
   try {
-    const {
+    let {
       customer_id,
       meal_plan_id,
       quantity,
@@ -149,6 +149,11 @@ async function handleCreateCustomerOrder(
       start_date,
       end_date,
     } = req.body as CreateCustomerOrderRequest;
+
+    // Handle selected_days if it comes as a comma-separated string
+    if (typeof selected_days === 'string') {
+      selected_days = selected_days.split(',').map((day: string) => day.trim());
+    }
 
     // Validation
     const errors = await validateCustomerOrderInput({
