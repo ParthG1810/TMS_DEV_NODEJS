@@ -112,7 +112,7 @@ async function handleUpdateCustomerOrder(
   id: number
 ) {
   try {
-    const {
+    let {
       customer_id,
       meal_plan_id,
       quantity,
@@ -121,6 +121,11 @@ async function handleUpdateCustomerOrder(
       start_date,
       end_date,
     } = req.body as UpdateCustomerOrderRequest;
+
+    // Handle selected_days if it comes as a comma-separated string
+    if (selected_days && typeof selected_days === 'string') {
+      selected_days = selected_days.split(',').map((day: string) => day.trim()) as any;
+    }
 
     // Check if order exists
     const existingOrders = (await query('SELECT * FROM customer_orders WHERE id = ?', [
