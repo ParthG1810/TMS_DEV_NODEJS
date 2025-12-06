@@ -112,11 +112,24 @@ async function handleGetCompleteTiffinList(
       params
     )) as any[];
 
-    // Parse JSON selected_days
-    const ordersWithParsedDays = orders.map((order) => ({
-      ...order,
-      selected_days: JSON.parse(order.selected_days),
-    })) as CustomerOrderWithDetails[];
+    // Parse JSON selected_days with defensive handling
+    const ordersWithParsedDays = orders.map((order) => {
+      let parsedDays: string[];
+      try {
+        parsedDays = JSON.parse(order.selected_days);
+      } catch (error) {
+        // If parse fails, try to handle as comma-separated string
+        if (typeof order.selected_days === 'string') {
+          parsedDays = order.selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
+        } else {
+          parsedDays = [];
+        }
+      }
+      return {
+        ...order,
+        selected_days: parsedDays,
+      };
+    }) as CustomerOrderWithDetails[];
 
     // Get total count for pagination
     const countResult = (await query(
