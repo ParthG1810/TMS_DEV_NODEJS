@@ -171,10 +171,14 @@ async function handleCreateCustomerOrder(
     // Convert selected_days to JSON string
     const selectedDaysJson = JSON.stringify(selected_days);
 
+    // Format dates to MySQL DATE format (YYYY-MM-DD)
+    const formattedStartDate = new Date(start_date).toISOString().split('T')[0];
+    const formattedEndDate = new Date(end_date).toISOString().split('T')[0];
+
     // Insert customer order
     const result = (await query(
       'INSERT INTO customer_orders (customer_id, meal_plan_id, quantity, selected_days, price, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [customer_id, meal_plan_id, quantity, selectedDaysJson, price, start_date, end_date]
+      [customer_id, meal_plan_id, quantity, selectedDaysJson, price, formattedStartDate, formattedEndDate]
     )) as any;
 
     const orderId = result.insertId;
