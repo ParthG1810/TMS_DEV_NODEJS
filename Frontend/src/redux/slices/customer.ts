@@ -109,7 +109,7 @@ export function createCustomer(customerData: ICustomerFormValues) {
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || error.message || 'Failed to create customer' };
+      return { success: false, error: error.error || error.message || 'Failed to create customer' };
     }
   };
 }
@@ -126,7 +126,7 @@ export function updateCustomer(id: number, customerData: Partial<ICustomerFormVa
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || error.message || 'Failed to update customer' };
+      return { success: false, error: error.error || error.message || 'Failed to update customer' };
     }
   };
 }
@@ -143,7 +143,7 @@ export function deleteCustomer(id: number) {
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || error.message || 'Failed to delete customer' };
+      return { success: false, error: error.error || error.message || 'Failed to delete customer' };
     }
   };
 }
