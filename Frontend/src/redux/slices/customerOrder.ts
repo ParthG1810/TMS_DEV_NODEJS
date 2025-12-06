@@ -135,7 +135,9 @@ export function createCustomerOrder(orderData: ICustomerOrderFormValues) {
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || error.message || 'Failed to create order' };
+      // Axios interceptor returns error.response.data, so error.error is the message
+      const errorMessage = error.error || error.message || 'Failed to create order';
+      return { success: false, error: errorMessage };
     }
   };
 }
@@ -166,7 +168,9 @@ export function updateCustomerOrder(id: number, orderData: Partial<ICustomerOrde
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || error.message || 'Failed to update order' };
+      // Axios interceptor returns error.response.data, so error.error is the message
+      const errorMessage = error.error || error.message || 'Failed to update order';
+      return { success: false, error: errorMessage };
     }
   };
 }
@@ -183,7 +187,9 @@ export function deleteCustomerOrder(id: number) {
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || error.message || 'Failed to delete order' };
+      // Axios interceptor returns error.response.data, so error.error is the message
+      const errorMessage = error.error || error.message || 'Failed to delete order';
+      return { success: false, error: errorMessage };
     }
   };
 }
