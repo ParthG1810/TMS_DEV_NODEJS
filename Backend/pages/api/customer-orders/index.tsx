@@ -148,11 +148,23 @@ async function handleCreateCustomerOrder(
       price,
       start_date,
       end_date,
-    } = req.body as CreateCustomerOrderRequest;
+    } = req.body as any; // Use any to allow flexible type handling
 
-    // Handle selected_days if it comes as a comma-separated string
-    if (typeof selected_days === 'string') {
-      selected_days = selected_days.split(',').map((day: string) => day.trim());
+    // Robust handling of selected_days - ensure it's always an array
+    let daysArray: string[] = [];
+
+    if (Array.isArray(selected_days)) {
+      // Already an array - use as is
+      daysArray = selected_days;
+    } else if (typeof selected_days === 'string') {
+      // String format - could be comma-separated or JSON string
+      try {
+        // Try parsing as JSON first
+        daysArray = JSON.parse(selected_days);
+      } catch {
+        // If JSON parse fails, treat as comma-separated string
+        daysArray = selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
+      }
     }
 
     // Validation
@@ -160,7 +172,7 @@ async function handleCreateCustomerOrder(
       customer_id,
       meal_plan_id,
       quantity,
-      selected_days,
+      selected_days: daysArray,
       price,
       start_date,
       end_date,
@@ -173,8 +185,8 @@ async function handleCreateCustomerOrder(
       });
     }
 
-    // Convert selected_days to JSON string
-    const selectedDaysJson = JSON.stringify(selected_days);
+    // Convert selected_days to JSON string for database storage
+    const selectedDaysJson = JSON.stringify(daysArray);
 
     // Format dates to MySQL DATE format (YYYY-MM-DD)
     const formattedStartDate = new Date(start_date).toISOString().split('T')[0];
