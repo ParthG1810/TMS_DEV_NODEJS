@@ -216,7 +216,7 @@ async function handleUpdateCustomerOrder(
         });
       }
       updates.push('start_date = ?');
-      values.push(start_date);
+      values.push(startDate.toISOString().split('T')[0]);
     }
 
     if (end_date !== undefined) {
@@ -228,7 +228,7 @@ async function handleUpdateCustomerOrder(
         });
       }
       updates.push('end_date = ?');
-      values.push(end_date);
+      values.push(endDate.toISOString().split('T')[0]);
     }
 
     // Validate date range if both are provided
