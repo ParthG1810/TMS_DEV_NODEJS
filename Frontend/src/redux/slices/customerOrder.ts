@@ -117,13 +117,25 @@ export function createCustomerOrder(orderData: ICustomerOrderFormValues) {
   return async (dispatch: Dispatch) => {
     dispatch(slice.actions.startLoading());
     try {
-      const response = await axios.post('/api/customer-orders', orderData);
+      // Ensure selected_days is an array
+      const payload = {
+        ...orderData,
+        selected_days: Array.isArray(orderData.selected_days)
+          ? orderData.selected_days
+          : [],
+      };
+
+      const response = await axios.post('/api/customer-orders', payload, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       dispatch(slice.actions.createOrderSuccess(response.data.data));
       return { success: true, data: response.data.data };
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || 'Failed to create order' };
+      return { success: false, error: error.response?.data?.error || error.message || 'Failed to create order' };
     }
   };
 }
@@ -134,13 +146,27 @@ export function updateCustomerOrder(id: number, orderData: Partial<ICustomerOrde
   return async (dispatch: Dispatch) => {
     dispatch(slice.actions.startLoading());
     try {
-      const response = await axios.put(`/api/customer-orders/${id}`, orderData);
+      // Ensure selected_days is an array if provided
+      const payload = {
+        ...orderData,
+        ...(orderData.selected_days && {
+          selected_days: Array.isArray(orderData.selected_days)
+            ? orderData.selected_days
+            : [],
+        }),
+      };
+
+      const response = await axios.put(`/api/customer-orders/${id}`, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       dispatch(slice.actions.updateOrderSuccess(response.data.data));
       return { success: true, data: response.data.data };
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || 'Failed to update order' };
+      return { success: false, error: error.response?.data?.error || error.message || 'Failed to update order' };
     }
   };
 }
@@ -157,7 +183,7 @@ export function deleteCustomerOrder(id: number) {
     } catch (error: any) {
       console.error(error);
       dispatch(slice.actions.hasError(error));
-      return { success: false, error: error.response?.data?.error || 'Failed to delete order' };
+      return { success: false, error: error.response?.data?.error || error.message || 'Failed to delete order' };
     }
   };
 }
