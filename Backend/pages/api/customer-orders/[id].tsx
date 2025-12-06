@@ -120,11 +120,28 @@ async function handleUpdateCustomerOrder(
       price,
       start_date,
       end_date,
-    } = req.body as UpdateCustomerOrderRequest;
+    } = req.body as any; // Use any to allow flexible type handling
 
-    // Handle selected_days if it comes as a comma-separated string
-    if (selected_days && typeof selected_days === 'string') {
-      selected_days = selected_days.split(',').map((day: string) => day.trim()) as any;
+    // Robust handling of selected_days - ensure it's always an array if provided
+    if (selected_days !== undefined) {
+      let daysArray: string[] = [];
+
+      if (Array.isArray(selected_days)) {
+        // Already an array - use as is
+        daysArray = selected_days;
+      } else if (typeof selected_days === 'string') {
+        // String format - could be comma-separated or JSON string
+        try {
+          // Try parsing as JSON first
+          daysArray = JSON.parse(selected_days);
+        } catch {
+          // If JSON parse fails, treat as comma-separated string
+          daysArray = selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
+        }
+      }
+
+      // Replace selected_days with the parsed array
+      selected_days = daysArray as any;
     }
 
     // Check if order exists
