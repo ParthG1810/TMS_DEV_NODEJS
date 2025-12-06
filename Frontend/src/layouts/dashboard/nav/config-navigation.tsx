@@ -136,6 +136,21 @@ const navConfig = [
           { title: 'create', path: PATH_DASHBOARD.recipe.new },
         ],
       },
+
+      // TIFFIN MANAGEMENT
+      {
+        title: 'Tiffin Management',
+        path: PATH_DASHBOARD.tiffin.root,
+        icon: ICONS.menuItem,
+        children: [
+          { title: 'Meal Plans', path: PATH_DASHBOARD.tiffin.mealPlans },
+          { title: 'Customers', path: PATH_DASHBOARD.tiffin.customers },
+          { title: 'Tiffin Orders', path: PATH_DASHBOARD.tiffin.orders },
+          { title: 'Daily Count', path: PATH_DASHBOARD.tiffin.dailyCount },
+          { title: 'Monthly List', path: PATH_DASHBOARD.tiffin.monthlyList },
+          { title: 'Complete List', path: PATH_DASHBOARD.tiffin.completeList },
+        ],
+      },
     ],
   },
 
