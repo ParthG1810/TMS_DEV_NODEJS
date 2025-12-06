@@ -83,10 +83,22 @@ async function handleGetCustomerOrder(
       });
     }
 
-    // Parse JSON selected_days
+    // Parse JSON selected_days with defensive handling
+    let parsedDays: string[];
+    try {
+      parsedDays = JSON.parse(orders[0].selected_days);
+    } catch (error) {
+      // If parse fails, try to handle as comma-separated string
+      if (typeof orders[0].selected_days === 'string') {
+        parsedDays = orders[0].selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
+      } else {
+        parsedDays = [];
+      }
+    }
+
     const orderWithParsedDays = {
       ...orders[0],
-      selected_days: JSON.parse(orders[0].selected_days),
+      selected_days: parsedDays,
     } as CustomerOrderWithDetails;
 
     return res.status(200).json({
@@ -299,10 +311,22 @@ async function handleUpdateCustomerOrder(
       [id]
     )) as any[];
 
-    // Parse JSON selected_days
+    // Parse JSON selected_days with defensive handling
+    let parsedUpdatedDays: string[];
+    try {
+      parsedUpdatedDays = JSON.parse(updatedOrders[0].selected_days);
+    } catch (error) {
+      // If parse fails, try to handle as comma-separated string
+      if (typeof updatedOrders[0].selected_days === 'string') {
+        parsedUpdatedDays = updatedOrders[0].selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
+      } else {
+        parsedUpdatedDays = [];
+      }
+    }
+
     const orderWithParsedDays = {
       ...updatedOrders[0],
-      selected_days: JSON.parse(updatedOrders[0].selected_days),
+      selected_days: parsedUpdatedDays,
     } as CustomerOrderWithDetails;
 
     return res.status(200).json({
