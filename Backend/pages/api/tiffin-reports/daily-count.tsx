@@ -82,10 +82,20 @@ async function handleGetDailyTiffinCount(
       [targetDate, targetDate]
     )) as any[];
 
-    // Filter orders that include the current day
+    // Filter orders that include the current day with defensive parsing
     const filteredOrders: DailyTiffinCount[] = orders
       .filter((order) => {
-        const selectedDays = JSON.parse(order.selected_days);
+        let selectedDays: string[];
+        try {
+          selectedDays = JSON.parse(order.selected_days);
+        } catch (error) {
+          // If parse fails, try to handle as comma-separated string
+          if (typeof order.selected_days === 'string') {
+            selectedDays = order.selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
+          } else {
+            selectedDays = [];
+          }
+        }
         // If selected_days is empty array, it means all days are included (for Daily frequency)
         return selectedDays.length === 0 || selectedDays.includes(currentDayName);
       })
