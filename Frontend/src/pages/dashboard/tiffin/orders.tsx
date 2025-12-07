@@ -158,6 +158,13 @@ export default function OrdersPage() {
     push(PATH_DASHBOARD.tiffin.orderEdit(String(id)));
   };
 
+  const handleCalculateBilling = (customerId: number) => {
+    // Get current month in YYYY-MM format
+    const today = new Date();
+    const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    push(`/dashboard/tiffin/billing-calendar?customer_id=${customerId}&month=${currentMonth}`);
+  };
+
   const handleResetFilter = () => {
     setFilterName('');
   };
@@ -243,6 +250,7 @@ export default function OrdersPage() {
                         onSelectRow={() => onSelectRow(String(row.id))}
                         onDeleteRow={() => handleDeleteRow(row.id)}
                         onEditRow={() => handleEditRow(row.id)}
+                        onCalculateBilling={() => handleCalculateBilling(row.customer_id)}
                       />
                     ))}
 
