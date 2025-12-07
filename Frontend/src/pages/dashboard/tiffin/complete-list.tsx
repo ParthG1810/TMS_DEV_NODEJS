@@ -71,7 +71,7 @@ export default function CompleteTiffinListPage() {
 
   const dispatch = useDispatch();
 
-  const { completeOrders, isLoading } = useSelector((state) => state.customerOrder);
+  const { orders, isLoading } = useSelector((state) => state.customerOrder);
 
   const [tableData, setTableData] = useState<ICustomerOrder[]>([]);
   const [filterName, setFilterName] = useState('');
@@ -89,10 +89,10 @@ export default function CompleteTiffinListPage() {
   }, [dispatch, filterName, page, rowsPerPage, orderBy, order]);
 
   useEffect(() => {
-    if (completeOrders && completeOrders.length) {
-      setTableData(completeOrders);
+    if (orders && orders.length) {
+      setTableData(orders);
     }
-  }, [completeOrders]);
+  }, [orders]);
 
   const dataFiltered = applyFilter({
     inputData: tableData,
