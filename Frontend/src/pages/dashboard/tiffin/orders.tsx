@@ -77,7 +77,7 @@ export default function OrdersPage() {
   const dispatch = useDispatch();
   const { enqueueSnackbar } = useSnackbar();
 
-  const { customerOrders, isLoading } = useSelector((state) => state.customerOrder);
+  const { orders, isLoading } = useSelector((state) => state.customerOrder);
 
   const [tableData, setTableData] = useState<ICustomerOrder[]>([]);
   const [filterName, setFilterName] = useState('');
@@ -88,10 +88,10 @@ export default function OrdersPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (customerOrders && customerOrders.length) {
-      setTableData(customerOrders);
+    if (orders && orders.length) {
+      setTableData(orders);
     }
-  }, [customerOrders]);
+  }, [orders]);
 
   const dataFiltered = applyFilter({
     inputData: tableData,
