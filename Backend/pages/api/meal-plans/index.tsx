@@ -81,6 +81,19 @@ async function handleCreateMealPlan(
       });
     }
 
+    // Check for duplicate meal plan name
+    const duplicateCheck = (await query(
+      'SELECT id FROM meal_plans WHERE meal_name = ? LIMIT 1',
+      [meal_name]
+    )) as any[];
+
+    if (duplicateCheck.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Duplicate meal plan: A meal plan with this name already exists',
+      });
+    }
+
     // Business rule: If frequency is 'Daily', set days to 'Single'
     let finalDays = days || 'Single';
     if (frequency === 'Daily') {
