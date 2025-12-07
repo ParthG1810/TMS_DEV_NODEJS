@@ -92,16 +92,21 @@ async function handleGetCustomerOrders(
     // Parse JSON selected_days with defensive handling
     const ordersWithParsedDays = orders.map((order) => {
       let parsedDays: string[];
-      try {
-        parsedDays = JSON.parse(order.selected_days);
-      } catch (error) {
-        // If parse fails, try to handle as comma-separated string
-        if (typeof order.selected_days === 'string') {
+
+      // Check if it's already an array (MySQL driver may auto-parse JSON columns)
+      if (Array.isArray(order.selected_days)) {
+        parsedDays = order.selected_days;
+      } else if (typeof order.selected_days === 'string') {
+        try {
+          parsedDays = JSON.parse(order.selected_days);
+        } catch (error) {
+          // If parse fails, try to handle as comma-separated string
           parsedDays = order.selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
-        } else {
-          parsedDays = [];
         }
+      } else {
+        parsedDays = [];
       }
+
       return {
         ...order,
         selected_days: parsedDays,
@@ -244,19 +249,25 @@ async function handleCreateCustomerOrder(
     console.log('[v2] Retrieved from database:', typeof createdOrders[0].selected_days, createdOrders[0].selected_days);
 
     let parsedDays: string[];
-    try {
-      parsedDays = JSON.parse(createdOrders[0].selected_days);
-      console.log('[v2] Successfully parsed selected_days:', parsedDays);
-    } catch (error) {
-      console.error('[v2] Error parsing selected_days from database:', error);
-      // If parse fails, try to handle as comma-separated string
-      if (typeof createdOrders[0].selected_days === 'string') {
+
+    // Check if it's already an array (MySQL driver may auto-parse JSON columns)
+    if (Array.isArray(createdOrders[0].selected_days)) {
+      parsedDays = createdOrders[0].selected_days;
+      console.log('[v2] selected_days already an array:', parsedDays);
+    } else if (typeof createdOrders[0].selected_days === 'string') {
+      // It's a string - try parsing
+      try {
+        parsedDays = JSON.parse(createdOrders[0].selected_days);
+        console.log('[v2] Successfully parsed selected_days from JSON string:', parsedDays);
+      } catch (error) {
+        console.error('[v2] JSON.parse failed, trying comma-separated parsing');
+        // If parse fails, try to handle as comma-separated string
         parsedDays = createdOrders[0].selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
-        console.log('[v2] Fallback: parsed as comma-separated string:', parsedDays);
-      } else {
-        parsedDays = [];
-        console.error('[v2] Could not parse selected_days, using empty array');
+        console.log('[v2] Parsed as comma-separated string:', parsedDays);
       }
+    } else {
+      parsedDays = [];
+      console.error('[v2] Unexpected type for selected_days:', typeof createdOrders[0].selected_days);
     }
 
     const orderWithParsedDays = {
