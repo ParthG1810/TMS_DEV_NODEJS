@@ -83,16 +83,21 @@ async function handleGetMonthlyTiffinList(
     // Parse JSON selected_days with defensive handling
     const ordersWithParsedDays = orders.map((order) => {
       let parsedDays: string[];
-      try {
-        parsedDays = JSON.parse(order.selected_days);
-      } catch (error) {
-        // If parse fails, try to handle as comma-separated string
-        if (typeof order.selected_days === 'string') {
+
+      // Check if it's already an array (MySQL driver may auto-parse JSON columns)
+      if (Array.isArray(order.selected_days)) {
+        parsedDays = order.selected_days;
+      } else if (typeof order.selected_days === 'string') {
+        try {
+          parsedDays = JSON.parse(order.selected_days);
+        } catch (error) {
+          // If parse fails, try to handle as comma-separated string
           parsedDays = order.selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
-        } else {
-          parsedDays = [];
         }
+      } else {
+        parsedDays = [];
       }
+
       return {
         ...order,
         selected_days: parsedDays,
