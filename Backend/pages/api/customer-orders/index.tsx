@@ -209,13 +209,31 @@ async function handleCreateCustomerOrder(
       });
     }
 
-    // Convert selected_days to JSON string for database storage
-    const selectedDaysJson = JSON.stringify(daysArray);
-    console.log('[v2] Storing in database as JSON:', selectedDaysJson);
-
     // Format dates to MySQL DATE format (YYYY-MM-DD)
     const formattedStartDate = new Date(start_date).toISOString().split('T')[0];
     const formattedEndDate = new Date(end_date).toISOString().split('T')[0];
+
+    // Check for duplicate orders (same customer, meal plan, and date range)
+    const duplicateCheck = (await query(
+      `SELECT id FROM customer_orders
+       WHERE customer_id = ?
+       AND meal_plan_id = ?
+       AND start_date = ?
+       AND end_date = ?
+       LIMIT 1`,
+      [customer_id, meal_plan_id, formattedStartDate, formattedEndDate]
+    )) as any[];
+
+    if (duplicateCheck.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Duplicate order: An order with the same customer, meal plan, and date range already exists',
+      });
+    }
+
+    // Convert selected_days to JSON string for database storage
+    const selectedDaysJson = JSON.stringify(daysArray);
+    console.log('[v2] Storing in database as JSON:', selectedDaysJson);
 
     // Insert customer order
     const result = (await query(
