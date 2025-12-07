@@ -36,7 +36,7 @@ MonthlyTiffinListPage.getLayout = (page: React.ReactElement) => (
 
 export default function MonthlyTiffinListPage() {
   const dispatch = useDispatch();
-  const { monthlyOrders, isLoading } = useSelector((state) => state.customerOrder);
+  const { orders, isLoading } = useSelector((state) => state.customerOrder);
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
@@ -92,7 +92,7 @@ export default function MonthlyTiffinListPage() {
                   </TableHead>
 
                   <TableBody>
-                    {monthlyOrders && monthlyOrders.map((order, index) => (
+                    {orders && orders.map((order, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{order.meal_plan_name}</TableCell>
@@ -123,7 +123,7 @@ export default function MonthlyTiffinListPage() {
                       </TableRow>
                     ))}
 
-                    {(!monthlyOrders || !monthlyOrders.length) && (
+                    {(!orders || !orders.length) && (
                       <TableRow>
                         <TableCell colSpan={6} align="center">
                           No orders for this month
