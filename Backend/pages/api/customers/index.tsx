@@ -81,6 +81,21 @@ async function handleCreateCustomer(
       });
     }
 
+    // Check for duplicate customer by phone number (if phone is provided)
+    if (phone && phone.trim() !== '') {
+      const duplicateCheck = (await query(
+        'SELECT id FROM customers WHERE phone = ? LIMIT 1',
+        [phone.trim()]
+      )) as any[];
+
+      if (duplicateCheck.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Duplicate customer: A customer with this phone number already exists',
+        });
+      }
+    }
+
     // Insert customer
     const result = (await query(
       'INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)',

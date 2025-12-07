@@ -131,6 +131,22 @@ async function handleUpdateCustomer(
           error: 'Phone number must be less than 50 characters',
         });
       }
+
+      // Check for duplicate phone number (if phone is provided and not empty)
+      if (phone && phone.trim() !== '') {
+        const duplicateCheck = (await query(
+          'SELECT id FROM customers WHERE phone = ? AND id != ? LIMIT 1',
+          [phone.trim(), id]
+        )) as any[];
+
+        if (duplicateCheck.length > 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'Duplicate customer: A customer with this phone number already exists',
+          });
+        }
+      }
+
       updates.push('phone = ?');
       values.push(phone || null);
     }

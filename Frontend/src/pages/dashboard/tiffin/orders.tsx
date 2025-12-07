@@ -77,7 +77,7 @@ export default function OrdersPage() {
   const dispatch = useDispatch();
   const { enqueueSnackbar } = useSnackbar();
 
-  const { customerOrders, isLoading } = useSelector((state) => state.customerOrder);
+  const { orders, isLoading } = useSelector((state) => state.customerOrder);
 
   const [tableData, setTableData] = useState<ICustomerOrder[]>([]);
   const [filterName, setFilterName] = useState('');
@@ -88,10 +88,10 @@ export default function OrdersPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (customerOrders && customerOrders.length) {
-      setTableData(customerOrders);
+    if (orders && orders.length) {
+      setTableData(orders);
     }
-  }, [customerOrders]);
+  }, [orders]);
 
   const dataFiltered = applyFilter({
     inputData: tableData,
@@ -156,6 +156,13 @@ export default function OrdersPage() {
 
   const handleEditRow = (id: number) => {
     push(PATH_DASHBOARD.tiffin.orderEdit(String(id)));
+  };
+
+  const handleCalculateBilling = (customerId: number) => {
+    // Get current month in YYYY-MM format
+    const today = new Date();
+    const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    push(`/dashboard/tiffin/billing-calendar?customer_id=${customerId}&month=${currentMonth}`);
   };
 
   const handleResetFilter = () => {
@@ -243,6 +250,7 @@ export default function OrdersPage() {
                         onSelectRow={() => onSelectRow(String(row.id))}
                         onDeleteRow={() => handleDeleteRow(row.id)}
                         onEditRow={() => handleEditRow(row.id)}
+                        onCalculateBilling={() => handleCalculateBilling(row.customer_id)}
                       />
                     ))}
 

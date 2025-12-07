@@ -174,6 +174,8 @@ export type ICustomerOrder = {
   quantity: number;
   selected_days: DayName[];
   price: number;
+  payment_id?: number;
+  payment_status: PaymentStatus;
   start_date: string;
   end_date: string;
   created_at: Date | string;
@@ -232,4 +234,178 @@ export type ICustomerOrderState = {
   orders: ICustomerOrder[];
   order: ICustomerOrder | null;
   dailySummary: IDailyTiffinSummary | null;
+};
+
+// ----------------------------------------------------------------------
+// Payment Management Types
+// ----------------------------------------------------------------------
+
+export type PaymentStatus = 'pending' | 'received' | 'calculating';
+export type CalendarEntryStatus = 'T' | 'A' | 'E';
+export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid';
+export type NotificationType = 'month_end_calculation' | 'payment_received' | 'payment_overdue';
+export type NotificationPriority = 'low' | 'medium' | 'high';
+
+// Tiffin Calendar Entry
+export type ITiffinCalendarEntry = {
+  id: number;
+  customer_id: number;
+  order_id: number;
+  delivery_date: string;
+  status: CalendarEntryStatus;
+  quantity: number;
+  price: number;
+  notes?: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+  // Joined data
+  customer_name?: string;
+  customer_phone?: string;
+  meal_plan_id?: number;
+  meal_plan_name?: string;
+};
+
+// Monthly Billing
+export type IMonthlyBilling = {
+  id: number;
+  customer_id: number;
+  billing_month: string;
+  total_delivered: number;
+  total_absent: number;
+  total_extra: number;
+  total_days: number;
+  base_amount: number;
+  extra_amount: number;
+  total_amount: number;
+  status: BillingStatus;
+  calculated_at?: Date | string;
+  finalized_at?: Date | string;
+  finalized_by?: string;
+  paid_at?: Date | string;
+  payment_method?: string;
+  notes?: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+  // Joined data
+  customer_name?: string;
+  customer_phone?: string;
+  customer_address?: string;
+};
+
+// Payment Notification
+export type IPaymentNotification = {
+  id: number;
+  notification_type: NotificationType;
+  billing_id?: number;
+  customer_id?: number;
+  billing_month?: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  is_dismissed: boolean;
+  priority: NotificationPriority;
+  action_url?: string;
+  created_at: Date | string;
+  read_at?: Date | string;
+  dismissed_at?: Date | string;
+  // Joined data
+  customer_name?: string;
+};
+
+// Payment History
+export type IPaymentHistory = {
+  id: number;
+  billing_id: number;
+  customer_id: number;
+  amount: number;
+  payment_method: string;
+  payment_date: string;
+  transaction_id?: string;
+  reference_number?: string;
+  notes?: string;
+  created_by?: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+// Pricing Rule
+export type IPricingRule = {
+  id: number;
+  meal_plan_id?: number;
+  rule_name: string;
+  delivered_price: number;
+  extra_price: number;
+  is_default: boolean;
+  effective_from: string;
+  effective_to?: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+// Calendar Grid Data
+export type ICalendarGridData = {
+  year: number;
+  month: number;
+  customers: ICalendarCustomerData[];
+};
+
+export type ICalendarCustomerData = {
+  customer_id: number;
+  customer_name: string;
+  customer_phone?: string;
+  entries: { [date: string]: CalendarEntryStatus | null };
+  total_delivered: number;
+  total_absent: number;
+  total_extra: number;
+  total_amount: number;
+  billing_status: BillingStatus;
+  billing_id?: number;
+};
+
+// Monthly Calendar Data
+export type IMonthlyCalendarData = {
+  customer_id: number;
+  customer_name: string;
+  billing_month: string;
+  entries: ITiffinCalendarEntry[];
+  billing?: IMonthlyBilling;
+  active_orders: ICustomerOrder[];
+};
+
+// Billing Calculation
+export type IBillingCalculation = {
+  customer_id: number;
+  billing_month: string;
+  total_delivered: number;
+  total_absent: number;
+  total_extra: number;
+  total_days: number;
+  delivered_price: number;
+  extra_price: number;
+  base_amount: number;
+  extra_amount: number;
+  total_amount: number;
+};
+
+// Form Values
+export type ICalendarEntryFormValues = {
+  customer_id: number;
+  order_id: number;
+  delivery_date: string;
+  status: CalendarEntryStatus;
+  quantity: number;
+  price: number;
+  notes?: string;
+};
+
+// Redux State Types
+export type IPaymentState = {
+  isLoading: boolean;
+  error: Error | string | null;
+  calendarData: ICalendarGridData | null;
+  monthlyBillings: IMonthlyBilling[];
+  currentBilling: IMonthlyBilling | null;
+  notifications: IPaymentNotification[];
+  unreadCount: number;
+  pricingRules: IPricingRule[];
 };

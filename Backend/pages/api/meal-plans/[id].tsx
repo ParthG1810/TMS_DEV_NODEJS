@@ -114,6 +114,20 @@ async function handleUpdateMealPlan(
           error: 'Meal name cannot be empty',
         });
       }
+
+      // Check for duplicate meal plan name (excluding current meal plan)
+      const duplicateCheck = (await query(
+        'SELECT id FROM meal_plans WHERE meal_name = ? AND id != ? LIMIT 1',
+        [meal_name, id]
+      )) as any[];
+
+      if (duplicateCheck.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Duplicate meal plan: A meal plan with this name already exists',
+        });
+      }
+
       updates.push('meal_name = ?');
       values.push(meal_name);
     }
