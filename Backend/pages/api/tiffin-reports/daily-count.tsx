@@ -82,10 +82,25 @@ async function handleGetDailyTiffinCount(
       [targetDate, targetDate]
     )) as any[];
 
-    // Filter orders that include the current day
+    // Filter orders that include the current day with defensive parsing
     const filteredOrders: DailyTiffinCount[] = orders
       .filter((order) => {
-        const selectedDays = JSON.parse(order.selected_days);
+        let selectedDays: string[];
+
+        // Check if it's already an array (MySQL driver may auto-parse JSON columns)
+        if (Array.isArray(order.selected_days)) {
+          selectedDays = order.selected_days;
+        } else if (typeof order.selected_days === 'string') {
+          try {
+            selectedDays = JSON.parse(order.selected_days);
+          } catch (error) {
+            // If parse fails, try to handle as comma-separated string
+            selectedDays = order.selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
+          }
+        } else {
+          selectedDays = [];
+        }
+
         // If selected_days is empty array, it means all days are included (for Daily frequency)
         return selectedDays.length === 0 || selectedDays.includes(currentDayName);
       })

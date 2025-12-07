@@ -25,7 +25,7 @@ export default function OrderEditPage() {
   const { query } = useRouter();
   const dispatch = useDispatch();
 
-  const { customerOrder, isLoading } = useSelector((state) => state.customerOrder);
+  const { order, isLoading } = useSelector((state) => state.customerOrder);
 
   const { id } = query;
 
@@ -56,14 +56,14 @@ export default function OrderEditPage() {
           links={[
             { name: 'Dashboard', href: PATH_DASHBOARD.root },
             { name: 'Orders', href: PATH_DASHBOARD.tiffin.orders },
-            { name: customerOrder?.customer_name || '' },
+            { name: order?.customer_name || '' },
           ]}
         />
 
         {isLoading ? (
           <LoadingScreen />
         ) : (
-          <OrderNewEditForm isEdit currentOrder={customerOrder || undefined} onSubmit={handleSubmit} />
+          <OrderNewEditForm isEdit currentOrder={order || undefined} onSubmit={handleSubmit} />
         )}
       </Container>
     </>

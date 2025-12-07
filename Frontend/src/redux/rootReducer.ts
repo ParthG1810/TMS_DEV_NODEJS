@@ -12,6 +12,7 @@ import tmsRecipeReducer from './slices/tmsRecipe';
 import mealPlanReducer from './slices/mealPlan';
 import customerReducer from './slices/customer';
 import customerOrderReducer from './slices/customerOrder';
+import paymentReducer from './slices/payment';
 
 // ----------------------------------------------------------------------
 
@@ -55,6 +56,7 @@ const rootReducer = combineReducers({
   mealPlan: mealPlanReducer,
   customer: customerReducer,
   customerOrder: customerOrderReducer,
+  payment: paymentReducer,
 });
 
 export default rootReducer;

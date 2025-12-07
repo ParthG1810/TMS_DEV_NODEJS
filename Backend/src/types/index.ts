@@ -304,6 +304,8 @@ export interface CustomerOrder {
   quantity: number;
   selected_days: DayName[];
   price: number;
+  payment_id?: number;
+  payment_status: PaymentStatus;
   start_date: string; // YYYY-MM-DD format
   end_date: string; // YYYY-MM-DD format
   created_at: Date;
@@ -405,4 +407,267 @@ export interface DailyTiffinSummary {
   date: string; // YYYY-MM-DD format
   orders: DailyTiffinCount[];
   total_count: number;
+}
+
+// ----------------------------------------------------------------------
+// PAYMENT MANAGEMENT TYPES
+// ----------------------------------------------------------------------
+
+/**
+ * Payment status enum
+ */
+export type PaymentStatus = 'pending' | 'received' | 'calculating';
+
+/**
+ * Calendar entry status enum
+ * T = Tiffin Delivered
+ * A = Absent/Cancelled
+ * E = Extra Tiffin
+ */
+export type CalendarEntryStatus = 'T' | 'A' | 'E';
+
+/**
+ * Billing status enum
+ */
+export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid';
+
+/**
+ * Notification type enum
+ */
+export type NotificationType = 'month_end_calculation' | 'payment_received' | 'payment_overdue';
+
+/**
+ * Notification priority enum
+ */
+export type NotificationPriority = 'low' | 'medium' | 'high';
+
+/**
+ * Tiffin Calendar Entry entity from database
+ */
+export interface TiffinCalendarEntry {
+  id: number;
+  customer_id: number;
+  order_id: number;
+  delivery_date: string; // YYYY-MM-DD format
+  status: CalendarEntryStatus;
+  quantity: number;
+  price: number;
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Monthly Billing entity from database
+ */
+export interface MonthlyBilling {
+  id: number;
+  customer_id: number;
+  billing_month: string; // YYYY-MM format
+  total_delivered: number;
+  total_absent: number;
+  total_extra: number;
+  total_days: number;
+  base_amount: number;
+  extra_amount: number;
+  total_amount: number;
+  status: BillingStatus;
+  calculated_at?: Date;
+  finalized_at?: Date;
+  finalized_by?: string;
+  paid_at?: Date;
+  payment_method?: string;
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Payment Notification entity from database
+ */
+export interface PaymentNotification {
+  id: number;
+  notification_type: NotificationType;
+  billing_id?: number;
+  customer_id?: number;
+  billing_month?: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  is_dismissed: boolean;
+  priority: NotificationPriority;
+  action_url?: string;
+  created_at: Date;
+  read_at?: Date;
+  dismissed_at?: Date;
+}
+
+/**
+ * Payment History entity from database
+ */
+export interface PaymentHistory {
+  id: number;
+  billing_id: number;
+  customer_id: number;
+  amount: number;
+  payment_method: string;
+  payment_date: string; // YYYY-MM-DD format
+  transaction_id?: string;
+  reference_number?: string;
+  notes?: string;
+  created_by?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Pricing Rule entity from database
+ */
+export interface PricingRule {
+  id: number;
+  meal_plan_id?: number;
+  rule_name: string;
+  delivered_price: number;
+  extra_price: number;
+  is_default: boolean;
+  effective_from: string; // YYYY-MM-DD format
+  effective_to?: string; // YYYY-MM-DD format
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Request body for creating a calendar entry
+ */
+export interface CreateCalendarEntryRequest {
+  customer_id: number;
+  order_id: number;
+  delivery_date: string; // YYYY-MM-DD format
+  status: CalendarEntryStatus;
+  quantity?: number;
+  price?: number;
+  notes?: string;
+}
+
+/**
+ * Request body for updating a calendar entry
+ */
+export interface UpdateCalendarEntryRequest {
+  status?: CalendarEntryStatus;
+  quantity?: number;
+  price?: number;
+  notes?: string;
+}
+
+/**
+ * Request body for batch updating calendar entries
+ */
+export interface BatchUpdateCalendarEntriesRequest {
+  entries: {
+    delivery_date: string;
+    status: CalendarEntryStatus;
+    quantity?: number;
+    price?: number;
+  }[];
+  customer_id: number;
+  order_id: number;
+}
+
+/**
+ * Request body for finalizing monthly billing
+ */
+export interface FinalizeBillingRequest {
+  billing_id: number;
+  finalized_by: string;
+  notes?: string;
+}
+
+/**
+ * Request body for recording payment
+ */
+export interface RecordPaymentRequest {
+  billing_id: number;
+  amount: number;
+  payment_method: string;
+  payment_date: string; // YYYY-MM-DD format
+  transaction_id?: string;
+  reference_number?: string;
+  notes?: string;
+  created_by?: string;
+}
+
+/**
+ * Calendar entry with customer and order details (joined data)
+ */
+export interface CalendarEntryWithDetails extends TiffinCalendarEntry {
+  customer_name: string;
+  customer_phone?: string;
+  meal_plan_id: number;
+  meal_plan_name: string;
+}
+
+/**
+ * Monthly billing with customer details (joined data)
+ */
+export interface MonthlyBillingWithDetails extends MonthlyBilling {
+  customer_name: string;
+  customer_phone?: string;
+  customer_address: string;
+}
+
+/**
+ * Payment notification with customer details (joined data)
+ */
+export interface PaymentNotificationWithDetails extends PaymentNotification {
+  customer_name?: string;
+}
+
+/**
+ * Monthly calendar data for a customer
+ */
+export interface MonthlyCalendarData {
+  customer_id: number;
+  customer_name: string;
+  billing_month: string; // YYYY-MM format
+  entries: TiffinCalendarEntry[];
+  billing?: MonthlyBilling;
+  active_orders: CustomerOrder[];
+}
+
+/**
+ * Calendar grid data for the frontend
+ */
+export interface CalendarGridData {
+  year: number;
+  month: number;
+  customers: {
+    customer_id: number;
+    customer_name: string;
+    customer_phone?: string;
+    entries: {
+      [date: string]: CalendarEntryStatus | null; // date in format 'YYYY-MM-DD'
+    };
+    total_delivered: number;
+    total_absent: number;
+    total_extra: number;
+    total_amount: number;
+    billing_status: BillingStatus;
+  }[];
+}
+
+/**
+ * Billing calculation result
+ */
+export interface BillingCalculation {
+  customer_id: number;
+  billing_month: string;
+  total_delivered: number;
+  total_absent: number;
+  total_extra: number;
+  total_days: number;
+  delivered_price: number;
+  extra_price: number;
+  base_amount: number;
+  extra_amount: number;
+  total_amount: number;
 }

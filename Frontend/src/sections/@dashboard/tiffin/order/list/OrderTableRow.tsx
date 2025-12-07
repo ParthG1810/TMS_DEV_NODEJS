@@ -25,6 +25,7 @@ type Props = {
   onEditRow: VoidFunction;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
+  onCalculateBilling?: VoidFunction;
 };
 
 export default function OrderTableRow({
@@ -33,6 +34,7 @@ export default function OrderTableRow({
   onEditRow,
   onSelectRow,
   onDeleteRow,
+  onCalculateBilling,
 }: Props) {
   const {
     customer_name,
@@ -108,7 +110,7 @@ export default function OrderTableRow({
         open={openPopover}
         onClose={handleClosePopover}
         arrow="right-top"
-        sx={{ width: 140 }}
+        sx={{ width: 160 }}
       >
         <MenuItem
           onClick={() => {
@@ -119,6 +121,19 @@ export default function OrderTableRow({
           <Iconify icon="eva:edit-fill" />
           Edit
         </MenuItem>
+
+        {onCalculateBilling && (
+          <MenuItem
+            onClick={() => {
+              onCalculateBilling();
+              handleClosePopover();
+            }}
+            sx={{ color: 'info.main' }}
+          >
+            <Iconify icon="eva:calculator-fill" />
+            Calculate
+          </MenuItem>
+        )}
 
         <MenuItem
           onClick={() => {
