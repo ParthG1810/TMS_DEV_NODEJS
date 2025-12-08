@@ -141,8 +141,8 @@ CREATE TABLE IF NOT EXISTS customer_orders (
     -- Prevent duplicate orders
     UNIQUE KEY unique_order (customer_id, meal_plan_id, start_date, end_date),
 
-    -- Ensure valid date range
-    CHECK (end_date > start_date),
+    -- Ensure valid date range (allow same-day orders for extra tiffins)
+    CHECK (end_date >= start_date),
     CHECK (quantity >= 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
