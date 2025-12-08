@@ -207,11 +207,22 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const currentDate = new Date(date);
+    const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[dayOfWeek];
 
     return customer.orders.some((order) => {
       const startDate = new Date(order.start_date);
       const endDate = new Date(order.end_date);
-      return currentDate >= startDate && currentDate <= endDate;
+      const isInDateRange = currentDate >= startDate && currentDate <= endDate;
+
+      // If order doesn't have selected_days, it covers all days in the range
+      if (!order.selected_days || order.selected_days.length === 0) {
+        return isInDateRange;
+      }
+
+      // Check if the current day of week is in the selected_days array
+      return isInDateRange && order.selected_days.includes(dayName);
     });
   };
 
