@@ -228,7 +228,7 @@ export default function BillingCalendarPage() {
                 sx={{
                   width: 24,
                   height: 24,
-                  bgcolor: 'grey.400',
+                  bgcolor: 'error.main',
                   borderRadius: 0.5,
                   display: 'flex',
                   alignItems: 'center',
@@ -261,6 +261,44 @@ export default function BillingCalendarPage() {
                 E
               </Box>
               <Typography variant="body2">Extra Tiffin</Typography>
+            </Stack>
+
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box
+                sx={{
+                  width: 24,
+                  height: 24,
+                  bgcolor: (theme) => theme.palette.mode === 'light' ? 'warning.lighter' : 'warning.dark',
+                  border: (theme) => `2px dashed ${theme.palette.warning.main}`,
+                  borderRadius: 0.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: 12,
+                }}
+              >
+              </Box>
+              <Typography variant="body2">Plan Day (unmarked)</Typography>
+            </Stack>
+
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box
+                sx={{
+                  width: 24,
+                  height: 24,
+                  bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.100' : 'grey.800',
+                  borderRadius: 0.5,
+                  opacity: 0.3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: 12,
+                }}
+              >
+              </Box>
+              <Typography variant="body2">Non-Plan Day (double-click to add extra)</Typography>
             </Stack>
           </Stack>
         </Card>
