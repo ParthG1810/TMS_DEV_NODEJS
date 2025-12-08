@@ -154,7 +154,7 @@ async function handleGetCalendarGrid(
       `
         SELECT
           customer_id,
-          delivery_date,
+          DATE_FORMAT(delivery_date, '%Y-%m-%d') as delivery_date,
           status
         FROM tiffin_calendar_entries
         WHERE DATE_FORMAT(delivery_date, '%Y-%m') = ?
