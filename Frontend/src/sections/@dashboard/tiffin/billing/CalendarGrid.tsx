@@ -244,30 +244,56 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       return currentDate >= startDate && currentDate <= endDate;
     });
 
-    // For plan days: toggle between T and A only
+    // For plan days: cycle through Blank → T → A → Blank
     if (isPlanDay && activeOrder) {
-      const newStatus = currentStatus === 'T' ? 'A' : 'T';
+      // Determine next status in the cycle
+      let newStatus: CalendarEntryStatus | null = null;
+      let shouldDelete = false;
+
+      if (!currentStatus) {
+        // Blank → T
+        newStatus = 'T';
+      } else if (currentStatus === 'T') {
+        // T → A
+        newStatus = 'A';
+      } else if (currentStatus === 'A') {
+        // A → Blank (delete entry)
+        shouldDelete = true;
+      }
 
       try {
-        const result = await dispatch(
-          createCalendarEntry({
-            customer_id: customer.customer_id,
-            order_id: activeOrder.id,
-            delivery_date: date,
-            status: newStatus,
-            quantity: 1,
-            price: 0, // Price will be calculated by the stored procedure
-          })
-        );
-
-        if (result.success) {
-          enqueueSnackbar(`Marked as ${newStatus === 'T' ? 'Delivered' : 'Absent'}`, {
-            variant: 'success'
+        if (shouldDelete) {
+          // Delete the entry to clear it
+          await axios.delete('/api/calendar-entries', {
+            params: {
+              customer_id: customer.customer_id,
+              delivery_date: date,
+            },
           });
-          onUpdate(); // Refresh the calendar
-        } else {
-          enqueueSnackbar(result.error || 'Failed to update entry', { variant: 'error' });
+          enqueueSnackbar('Status cleared', { variant: 'info' });
+        } else if (newStatus) {
+          // Create or update entry
+          const result = await dispatch(
+            createCalendarEntry({
+              customer_id: customer.customer_id,
+              order_id: activeOrder.id,
+              delivery_date: date,
+              status: newStatus,
+              quantity: 1,
+              price: 0, // Price will be calculated by the stored procedure
+            })
+          );
+
+          if (result.success) {
+            enqueueSnackbar(`Marked as ${newStatus === 'T' ? 'Delivered' : 'Absent'}`, {
+              variant: 'success'
+            });
+          } else {
+            enqueueSnackbar(result.error || 'Failed to update entry', { variant: 'error' });
+          }
         }
+
+        onUpdate(); // Refresh the calendar
       } catch (error) {
         console.error('Error updating calendar entry:', error);
         enqueueSnackbar('Failed to update entry', { variant: 'error' });
@@ -508,9 +534,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                               ? status === 'T'
                                 ? 'Delivered - Click to mark Absent'
                                 : status === 'A'
-                                ? 'Absent - Click to mark Delivered'
+                                ? 'Absent - Click to clear'
                                 : ''
-                              : 'Plan day - Click to mark as Delivered or Absent'
+                              : 'Plan day - Click to mark as Delivered'
                             : status === 'E'
                             ? 'Extra tiffin - Click to remove'
                             : 'Double-click to add extra tiffin'
