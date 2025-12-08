@@ -78,12 +78,17 @@ BEGIN
   -- Calculate amounts based on new logic:
   -- Base amount = delivered days * daily rate
   -- Absent days reduce the total
-  -- Extra days add additional charges
+  -- Extra days add additional charges from actual extra orders
   SET v_base_amount = v_total_delivered * v_daily_rate;
 
-  -- For extra tiffins, use a premium rate (daily_rate * 1.2) or fixed extra price
-  -- You can adjust this logic as needed
-  SET v_extra_amount = v_total_extra * (v_daily_rate * 1.2);
+  -- For extra tiffins, sum up the actual prices from extra orders
+  -- Get total price from all extra order entries
+  SELECT COALESCE(SUM(tce.price), 0) INTO v_extra_amount
+  FROM tiffin_calendar_entries tce
+  INNER JOIN customer_orders co ON tce.order_id = co.id
+  WHERE tce.customer_id = p_customer_id
+    AND tce.status = 'E'
+    AND DATE_FORMAT(tce.delivery_date, '%Y-%m') = p_billing_month;
 
   -- Total = base amount (delivered) + extra amount
   -- Absent days are already not counted in delivered
