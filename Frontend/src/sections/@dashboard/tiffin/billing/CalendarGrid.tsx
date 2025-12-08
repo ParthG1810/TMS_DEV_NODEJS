@@ -390,14 +390,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
   const getStatusForDate = (customer: ICalendarCustomerData, day: number): CalendarEntryStatus | null => {
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    // Check for the date in entries - handle both string and date object formats
-    for (const [entryDate, status] of Object.entries(customer.entries)) {
-      const normalizedDate = entryDate.split('T')[0]; // Remove time part if present
-      if (normalizedDate === date) {
-        return status as CalendarEntryStatus;
-      }
-    }
-    return null;
+    return customer.entries[date] || null;
   };
 
   const getBillingStatusColor = (status: string) => {
