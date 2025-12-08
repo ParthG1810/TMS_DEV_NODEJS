@@ -37,7 +37,7 @@ import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/t
 // ----------------------------------------------------------------------
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  padding: theme.spacing(0.5),
+  padding: theme.spacing(0.25),
   textAlign: 'center',
   borderRight: `1px solid ${theme.palette.divider}`,
   '&:first-of-type': {
@@ -45,39 +45,44 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
     left: 0,
     backgroundColor: theme.palette.background.paper,
     zIndex: 2,
-    minWidth: 180,
-    maxWidth: 180,
+    minWidth: 140,
+    maxWidth: 140,
     borderRight: `2px solid ${theme.palette.divider}`,
+    textAlign: 'left',
+    paddingLeft: theme.spacing(1),
   },
   '&:last-child': {
     position: 'sticky',
     right: 0,
     backgroundColor: theme.palette.background.paper,
     zIndex: 2,
-    minWidth: 120,
+    minWidth: 100,
     borderLeft: `2px solid ${theme.palette.divider}`,
   },
 }));
 
 const StyledHeaderCell = styled(TableCell)(({ theme }) => ({
-  padding: theme.spacing(1),
+  padding: theme.spacing(0.5, 0.25),
   textAlign: 'center',
   fontWeight: 'bold',
+  fontSize: 11,
   backgroundColor: theme.palette.grey[200],
   borderRight: `1px solid ${theme.palette.divider}`,
   '&:first-of-type': {
     position: 'sticky',
     left: 0,
     zIndex: 3,
-    minWidth: 180,
-    maxWidth: 180,
+    minWidth: 140,
+    maxWidth: 140,
     borderRight: `2px solid ${theme.palette.divider}`,
+    textAlign: 'left',
+    paddingLeft: theme.spacing(1),
   },
   '&:last-child': {
     position: 'sticky',
     right: 0,
     zIndex: 3,
-    minWidth: 120,
+    minWidth: 100,
     borderLeft: `2px solid ${theme.palette.divider}`,
   },
 }));
@@ -92,16 +97,16 @@ interface DayCellProps {
 const DayCell = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'status' && prop !== 'isWeekend' && prop !== 'disabled',
 })<DayCellProps>(({ theme, status, isWeekend, disabled }) => ({
-  width: 32,
-  height: 32,
+  width: 24,
+  height: 24,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   cursor: disabled ? 'not-allowed' : 'pointer',
   borderRadius: theme.spacing(0.5),
-  fontSize: 12,
+  fontSize: 10,
   fontWeight: 'bold',
-  transition: 'all 0.2s',
+  transition: 'all 0.15s',
   opacity: disabled ? 0.3 : 1,
   backgroundColor: disabled
     ? alpha(theme.palette.grey[300], 0.2)
@@ -119,8 +124,8 @@ const DayCell = styled(Box, {
   '&:hover': disabled
     ? {}
     : {
-        transform: 'scale(1.1)',
-        boxShadow: theme.shadows[4],
+        transform: 'scale(1.15)',
+        boxShadow: theme.shadows[3],
         zIndex: 1,
       },
 }));
@@ -414,20 +419,20 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         <Table stickyHeader>
           <TableHead>
             <TableRow>
-              <StyledHeaderCell>Customer Name</StyledHeaderCell>
+              <StyledHeaderCell>Customer</StyledHeaderCell>
               {days.map((day) => (
-                <StyledHeaderCell key={day} sx={{ minWidth: 40 }}>
-                  <Stack spacing={0.5}>
-                    <Typography variant="caption" fontWeight="bold">
+                <StyledHeaderCell key={day} sx={{ minWidth: 30, maxWidth: 30 }}>
+                  <Stack spacing={0.25}>
+                    <Typography variant="caption" fontWeight="bold" sx={{ fontSize: 10 }}>
                       {day}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: 9 }}>
+                    <Typography variant="caption" sx={{ fontSize: 8 }}>
                       {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][getDayOfWeek(day)]}
                     </Typography>
                   </Stack>
                 </StyledHeaderCell>
               ))}
-              <StyledHeaderCell>Summary</StyledHeaderCell>
+              <StyledHeaderCell sx={{ fontSize: 10 }}>Summary</StyledHeaderCell>
             </TableRow>
           </TableHead>
 
@@ -435,12 +440,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             {customers.map((customer) => (
               <TableRow key={customer.customer_id} hover>
                 <StyledTableCell>
-                  <Stack spacing={0.5} alignItems="flex-start">
-                    <Typography variant="body2" fontWeight="600">
+                  <Stack spacing={0.25} alignItems="flex-start">
+                    <Typography variant="caption" fontWeight="600" sx={{ fontSize: 11 }}>
                       {customer.customer_name}
                     </Typography>
                     {customer.customer_phone && (
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: 9 }}>
                         {customer.customer_phone}
                       </Typography>
                     )}
@@ -482,26 +487,26 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 })}
 
                 <StyledTableCell>
-                  <Stack spacing={1} alignItems="center">
-                    <Stack direction="row" spacing={1} justifyContent="center">
+                  <Stack spacing={0.5} alignItems="center">
+                    <Stack direction="row" spacing={0.5} justifyContent="center">
                       <Tooltip title="Delivered">
-                        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                          T: {customer.total_delivered}
+                        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'bold', fontSize: 9 }}>
+                          T:{customer.total_delivered}
                         </Typography>
                       </Tooltip>
                       <Tooltip title="Absent">
-                        <Typography variant="caption" sx={{ color: 'grey.600', fontWeight: 'bold' }}>
-                          A: {customer.total_absent}
+                        <Typography variant="caption" sx={{ color: 'grey.600', fontWeight: 'bold', fontSize: 9 }}>
+                          A:{customer.total_absent}
                         </Typography>
                       </Tooltip>
                       <Tooltip title="Extra">
-                        <Typography variant="caption" sx={{ color: 'info.main', fontWeight: 'bold' }}>
-                          E: {customer.total_extra}
+                        <Typography variant="caption" sx={{ color: 'info.main', fontWeight: 'bold', fontSize: 9 }}>
+                          E:{customer.total_extra}
                         </Typography>
                       </Tooltip>
                     </Stack>
 
-                    <Typography variant="body2" fontWeight="700" color="primary">
+                    <Typography variant="caption" fontWeight="700" color="primary" sx={{ fontSize: 11 }}>
                       CAD ${customer.total_amount.toFixed(2)}
                     </Typography>
 
@@ -514,12 +519,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                         disabled={finalizingCustomerId === customer.customer_id}
                         startIcon={
                           finalizingCustomerId === customer.customer_id ? (
-                            <CircularProgress size={16} />
+                            <CircularProgress size={12} />
                           ) : (
-                            <Iconify icon="eva:checkmark-circle-fill" width={16} />
+                            <Iconify icon="eva:checkmark-circle-fill" width={12} />
                           )
                         }
-                        sx={{ minWidth: 100, fontSize: 11 }}
+                        sx={{ minWidth: 70, fontSize: 9, py: 0.25 }}
                       >
                         Finalize
                       </Button>
@@ -529,9 +534,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                       <Typography
                         variant="caption"
                         sx={{
-                          px: 1,
-                          py: 0.5,
-                          borderRadius: 1,
+                          px: 0.75,
+                          py: 0.25,
+                          borderRadius: 0.5,
+                          fontSize: 9,
                           bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
                           color: `${getBillingStatusColor(customer.billing_status)}.darker`,
                           textTransform: 'capitalize',
@@ -603,6 +609,33 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         <DialogActions>
           <Button onClick={() => setOpenExtraDialog(false)} color="inherit">
             Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              // Make the cell blank by deleting any existing entry
+              if (extraOrderData) {
+                try {
+                  await axios.delete('/api/calendar-entries', {
+                    params: {
+                      customer_id: extraOrderData.customer_id,
+                      delivery_date: extraOrderData.delivery_date,
+                    },
+                  });
+                  enqueueSnackbar('Cell cleared', { variant: 'info' });
+                  setOpenExtraDialog(false);
+                  setExtraOrderData(null);
+                  setSelectedMealPlan(null);
+                  setExtraPrice('');
+                  onUpdate();
+                } catch (error) {
+                  enqueueSnackbar('Failed to clear cell', { variant: 'error' });
+                }
+              }
+            }}
+            color="warning"
+            variant="outlined"
+          >
+            Make Blank
           </Button>
           <Button onClick={handleCreateExtraOrder} variant="contained" color="primary">
             Create Order
