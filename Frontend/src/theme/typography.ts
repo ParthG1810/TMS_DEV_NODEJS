@@ -1,4 +1,5 @@
-import { Public_Sans, Barlow } from '@next/font/google';
+// Temporarily disabled Google Fonts due to network restrictions
+// import { Public_Sans, Barlow } from '@next/font/google';
 
 // ----------------------------------------------------------------------
 
@@ -24,19 +25,20 @@ export function responsiveFontSizes({ sm, md, lg }: { sm: number; md: number; lg
   };
 }
 
-export const primaryFont = Public_Sans({
-  weight: ['400', '500', '600', '700', '800'],
-  subsets: ['latin'],
-  display: 'swap',
-  fallback: ['Helvetica', 'Arial', 'sans-serif'],
-});
+// Using fallback fonts directly due to network restrictions
+export const primaryFont = {
+  className: '',
+  style: {
+    fontFamily: 'Helvetica, Arial, sans-serif',
+  },
+};
 
-export const secondaryFont = Barlow({
-  weight: ['900'],
-  subsets: ['latin'],
-  display: 'swap',
-  fallback: ['Helvetica', 'Arial', 'sans-serif'],
-});
+export const secondaryFont = {
+  className: '',
+  style: {
+    fontFamily: 'Helvetica, Arial, sans-serif',
+  },
+};
 
 // ----------------------------------------------------------------------
 

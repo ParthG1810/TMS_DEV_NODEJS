@@ -95,6 +95,33 @@ export const PATH_DASHBOARD = {
     view: (title: string) => path(ROOTS_DASHBOARD, `/blog/post/${title}`),
     demoView: path(ROOTS_DASHBOARD, '/blog/post/apply-these-7-secret-techniques-to-improve-event'),
   },
+  ingredient: {
+    root: path(ROOTS_DASHBOARD, '/ingredient-management'),
+    list: path(ROOTS_DASHBOARD, '/ingredient-management'),
+    new: path(ROOTS_DASHBOARD, '/ingredient-entry'),
+    edit: (id: string) => path(ROOTS_DASHBOARD, `/ingredient-entry?id=${id}`),
+  },
+  recipe: {
+    root: path(ROOTS_DASHBOARD, '/recipe-management'),
+    list: path(ROOTS_DASHBOARD, '/recipe-management'),
+    new: path(ROOTS_DASHBOARD, '/recipe-creation'),
+    edit: (id: string) => path(ROOTS_DASHBOARD, `/recipe-creation?id=${id}`),
+  },
+  tiffin: {
+    root: path(ROOTS_DASHBOARD, '/tiffin'),
+    mealPlans: path(ROOTS_DASHBOARD, '/tiffin/meal-plans'),
+    mealPlanNew: path(ROOTS_DASHBOARD, '/tiffin/meal-plan-new'),
+    mealPlanEdit: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/meal-plan-edit?id=${id}`),
+    customers: path(ROOTS_DASHBOARD, '/tiffin/customers'),
+    customerNew: path(ROOTS_DASHBOARD, '/tiffin/customer-new'),
+    customerEdit: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/customer-edit?id=${id}`),
+    orders: path(ROOTS_DASHBOARD, '/tiffin/orders'),
+    orderNew: path(ROOTS_DASHBOARD, '/tiffin/order-new'),
+    orderEdit: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/order-edit?id=${id}`),
+    dailyCount: path(ROOTS_DASHBOARD, '/tiffin/daily-count'),
+    monthlyList: path(ROOTS_DASHBOARD, '/tiffin/monthly-list'),
+    completeList: path(ROOTS_DASHBOARD, '/tiffin/complete-list'),
+  },
 };
 
 export const PATH_DOCS = {

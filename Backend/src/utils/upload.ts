@@ -7,6 +7,9 @@ import { UploadedFile } from 'src/types';
 
 // ----------------------------------------------------------------------
 
+// Backend server URL for serving uploaded files
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+
 // Allowed image MIME types
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -126,7 +129,7 @@ export const processUploadedFiles = (files: formidable.Files): UploadedFile[] =>
         filepath: file.filepath,
         mimetype: file.mimetype || 'application/octet-stream',
         size: file.size,
-        url: `/uploads/recipes/${filename}`,
+        url: `${BACKEND_URL}/uploads/recipes/${filename}`,
       });
     }
   }
@@ -136,11 +139,18 @@ export const processUploadedFiles = (files: formidable.Files): UploadedFile[] =>
 
 /**
  * Delete image file from filesystem
- * @param imageUrl - Public URL of the image (e.g., /uploads/recipes/image.jpg)
+ * @param imageUrl - Public URL of the image (e.g., /uploads/recipes/image.jpg or http://localhost:3000/uploads/recipes/image.jpg)
  */
 export const deleteImage = async (imageUrl: string): Promise<void> => {
   try {
-    const filepath = path.join(process.cwd(), 'public', imageUrl);
+    // Extract path from URL (handle both relative and absolute URLs)
+    let relativePath = imageUrl;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      const url = new URL(imageUrl);
+      relativePath = url.pathname;
+    }
+
+    const filepath = path.join(process.cwd(), 'public', relativePath);
     await fs.unlink(filepath);
   } catch (error: any) {
     console.error('Error deleting image:', error.message);
