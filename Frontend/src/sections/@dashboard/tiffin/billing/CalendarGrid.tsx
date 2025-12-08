@@ -90,38 +90,50 @@ const StyledHeaderCell = styled(TableCell)(({ theme }) => ({
 interface DayCellProps {
   status: CalendarEntryStatus | null;
   onClick: () => void;
+  onDoubleClick?: () => void;
   isWeekend: boolean;
   disabled?: boolean;
+  isPlanDay?: boolean; // Whether this day is covered by a plan order
 }
 
 const DayCell = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'status' && prop !== 'isWeekend' && prop !== 'disabled',
-})<DayCellProps>(({ theme, status, isWeekend, disabled }) => ({
+  shouldForwardProp: (prop) => prop !== 'status' && prop !== 'isWeekend' && prop !== 'disabled' && prop !== 'isPlanDay',
+})<DayCellProps>(({ theme, status, isWeekend, disabled, isPlanDay }) => ({
   width: 24,
   height: 24,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  cursor: disabled ? 'not-allowed' : 'pointer',
+  cursor: disabled ? (isPlanDay ? 'not-allowed' : 'pointer') : 'pointer',
   borderRadius: theme.spacing(0.5),
   fontSize: 10,
   fontWeight: 'bold',
   transition: 'all 0.15s',
-  opacity: disabled ? 0.3 : 1,
-  backgroundColor: disabled
+  opacity: disabled && !isPlanDay ? 0.3 : 1,
+  backgroundColor: disabled && !isPlanDay
     ? alpha(theme.palette.grey[300], 0.2)
     : !status
-    ? isWeekend
+    ? isPlanDay
+      ? alpha(theme.palette.warning.light, 0.15) // Light yellow/orange for blank plan days
+      : isWeekend
       ? alpha(theme.palette.grey[300], 0.3)
       : 'transparent'
     : status === 'T'
     ? theme.palette.success.main
     : status === 'A'
-    ? theme.palette.grey[400]
+    ? theme.palette.error.main // Red for absent
     : theme.palette.info.main,
-  color: disabled ? theme.palette.text.disabled : status ? 'white' : theme.palette.text.primary,
-  border: `1px solid ${theme.palette.divider}`,
-  '&:hover': disabled
+  color: disabled && !isPlanDay
+    ? theme.palette.text.disabled
+    : status
+    ? 'white'
+    : isPlanDay
+    ? theme.palette.warning.dark
+    : theme.palette.text.primary,
+  border: isPlanDay && !status
+    ? `2px dashed ${theme.palette.warning.main}` // Dashed border for blank plan days
+    : `1px solid ${theme.palette.divider}`,
+  '&:hover': disabled && !isPlanDay
     ? {}
     : {
         transform: 'scale(1.15)',
@@ -149,6 +161,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
   // Extra tiffin order dialog state
   const [openExtraDialog, setOpenExtraDialog] = useState(false);
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [extraOrderData, setExtraOrderData] = useState<{
     customer_id: number;
     customer_name: string;
@@ -206,23 +219,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     customer: ICalendarCustomerData,
     day: number,
     currentStatus: CalendarEntryStatus | null,
-    isDisabled: boolean
+    isPlanDay: boolean
   ) => {
-    // Don't allow clicks on disabled dates
-    if (isDisabled) {
-      return;
-    }
-
     // Get customer's orders
     const orders = customer.orders || [];
-
-    if (orders.length === 0) {
-      enqueueSnackbar('No active orders found for this customer.', {
-        variant: 'warning',
-      });
-      return;
-    }
-
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     // Find an order that covers this date
@@ -233,86 +233,110 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       return currentDate >= startDate && currentDate <= endDate;
     });
 
-    if (!activeOrder) {
-      enqueueSnackbar('No order covers this date.', {
-        variant: 'warning',
-      });
-      return;
+    // For plan days: toggle between T and A only
+    if (isPlanDay && activeOrder) {
+      const newStatus = currentStatus === 'T' ? 'A' : 'T';
+
+      try {
+        const result = await dispatch(
+          createCalendarEntry({
+            customer_id: customer.customer_id,
+            order_id: activeOrder.id,
+            delivery_date: date,
+            status: newStatus,
+            quantity: 1,
+            price: 0, // Price will be calculated by the stored procedure
+          })
+        );
+
+        if (result.success) {
+          enqueueSnackbar(`Marked as ${newStatus === 'T' ? 'Delivered' : 'Absent'}`, {
+            variant: 'success'
+          });
+          onUpdate(); // Refresh the calendar
+        } else {
+          enqueueSnackbar(result.error || 'Failed to update entry', { variant: 'error' });
+        }
+      } catch (error) {
+        console.error('Error updating calendar entry:', error);
+        enqueueSnackbar('Failed to update entry', { variant: 'error' });
+      }
     }
 
-    // Cycle through statuses: null -> T -> A -> E -> null
-    let newStatus: CalendarEntryStatus | null = null;
-
-    if (currentStatus === null) {
-      newStatus = 'T';
-    } else if (currentStatus === 'T') {
-      newStatus = 'A';
-    } else if (currentStatus === 'A') {
-      newStatus = 'E';
-    } else {
-      newStatus = null; // E -> null (clear entry)
-    }
-
-    try {
-      if (newStatus === null) {
-        // Delete the calendar entry
-        const deleteResult = await axios.delete('/api/calendar-entries', {
+    // For non-plan days with 'E' status: remove the entry (toggle to blank)
+    if (!isPlanDay && currentStatus === 'E') {
+      try {
+        await axios.delete('/api/calendar-entries', {
           params: {
             customer_id: customer.customer_id,
             delivery_date: date,
           },
         });
-
-        if (deleteResult.data.success) {
-          enqueueSnackbar('Entry cleared', { variant: 'info' });
-        } else {
-          enqueueSnackbar('Failed to clear entry', { variant: 'error' });
-        }
-        onUpdate(); // Refresh the calendar
-        return;
+        enqueueSnackbar('Extra tiffin removed', { variant: 'info' });
+        onUpdate();
+      } catch (error) {
+        console.error('Error removing calendar entry:', error);
+        enqueueSnackbar('Failed to remove entry', { variant: 'error' });
       }
-
-      // If marking as Extra, show dialog to create a new order
-      if (newStatus === 'E') {
-        setExtraOrderData({
-          customer_id: customer.customer_id,
-          customer_name: customer.customer_name,
-          delivery_date: date,
-          order_id: activeOrder.id,
-        });
-        setOpenExtraDialog(true);
-        return;
-      }
-
-      // For T and A, create entry directly
-      const result = await dispatch(
-        createCalendarEntry({
-          customer_id: customer.customer_id,
-          order_id: activeOrder.id,
-          delivery_date: date,
-          status: newStatus,
-          quantity: 1,
-          price: 0, // Price will be calculated by the stored procedure
-        })
-      );
-
-      if (result.success) {
-        enqueueSnackbar(`Marked as ${newStatus === 'T' ? 'Delivered' : newStatus === 'A' ? 'Absent' : 'Extra'}`, {
-          variant: 'success'
-        });
-        onUpdate(); // Refresh the calendar
-      } else {
-        enqueueSnackbar(result.error || 'Failed to update entry', { variant: 'error' });
-      }
-    } catch (error) {
-      console.error('Error updating calendar entry:', error);
-      enqueueSnackbar('Failed to update entry', { variant: 'error' });
     }
+  };
+
+  // Handle double-click on non-plan days for extra tiffin
+  const handleCellDoubleClick = (customer: ICalendarCustomerData, day: number, currentStatus: CalendarEntryStatus | null, isPlanDay: boolean) => {
+    // Only allow double-click on non-plan days
+    if (isPlanDay) {
+      return;
+    }
+
+    // If already has status 'E', single-click handles removal, so ignore double-click
+    if (currentStatus === 'E') {
+      return;
+    }
+
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    // Set data and show confirmation dialog
+    setExtraOrderData({
+      customer_id: customer.customer_id,
+      customer_name: customer.customer_name,
+      delivery_date: date,
+      order_id: 0, // Will be created
+    });
+    setOpenConfirmDialog(true);
+  };
+
+  const handleConfirmExtraTiffin = () => {
+    setOpenConfirmDialog(false);
+    setOpenExtraDialog(true);
+  };
+
+  const handleCancelExtraTiffin = () => {
+    setOpenConfirmDialog(false);
+    setExtraOrderData(null);
   };
 
   const handleFinalize = async (customer: ICalendarCustomerData) => {
     if (!customer.billing_id) {
       enqueueSnackbar('No billing record found for this customer', { variant: 'warning' });
+      return;
+    }
+
+    // Validate that all plan days have a status (T or A)
+    const missingPlanDays: number[] = [];
+    days.forEach((day) => {
+      const isPlanDay = isDateCoveredByOrder(customer, day);
+      const status = getStatusForDate(customer, day);
+
+      if (isPlanDay && !status) {
+        missingPlanDays.push(day);
+      }
+    });
+
+    if (missingPlanDays.length > 0) {
+      enqueueSnackbar(
+        `Please mark all plan days before finalizing. Missing: ${missingPlanDays.join(', ')}`,
+        { variant: 'warning' }
+      );
       return;
     }
 
@@ -461,29 +485,33 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 {days.map((day) => {
                   const status = getStatusForDate(customer, day);
                   const weekend = isWeekend(day);
-                  const isCovered = isDateCoveredByOrder(customer, day);
-                  const disabled = !isCovered;
+                  const isPlanDay = isDateCoveredByOrder(customer, day);
+                  const disabled = !isPlanDay && !status;
 
                   return (
                     <StyledTableCell key={day}>
                       <Tooltip
                         title={
-                          disabled
-                            ? 'No order for this date'
-                            : status
-                            ? status === 'T'
-                              ? 'Delivered'
-                              : status === 'A'
-                              ? 'Absent'
-                              : 'Extra'
-                            : 'Click to mark'
+                          isPlanDay
+                            ? status
+                              ? status === 'T'
+                                ? 'Delivered - Click to mark Absent'
+                                : status === 'A'
+                                ? 'Absent - Click to mark Delivered'
+                                : ''
+                              : 'Plan day - Click to mark as Delivered or Absent'
+                            : status === 'E'
+                            ? 'Extra tiffin - Click to remove'
+                            : 'Double-click to add extra tiffin'
                         }
                       >
                         <DayCell
                           status={status}
                           isWeekend={weekend}
                           disabled={disabled}
-                          onClick={() => handleCellClick(customer, day, status, disabled)}
+                          isPlanDay={isPlanDay}
+                          onClick={() => handleCellClick(customer, day, status, isPlanDay)}
+                          onDoubleClick={() => handleCellDoubleClick(customer, day, status, isPlanDay)}
                         >
                           {status || ''}
                         </DayCell>
@@ -501,7 +529,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                         </Typography>
                       </Tooltip>
                       <Tooltip title="Absent">
-                        <Typography variant="caption" sx={{ color: 'grey.600', fontWeight: 'bold', fontSize: 9 }}>
+                        <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 'bold', fontSize: 9 }}>
                           A:{customer.total_absent}
                         </Typography>
                       </Tooltip>
@@ -567,6 +595,25 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           </Typography>
         </Box>
       )}
+
+      {/* Confirmation Dialog for Extra Tiffin */}
+      <Dialog open={openConfirmDialog} onClose={handleCancelExtraTiffin} maxWidth="xs" fullWidth>
+        <DialogTitle>Add Extra Tiffin?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Do you want to add an extra tiffin for {extraOrderData?.customer_name} on{' '}
+            {extraOrderData?.delivery_date}?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelExtraTiffin} color="inherit">
+            No
+          </Button>
+          <Button onClick={handleConfirmExtraTiffin} variant="contained" color="primary">
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Extra Tiffin Order Dialog */}
       <Dialog open={openExtraDialog} onClose={() => setOpenExtraDialog(false)} maxWidth="sm" fullWidth>
