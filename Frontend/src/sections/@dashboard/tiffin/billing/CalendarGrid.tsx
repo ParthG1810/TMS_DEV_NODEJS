@@ -45,11 +45,16 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
     left: 0,
     backgroundColor: theme.palette.background.paper,
     zIndex: 2,
-    minWidth: 140,
-    maxWidth: 140,
+    minWidth: 90,
+    maxWidth: 90,
+    width: 90,
     borderRight: `2px solid ${theme.palette.divider}`,
     textAlign: 'left',
-    paddingLeft: theme.spacing(1),
+    paddingLeft: theme.spacing(0.5),
+    paddingRight: theme.spacing(0.5),
+    whiteSpace: 'normal',
+    wordWrap: 'break-word',
+    overflow: 'hidden',
   },
   '&:last-child': {
     position: 'sticky',
@@ -72,11 +77,15 @@ const StyledHeaderCell = styled(TableCell)(({ theme }) => ({
     position: 'sticky',
     left: 0,
     zIndex: 3,
-    minWidth: 140,
-    maxWidth: 140,
+    minWidth: 90,
+    maxWidth: 90,
+    width: 90,
     borderRight: `2px solid ${theme.palette.divider}`,
     textAlign: 'left',
-    paddingLeft: theme.spacing(1),
+    paddingLeft: theme.spacing(0.5),
+    paddingRight: theme.spacing(0.5),
+    whiteSpace: 'normal',
+    wordWrap: 'break-word',
   },
   '&:last-child': {
     position: 'sticky',
@@ -300,20 +309,38 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       }
     }
 
-    // For non-plan days with 'E' status: remove the entry (toggle to blank)
+    // For non-plan days with 'E' status: remove the entry and delete the order
     if (!isPlanDay && currentStatus === 'E') {
       try {
-        await axios.delete('/api/calendar-entries', {
+        // First, get the calendar entry to find the order_id
+        const entryResponse = await axios.get('/api/calendar-entries', {
           params: {
             customer_id: customer.customer_id,
             delivery_date: date,
           },
         });
-        enqueueSnackbar('Extra tiffin removed', { variant: 'info' });
+
+        const orderId = entryResponse.data?.data?.order_id;
+
+        // Delete the customer order (this will also cascade delete the calendar entry)
+        if (orderId) {
+          await axios.delete(`/api/customer-orders/${orderId}`);
+          enqueueSnackbar('Extra tiffin order removed', { variant: 'info' });
+        } else {
+          // Fallback: just delete the calendar entry if no order found
+          await axios.delete('/api/calendar-entries', {
+            params: {
+              customer_id: customer.customer_id,
+              delivery_date: date,
+            },
+          });
+          enqueueSnackbar('Extra tiffin removed', { variant: 'info' });
+        }
+
         onUpdate();
       } catch (error) {
-        console.error('Error removing calendar entry:', error);
-        enqueueSnackbar('Failed to remove entry', { variant: 'error' });
+        console.error('Error removing extra tiffin:', error);
+        enqueueSnackbar('Failed to remove extra tiffin', { variant: 'error' });
       }
     }
   };
@@ -507,12 +534,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             {customers.map((customer) => (
               <TableRow key={customer.customer_id} hover>
                 <StyledTableCell>
-                  <Stack spacing={0.25} alignItems="flex-start">
-                    <Typography variant="caption" fontWeight="600" sx={{ fontSize: 11 }}>
+                  <Stack spacing={0.1} alignItems="flex-start">
+                    <Typography variant="caption" fontWeight="600" sx={{ fontSize: 9, lineHeight: 1.2 }}>
                       {customer.customer_name}
                     </Typography>
                     {customer.customer_phone && (
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: 9 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: 7, lineHeight: 1.2 }}>
                         {customer.customer_phone}
                       </Typography>
                     )}
