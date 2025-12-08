@@ -12,6 +12,7 @@ const withTM = require('next-transpile-modules')([
 module.exports = withTM({
   swcMinify: false,
   trailingSlash: true,
+  optimizeFonts: false,
   env: {
     // HOST
     HOST_API_KEY: 'http://localhost:3000',

@@ -114,6 +114,43 @@ const navConfig = [
         path: PATH_DASHBOARD.fileManager,
         icon: ICONS.folder,
       },
+
+      // INGREDIENT MANAGEMENT
+      {
+        title: 'Ingredient Management',
+        path: PATH_DASHBOARD.ingredient.root,
+        icon: ICONS.cart,
+        children: [
+          { title: 'list', path: PATH_DASHBOARD.ingredient.list },
+          { title: 'create', path: PATH_DASHBOARD.ingredient.new },
+        ],
+      },
+
+      // RECIPE MANAGEMENT
+      {
+        title: 'Recipe Management',
+        path: PATH_DASHBOARD.recipe.root,
+        icon: ICONS.booking,
+        children: [
+          { title: 'list', path: PATH_DASHBOARD.recipe.list },
+          { title: 'create', path: PATH_DASHBOARD.recipe.new },
+        ],
+      },
+
+      // TIFFIN MANAGEMENT
+      {
+        title: 'Tiffin Management',
+        path: PATH_DASHBOARD.tiffin.root,
+        icon: ICONS.menuItem,
+        children: [
+          { title: 'Meal Plans', path: PATH_DASHBOARD.tiffin.mealPlans },
+          { title: 'Customers', path: PATH_DASHBOARD.tiffin.customers },
+          { title: 'Tiffin Orders', path: PATH_DASHBOARD.tiffin.orders },
+          { title: 'Daily Count', path: PATH_DASHBOARD.tiffin.dailyCount },
+          { title: 'Monthly List', path: PATH_DASHBOARD.tiffin.monthlyList },
+          { title: 'Complete List', path: PATH_DASHBOARD.tiffin.completeList },
+        ],
+      },
     ],
   },
 
