@@ -45,7 +45,7 @@ const TABLE_HEAD = [
   { id: 'meal_name', label: 'Meal Name', align: 'left' },
   { id: 'frequency', label: 'Frequency', align: 'left' },
   { id: 'days', label: 'Days', align: 'left' },
-  { id: 'price', label: 'Price (₹)', align: 'right' },
+  { id: 'price', label: 'Price (CAD $)', align: 'right' },
   { id: '' },
 ];
 

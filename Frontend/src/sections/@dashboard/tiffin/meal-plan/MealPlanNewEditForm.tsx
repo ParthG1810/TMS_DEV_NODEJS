@@ -120,7 +120,7 @@ export default function MealPlanNewEditForm({ isEdit = false, currentMealPlan, o
             >
               <RHFTextField name="meal_name" label="Meal Name *" />
 
-              <RHFTextField name="price" label="Price (₹) *" type="number" />
+              <RHFTextField name="price" label="Price (CAD $) *" type="number" />
 
               <RHFSelect native name="frequency" label="Frequency *">
                 <option value="" />

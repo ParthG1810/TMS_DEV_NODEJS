@@ -146,6 +146,7 @@ const navConfig = [
           { title: 'Meal Plans', path: PATH_DASHBOARD.tiffin.mealPlans },
           { title: 'Customers', path: PATH_DASHBOARD.tiffin.customers },
           { title: 'Tiffin Orders', path: PATH_DASHBOARD.tiffin.orders },
+          { title: 'Billing Calendar', path: PATH_DASHBOARD.tiffin.billingCalendar },
           { title: 'Daily Count', path: PATH_DASHBOARD.tiffin.dailyCount },
           { title: 'Monthly List', path: PATH_DASHBOARD.tiffin.monthlyList },
           { title: 'Complete List', path: PATH_DASHBOARD.tiffin.completeList },

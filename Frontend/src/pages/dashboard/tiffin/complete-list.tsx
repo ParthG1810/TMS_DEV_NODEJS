@@ -45,7 +45,7 @@ const TABLE_HEAD = [
   { id: 'meal_plan_name', label: 'Meal Plan', align: 'left' },
   { id: 'quantity', label: 'Qty', align: 'center' },
   { id: 'selected_days', label: 'Days', align: 'left' },
-  { id: 'price', label: 'Price (₹)', align: 'right' },
+  { id: 'price', label: 'Price (CAD $)', align: 'right' },
   { id: 'dates', label: 'Period', align: 'left' },
 ];
 
@@ -186,7 +186,7 @@ export default function CompleteTiffinListPage() {
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell align="right">₹{Number(row.price).toFixed(2)}</TableCell>
+                        <TableCell align="right">CAD ${Number(row.price).toFixed(2)}</TableCell>
                         <TableCell>
                           {format(new Date(row.start_date), 'dd MMM yyyy')} -{' '}
                           {format(new Date(row.end_date), 'dd MMM yyyy')}

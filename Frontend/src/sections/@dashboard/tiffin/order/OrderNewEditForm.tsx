@@ -211,7 +211,7 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
                       <Box>
                         <Typography variant="body2">{plan?.meal_name}</Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {plan?.frequency} | {plan?.days} | ₹{plan?.price}
+                          {plan?.frequency} | {plan?.days} | CAD ${plan?.price}
                         </Typography>
                       </Box>
                     </li>
@@ -225,7 +225,7 @@ export default function OrderNewEditForm({ isEdit = false, currentOrder, onSubmi
 
               <RHFTextField name="quantity" label="Quantity *" type="number" />
 
-              <RHFTextField name="price" label="Price (₹) *" type="number" />
+              <RHFTextField name="price" label="Price (CAD $) *" type="number" />
 
               <Controller
                 name="start_date"

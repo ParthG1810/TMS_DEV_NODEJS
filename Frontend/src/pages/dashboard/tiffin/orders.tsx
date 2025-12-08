@@ -46,7 +46,7 @@ const TABLE_HEAD = [
   { id: 'meal_plan_name', label: 'Meal Plan', align: 'left' },
   { id: 'quantity', label: 'Qty', align: 'center' },
   { id: 'selected_days', label: 'Days', align: 'left' },
-  { id: 'price', label: 'Price (₹)', align: 'right' },
+  { id: 'price', label: 'Price (CAD $)', align: 'right' },
   { id: 'dates', label: 'Period', align: 'left' },
   { id: '' },
 ];
