@@ -122,7 +122,7 @@ export default function BillingCalendarPage() {
 
   // Calculate summary stats
   const totalCustomers = calendarData?.customers?.length || 0;
-  const totalAmount = (calendarData?.customers || []).reduce((sum, c) => sum + c.total_amount, 0);
+  const totalAmount = (calendarData?.customers || []).reduce((sum, c) => sum + Number(c.total_amount || 0), 0);
   const pendingCount = (calendarData?.customers || []).filter((c) => c.billing_status === 'calculating').length;
   const finalizedCount = (calendarData?.customers || []).filter((c) => c.billing_status === 'pending').length;
 
