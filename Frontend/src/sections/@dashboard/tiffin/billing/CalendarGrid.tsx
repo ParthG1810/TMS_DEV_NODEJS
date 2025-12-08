@@ -349,6 +349,11 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     }
 
     try {
+      // Determine the day of week for the selected date
+      const deliveryDate = new Date(extraOrderData.delivery_date);
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayOfWeek = dayNames[deliveryDate.getDay()];
+
       // Create a new order for the extra tiffin
       const orderResult = await axios.post('/api/customer-orders', {
         customer_id: extraOrderData.customer_id,
@@ -357,6 +362,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         end_date: extraOrderData.delivery_date,
         quantity: 1,
         price: priceValue,
+        selected_days: [dayOfWeek], // Single day for extra tiffin
       });
 
       if (orderResult.data.success) {
