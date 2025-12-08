@@ -24,11 +24,13 @@ import { styled, alpha } from '@mui/material/styles';
 // components
 import Iconify from '../../../../components/iconify';
 import { useSnackbar } from '../../../../components/snackbar';
+// utils
+import axios from '../../../../utils/axios';
 // redux
 import { useDispatch } from '../../../../redux/store';
 import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/payment';
 // types
-import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/tms';
+import { ICalendarCustomerData, CalendarEntryStatus, ICustomerOrder } from '../../../../@types/tms';
 
 // ----------------------------------------------------------------------
 
@@ -131,6 +133,32 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const [selectedCustomer, setSelectedCustomer] = useState<ICalendarCustomerData | null>(null);
   const [openFinalizeDialog, setOpenFinalizeDialog] = useState(false);
   const [finalizingCustomerId, setFinalizingCustomerId] = useState<number | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<{ [customerId: number]: ICustomerOrder[] }>({});
+
+  // Fetch customer orders when component mounts
+  useEffect(() => {
+    const fetchCustomerOrders = async () => {
+      try {
+        const response = await axios.get('/api/customer-orders');
+        const orders: ICustomerOrder[] = response.data.data.orders || response.data.data || [];
+
+        // Group orders by customer_id
+        const ordersByCustomer: { [customerId: number]: ICustomerOrder[] } = {};
+        orders.forEach((order) => {
+          if (!ordersByCustomer[order.customer_id]) {
+            ordersByCustomer[order.customer_id] = [];
+          }
+          ordersByCustomer[order.customer_id].push(order);
+        });
+
+        setCustomerOrders(ordersByCustomer);
+      } catch (error) {
+        console.error('Error fetching customer orders:', error);
+      }
+    };
+
+    fetchCustomerOrders();
+  }, []);
 
   // Get number of days in the month
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -151,6 +179,33 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     day: number,
     currentStatus: CalendarEntryStatus | null
   ) => {
+    // Get customer's active orders
+    const orders = customerOrders[customer.customer_id] || [];
+
+    if (orders.length === 0) {
+      enqueueSnackbar('No active orders found for this customer. Please create an order first.', {
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    // Find an order that covers this date
+    const activeOrder = orders.find((order) => {
+      const startDate = new Date(order.start_date);
+      const endDate = new Date(order.end_date);
+      const currentDate = new Date(date);
+      return currentDate >= startDate && currentDate <= endDate;
+    });
+
+    if (!activeOrder) {
+      enqueueSnackbar('No order covers this date. Please check the order period.', {
+        variant: 'warning',
+      });
+      return;
+    }
+
     // Cycle through statuses: null -> T -> A -> E -> null
     let newStatus: CalendarEntryStatus | null = null;
 
@@ -164,8 +219,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       newStatus = null;
     }
 
-    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
     if (newStatus === null) {
       // Delete entry - for now, we'll just set it to 'A' as a workaround
       // In a real implementation, you'd call a delete endpoint
@@ -175,13 +228,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     }
 
     try {
-      // We need to find an active order for this customer
-      // For simplicity, we'll assume there's at least one order
-      // In production, you'd fetch active orders for this customer
       const result = await dispatch(
         createCalendarEntry({
           customer_id: customer.customer_id,
-          order_id: 1, // This should be fetched from active orders
+          order_id: activeOrder.id,
           delivery_date: date,
           status: newStatus,
           quantity: 1,
