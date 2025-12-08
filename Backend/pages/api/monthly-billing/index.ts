@@ -139,7 +139,7 @@ async function handleGetCalendarGrid(
       const placeholders = customerIds.map(() => '?').join(',');
       orders = await query<any[]>(
         `
-          SELECT id, customer_id, start_date, end_date
+          SELECT id, customer_id, start_date, end_date, selected_days
           FROM customer_orders
           WHERE customer_id IN (${placeholders})
           AND start_date <= ? AND end_date >= ?
@@ -192,10 +192,24 @@ async function handleGetCalendarGrid(
       if (!ordersMap.has(order.customer_id)) {
         ordersMap.set(order.customer_id, []);
       }
+
+      // Parse selected_days from JSON string if it exists
+      let selectedDays = null;
+      if (order.selected_days) {
+        try {
+          selectedDays = typeof order.selected_days === 'string'
+            ? JSON.parse(order.selected_days)
+            : order.selected_days;
+        } catch (e) {
+          console.error('Error parsing selected_days:', e);
+        }
+      }
+
       ordersMap.get(order.customer_id).push({
         id: order.id,
         start_date: order.start_date,
         end_date: order.end_date,
+        selected_days: selectedDays,
       });
     });
 
