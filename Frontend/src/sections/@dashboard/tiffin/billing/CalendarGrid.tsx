@@ -385,7 +385,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                     </Stack>
 
                     <Typography variant="body2" fontWeight="700" color="primary">
-                      ₹{customer.total_amount.toFixed(2)}
+                      CAD ${customer.total_amount.toFixed(2)}
                     </Typography>
 
                     {customer.billing_status === 'calculating' && (
