@@ -321,6 +321,25 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       return;
     }
 
+    // Validate that all plan days have a status (T or A)
+    const missingPlanDays: number[] = [];
+    days.forEach((day) => {
+      const isPlanDay = isDateCoveredByOrder(customer, day);
+      const status = getStatusForDate(customer, day);
+
+      if (isPlanDay && !status) {
+        missingPlanDays.push(day);
+      }
+    });
+
+    if (missingPlanDays.length > 0) {
+      enqueueSnackbar(
+        `Please mark all plan days before finalizing. Missing: ${missingPlanDays.join(', ')}`,
+        { variant: 'warning' }
+      );
+      return;
+    }
+
     setFinalizingCustomerId(customer.customer_id);
 
     try {
