@@ -24,6 +24,8 @@ import { styled, alpha } from '@mui/material/styles';
 // components
 import Iconify from '../../../../components/iconify';
 import { useSnackbar } from '../../../../components/snackbar';
+// utils
+import axios from '../../../../utils/axios';
 // redux
 import { useDispatch } from '../../../../redux/store';
 import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/payment';
@@ -216,18 +218,28 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     } else if (currentStatus === 'A') {
       newStatus = 'E';
     } else {
-      newStatus = null;
-    }
-
-    if (newStatus === null) {
-      // Delete entry - for now, we'll just set it to 'A' as a workaround
-      // In a real implementation, you'd call a delete endpoint
-      enqueueSnackbar('Entry cleared', { variant: 'info' });
-      onUpdate();
-      return;
+      newStatus = null; // E -> null (clear entry)
     }
 
     try {
+      if (newStatus === null) {
+        // Delete the calendar entry
+        const deleteResult = await axios.delete('/api/calendar-entries', {
+          params: {
+            customer_id: customer.customer_id,
+            delivery_date: date,
+          },
+        });
+
+        if (deleteResult.data.success) {
+          enqueueSnackbar('Entry cleared', { variant: 'info' });
+        } else {
+          enqueueSnackbar('Failed to clear entry', { variant: 'error' });
+        }
+        onUpdate(); // Refresh the calendar
+        return;
+      }
+
       const result = await dispatch(
         createCalendarEntry({
           customer_id: customer.customer_id,
@@ -235,17 +247,20 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           delivery_date: date,
           status: newStatus,
           quantity: 1,
-          price: newStatus === 'E' ? 60 : 50, // Default prices
+          price: newStatus === 'E' ? 60 : 50, // Default prices (will be updated with new logic)
         })
       );
 
       if (result.success) {
-        enqueueSnackbar('Entry updated successfully', { variant: 'success' });
-        onUpdate();
+        enqueueSnackbar(`Marked as ${newStatus === 'T' ? 'Delivered' : newStatus === 'A' ? 'Absent' : 'Extra'}`, {
+          variant: 'success'
+        });
+        onUpdate(); // Refresh the calendar
       } else {
         enqueueSnackbar(result.error || 'Failed to update entry', { variant: 'error' });
       }
     } catch (error) {
+      console.error('Error updating calendar entry:', error);
       enqueueSnackbar('Failed to update entry', { variant: 'error' });
     }
   };
@@ -278,7 +293,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
   const getStatusForDate = (customer: ICalendarCustomerData, day: number): CalendarEntryStatus | null => {
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return customer.entries[date] || null;
+    // Check for the date in entries - handle both string and date object formats
+    for (const [entryDate, status] of Object.entries(customer.entries)) {
+      const normalizedDate = entryDate.split('T')[0]; // Remove time part if present
+      if (normalizedDate === date) {
+        return status as CalendarEntryStatus;
+      }
+    }
+    return null;
   };
 
   const getBillingStatusColor = (status: string) => {

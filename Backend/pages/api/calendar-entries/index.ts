@@ -13,6 +13,7 @@ import cors from '../../../src/utils/cors';
  * @api {get} /api/calendar-entries Get calendar entries
  * @api {post} /api/calendar-entries Create calendar entry
  * @api {put} /api/calendar-entries Batch update calendar entries
+ * @api {delete} /api/calendar-entries Delete calendar entry by date
  */
 export default async function handler(
   req: NextApiRequest,
@@ -27,6 +28,8 @@ export default async function handler(
     return handlePost(req, res);
   } else if (req.method === 'PUT') {
     return handleBatchUpdate(req, res);
+  } else if (req.method === 'DELETE') {
+    return handleDelete(req, res);
   } else {
     return res.status(405).json({
       success: false,
@@ -338,6 +341,48 @@ async function handleBatchUpdate(
     return res.status(500).json({
       success: false,
       error: error.message || 'Failed to batch update calendar entries',
+    });
+  }
+}
+
+/**
+ * DELETE /api/calendar-entries
+ * Query params:
+ * - customer_id: number (required)
+ * - delivery_date: string (YYYY-MM-DD) (required)
+ */
+async function handleDelete(
+  req: NextApiRequest,
+  res: NextApiResponse<ApiResponse<any>>
+) {
+  try {
+    const { customer_id, delivery_date } = req.query;
+
+    if (!customer_id || !delivery_date) {
+      return res.status(400).json({
+        success: false,
+        error: 'customer_id and delivery_date are required',
+      });
+    }
+
+    // Delete the calendar entry
+    await query(
+      `
+        DELETE FROM tiffin_calendar_entries
+        WHERE customer_id = ? AND delivery_date = ?
+      `,
+      [customer_id, delivery_date]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: { message: 'Entry deleted successfully' },
+    });
+  } catch (error: any) {
+    console.error('Error deleting calendar entry:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to delete calendar entry',
     });
   }
 }
