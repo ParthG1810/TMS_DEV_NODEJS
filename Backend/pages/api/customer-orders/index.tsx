@@ -380,8 +380,9 @@ async function validateCustomerOrderInput(
       errors.push('Invalid end date format');
     }
 
-    if (endDate <= startDate) {
-      errors.push('End date must be after start date');
+    // Allow same-day orders (for daily/extra tiffins)
+    if (endDate < startDate) {
+      errors.push('End date cannot be before start date');
     }
   }
 
