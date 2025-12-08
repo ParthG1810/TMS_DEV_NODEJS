@@ -12,6 +12,9 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  decimalNumbers: true, // Return DECIMAL and NEWDECIMAL types as numbers instead of strings
+  supportBigNumbers: true, // Support big numbers (BIGINT, DECIMAL)
+  bigNumberStrings: false, // Return big numbers as numbers, not strings (unless they exceed JS number limits)
 });
 
 // Test database connection on startup
