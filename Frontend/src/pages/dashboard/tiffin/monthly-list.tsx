@@ -86,7 +86,7 @@ export default function MonthlyTiffinListPage() {
                       <TableCell>Meal Plan</TableCell>
                       <TableCell align="center">Quantity</TableCell>
                       <TableCell>Selected Days</TableCell>
-                      <TableCell align="right">Price (₹)</TableCell>
+                      <TableCell align="right">Price (CAD $)</TableCell>
                       <TableCell>Period</TableCell>
                     </TableRow>
                   </TableHead>
@@ -115,7 +115,7 @@ export default function MonthlyTiffinListPage() {
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell align="right">₹{Number(order.price).toFixed(2)}</TableCell>
+                        <TableCell align="right">CAD ${Number(order.price).toFixed(2)}</TableCell>
                         <TableCell>
                           {format(new Date(order.start_date), 'dd MMM yyyy')} -{' '}
                           {format(new Date(order.end_date), 'dd MMM yyyy')}

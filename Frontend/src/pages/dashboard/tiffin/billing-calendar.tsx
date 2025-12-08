@@ -182,7 +182,7 @@ export default function BillingCalendarPage() {
                 variant="outlined"
               />
               <Chip
-                label={`₹${totalAmount.toFixed(2)} Total`}
+                label={`CAD $${totalAmount.toFixed(2)} Total`}
                 color="success"
                 variant="outlined"
               />

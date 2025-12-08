@@ -44,7 +44,7 @@ const TABLE_HEAD = [
   { id: 'meal_name', label: 'Meal Name', align: 'left' },
   { id: 'frequency', label: 'Frequency', align: 'left' },
   { id: 'days', label: 'Days', align: 'left' },
-  { id: 'price', label: 'Price (₹)', align: 'right' },
+  { id: 'price', label: 'Price (CAD $)', align: 'right' },
   { id: '' },
 ];
 
@@ -216,7 +216,7 @@ export default function MealPlansPage() {
                         <TableCell>{row.meal_name}</TableCell>
                         <TableCell>{row.frequency}</TableCell>
                         <TableCell>{row.days}</TableCell>
-                        <TableCell align="right">₹{row.price}</TableCell>
+                        <TableCell align="right">CAD ${row.price}</TableCell>
                         <TableCell align="right">
                           <Tooltip title="Edit">
                             <IconButton onClick={() => handleEditRow(row.id)}>
