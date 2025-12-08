@@ -121,10 +121,10 @@ export default function BillingCalendarPage() {
   const currentMonthName = monthNames[selectedMonth - 1];
 
   // Calculate summary stats
-  const totalCustomers = calendarData?.customers.length || 0;
-  const totalAmount = calendarData?.customers.reduce((sum, c) => sum + c.total_amount, 0) || 0;
-  const pendingCount = calendarData?.customers.filter((c) => c.billing_status === 'calculating').length || 0;
-  const finalizedCount = calendarData?.customers.filter((c) => c.billing_status === 'pending').length || 0;
+  const totalCustomers = calendarData?.customers?.length || 0;
+  const totalAmount = (calendarData?.customers || []).reduce((sum, c) => sum + c.total_amount, 0);
+  const pendingCount = (calendarData?.customers || []).filter((c) => c.billing_status === 'calculating').length;
+  const finalizedCount = (calendarData?.customers || []).filter((c) => c.billing_status === 'pending').length;
 
   return (
     <>

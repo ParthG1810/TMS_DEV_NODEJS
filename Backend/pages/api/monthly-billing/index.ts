@@ -108,18 +108,46 @@ async function handleGetCalendarGrid(
 
     const [year, monthNum] = month.split('-').map(Number);
 
-    // Get all customers or specific customer
-    let customerSql = 'SELECT id, name, phone FROM customers';
-    const customerParams: any[] = [];
+    // Calculate the first and last day of the selected month
+    const firstDayOfMonth = `${month}-01`;
+    const lastDayOfMonth = new Date(year, monthNum, 0).getDate();
+    const lastDayOfMonthStr = `${month}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+    // Get customers who have orders that overlap with the selected month
+    let customerSql = `
+      SELECT DISTINCT c.id, c.name, c.phone
+      FROM customers c
+      INNER JOIN customer_orders co ON c.id = co.customer_id
+      WHERE co.start_date <= ? AND co.end_date >= ?
+    `;
+    const customerParams: any[] = [lastDayOfMonthStr, firstDayOfMonth];
 
     if (customer_id) {
-      customerSql += ' WHERE id = ?';
+      customerSql += ' AND c.id = ?';
       customerParams.push(customer_id);
     }
 
-    customerSql += ' ORDER BY name ASC';
+    customerSql += ' ORDER BY c.name ASC';
 
     const customers = await query<any[]>(customerSql, customerParams);
+
+    // Get orders for these customers that overlap with the selected month
+    const customerIds = customers.map(c => c.id);
+    let orders: any[] = [];
+
+    if (customerIds.length > 0) {
+      const placeholders = customerIds.map(() => '?').join(',');
+      orders = await query<any[]>(
+        `
+          SELECT id, customer_id, start_date, end_date
+          FROM customer_orders
+          WHERE customer_id IN (${placeholders})
+          AND start_date <= ? AND end_date >= ?
+          ORDER BY customer_id, start_date
+        `,
+        [...customerIds, lastDayOfMonthStr, firstDayOfMonth]
+      );
+    }
 
     // Get calendar entries for the month
     const entries = await query<any[]>(
@@ -158,6 +186,19 @@ async function handleGetCalendarGrid(
       billingMap.set(b.customer_id, b);
     });
 
+    // Create orders lookup by customer
+    const ordersMap = new Map();
+    orders.forEach((order) => {
+      if (!ordersMap.has(order.customer_id)) {
+        ordersMap.set(order.customer_id, []);
+      }
+      ordersMap.get(order.customer_id).push({
+        id: order.id,
+        start_date: order.start_date,
+        end_date: order.end_date,
+      });
+    });
+
     // Build grid data
     const gridData: CalendarGridData = {
       year,
@@ -171,6 +212,7 @@ async function handleGetCalendarGrid(
         });
 
         const billing = billingMap.get(customer.id);
+        const customerOrders = ordersMap.get(customer.id) || [];
 
         return {
           customer_id: customer.id,
@@ -183,6 +225,7 @@ async function handleGetCalendarGrid(
           total_amount: billing?.total_amount || 0,
           billing_status: billing?.status || 'calculating',
           billing_id: billing?.id,
+          orders: customerOrders,
         };
       }),
     };

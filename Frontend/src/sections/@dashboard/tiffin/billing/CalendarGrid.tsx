@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 // @mui
 import {
   Card,
@@ -24,13 +24,11 @@ import { styled, alpha } from '@mui/material/styles';
 // components
 import Iconify from '../../../../components/iconify';
 import { useSnackbar } from '../../../../components/snackbar';
-// utils
-import axios from '../../../../utils/axios';
 // redux
 import { useDispatch } from '../../../../redux/store';
 import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/payment';
 // types
-import { ICalendarCustomerData, CalendarEntryStatus, ICustomerOrder } from '../../../../@types/tms';
+import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/tms';
 
 // ----------------------------------------------------------------------
 
@@ -84,22 +82,26 @@ interface DayCellProps {
   status: CalendarEntryStatus | null;
   onClick: () => void;
   isWeekend: boolean;
+  disabled?: boolean;
 }
 
 const DayCell = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'status' && prop !== 'isWeekend',
-})<DayCellProps>(({ theme, status, isWeekend }) => ({
+  shouldForwardProp: (prop) => prop !== 'status' && prop !== 'isWeekend' && prop !== 'disabled',
+})<DayCellProps>(({ theme, status, isWeekend, disabled }) => ({
   width: 32,
   height: 32,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  cursor: 'pointer',
+  cursor: disabled ? 'not-allowed' : 'pointer',
   borderRadius: theme.spacing(0.5),
   fontSize: 12,
   fontWeight: 'bold',
   transition: 'all 0.2s',
-  backgroundColor: !status
+  opacity: disabled ? 0.3 : 1,
+  backgroundColor: disabled
+    ? alpha(theme.palette.grey[300], 0.2)
+    : !status
     ? isWeekend
       ? alpha(theme.palette.grey[300], 0.3)
       : 'transparent'
@@ -108,13 +110,15 @@ const DayCell = styled(Box, {
     : status === 'A'
     ? theme.palette.grey[400]
     : theme.palette.info.main,
-  color: status ? 'white' : theme.palette.text.primary,
+  color: disabled ? theme.palette.text.disabled : status ? 'white' : theme.palette.text.primary,
   border: `1px solid ${theme.palette.divider}`,
-  '&:hover': {
-    transform: 'scale(1.1)',
-    boxShadow: theme.shadows[4],
-    zIndex: 1,
-  },
+  '&:hover': disabled
+    ? {}
+    : {
+        transform: 'scale(1.1)',
+        boxShadow: theme.shadows[4],
+        zIndex: 1,
+      },
 }));
 
 // ----------------------------------------------------------------------
@@ -133,32 +137,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const [selectedCustomer, setSelectedCustomer] = useState<ICalendarCustomerData | null>(null);
   const [openFinalizeDialog, setOpenFinalizeDialog] = useState(false);
   const [finalizingCustomerId, setFinalizingCustomerId] = useState<number | null>(null);
-  const [customerOrders, setCustomerOrders] = useState<{ [customerId: number]: ICustomerOrder[] }>({});
-
-  // Fetch customer orders when component mounts
-  useEffect(() => {
-    const fetchCustomerOrders = async () => {
-      try {
-        const response = await axios.get('/api/customer-orders');
-        const orders: ICustomerOrder[] = response.data.data.orders || response.data.data || [];
-
-        // Group orders by customer_id
-        const ordersByCustomer: { [customerId: number]: ICustomerOrder[] } = {};
-        orders.forEach((order) => {
-          if (!ordersByCustomer[order.customer_id]) {
-            ordersByCustomer[order.customer_id] = [];
-          }
-          ordersByCustomer[order.customer_id].push(order);
-        });
-
-        setCustomerOrders(ordersByCustomer);
-      } catch (error) {
-        console.error('Error fetching customer orders:', error);
-      }
-    };
-
-    fetchCustomerOrders();
-  }, []);
 
   // Get number of days in the month
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -174,16 +152,38 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     return dayOfWeek === 0 || dayOfWeek === 6;
   };
 
+  // Check if a date is covered by any order for the customer
+  const isDateCoveredByOrder = (customer: ICalendarCustomerData, day: number): boolean => {
+    if (!customer.orders || customer.orders.length === 0) {
+      return false;
+    }
+
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const currentDate = new Date(date);
+
+    return customer.orders.some((order) => {
+      const startDate = new Date(order.start_date);
+      const endDate = new Date(order.end_date);
+      return currentDate >= startDate && currentDate <= endDate;
+    });
+  };
+
   const handleCellClick = async (
     customer: ICalendarCustomerData,
     day: number,
-    currentStatus: CalendarEntryStatus | null
+    currentStatus: CalendarEntryStatus | null,
+    isDisabled: boolean
   ) => {
-    // Get customer's active orders
-    const orders = customerOrders[customer.customer_id] || [];
+    // Don't allow clicks on disabled dates
+    if (isDisabled) {
+      return;
+    }
+
+    // Get customer's orders
+    const orders = customer.orders || [];
 
     if (orders.length === 0) {
-      enqueueSnackbar('No active orders found for this customer. Please create an order first.', {
+      enqueueSnackbar('No active orders found for this customer.', {
         variant: 'warning',
       });
       return;
@@ -200,7 +200,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     });
 
     if (!activeOrder) {
-      enqueueSnackbar('No order covers this date. Please check the order period.', {
+      enqueueSnackbar('No order covers this date.', {
         variant: 'warning',
       });
       return;
@@ -338,12 +338,16 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 {days.map((day) => {
                   const status = getStatusForDate(customer, day);
                   const weekend = isWeekend(day);
+                  const isCovered = isDateCoveredByOrder(customer, day);
+                  const disabled = !isCovered;
 
                   return (
                     <StyledTableCell key={day}>
                       <Tooltip
                         title={
-                          status
+                          disabled
+                            ? 'No order for this date'
+                            : status
                             ? status === 'T'
                               ? 'Delivered'
                               : status === 'A'
@@ -355,7 +359,8 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                         <DayCell
                           status={status}
                           isWeekend={weekend}
-                          onClick={() => handleCellClick(customer, day, status)}
+                          disabled={disabled}
+                          onClick={() => handleCellClick(customer, day, status, disabled)}
                         >
                           {status || ''}
                         </DayCell>

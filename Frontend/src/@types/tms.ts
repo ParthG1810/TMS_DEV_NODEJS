@@ -360,6 +360,11 @@ export type ICalendarCustomerData = {
   total_amount: number;
   billing_status: BillingStatus;
   billing_id?: number;
+  orders?: Array<{
+    id: number;
+    start_date: string;
+    end_date: string;
+  }>;
 };
 
 // Monthly Calendar Data
