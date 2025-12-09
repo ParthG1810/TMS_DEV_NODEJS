@@ -312,6 +312,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           }
         }
 
+        // Revert billing status if it was finalized
+        await revertBillingIfFinalized(customer);
+
         onUpdate(); // Refresh the calendar
       } catch (error) {
         console.error('Error updating calendar entry:', error);
@@ -348,6 +351,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           });
           enqueueSnackbar('Extra tiffin removed', { variant: 'info' });
         }
+
+        // Revert billing status if it was finalized
+        await revertBillingIfFinalized(customer);
 
         onUpdate();
       } catch (error) {
@@ -389,6 +395,25 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const handleCancelExtraTiffin = () => {
     setOpenConfirmDialog(false);
     setExtraOrderData(null);
+  };
+
+  // Helper function to revert billing status if it was finalized
+  const revertBillingIfFinalized = async (customer: ICalendarCustomerData) => {
+    // Only revert if billing exists and is finalized or pending
+    if (
+      customer.billing_id &&
+      (customer.billing_status === 'pending' || customer.billing_status === 'finalized')
+    ) {
+      try {
+        await axios.put(`/api/monthly-billing/${customer.billing_id}`, {
+          status: 'calculating',
+        });
+        // Note: onUpdate() will be called by the parent to refresh the data
+      } catch (error) {
+        console.error('Error reverting billing status:', error);
+        // Don't show error to user - this is a background operation
+      }
+    }
   };
 
   const handleFinalize = async (customer: ICalendarCustomerData) => {
@@ -482,6 +507,13 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
         if (result.success) {
           enqueueSnackbar('Extra tiffin order created successfully', { variant: 'success' });
+
+          // Find the customer and revert billing if finalized
+          const customer = customers.find((c) => c.customer_id === extraOrderData.customer_id);
+          if (customer) {
+            await revertBillingIfFinalized(customer);
+          }
+
           setOpenExtraDialog(false);
           setExtraOrderData(null);
           setSelectedMealPlan(null);
