@@ -208,6 +208,7 @@ async function handlePost(
       )
       VALUES (?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
+        order_id = VALUES(order_id),
         status = VALUES(status),
         quantity = VALUES(quantity),
         price = VALUES(price),
@@ -290,6 +291,7 @@ async function handleBatchUpdate(
       )
       VALUES (?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
+        order_id = VALUES(order_id),
         status = VALUES(status),
         quantity = VALUES(quantity),
         price = VALUES(price),
