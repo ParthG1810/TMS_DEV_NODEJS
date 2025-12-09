@@ -194,6 +194,16 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     fetchMealPlans();
   }, []);
 
+  // Auto-populate price when meal plan is selected
+  useEffect(() => {
+    if (selectedMealPlan && mealPlans.length > 0) {
+      const selectedPlan = mealPlans.find((plan) => plan.id === selectedMealPlan);
+      if (selectedPlan && selectedPlan.price) {
+        setExtraPrice(Number(selectedPlan.price).toFixed(2));
+      }
+    }
+  }, [selectedMealPlan, mealPlans]);
+
   // Get number of days in the month
   const daysInMonth = new Date(year, month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -536,12 +546,32 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             {customers.map((customer) => (
               <TableRow key={customer.customer_id} hover>
                 <StyledTableCell>
-                  <Stack spacing={0.1} alignItems="flex-start">
-                    <Typography variant="caption" fontWeight="600" sx={{ fontSize: 9, lineHeight: 1.2 }}>
+                  <Stack spacing={0.2} alignItems="flex-start">
+                    <Typography
+                      variant="caption"
+                      fontWeight="600"
+                      sx={{
+                        fontSize: 10.5,
+                        lineHeight: 1.3,
+                        wordBreak: 'break-word',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
                       {customer.customer_name}
                     </Typography>
                     {customer.customer_phone && (
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: 7, lineHeight: 1.2 }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          fontSize: 7.5,
+                          lineHeight: 1.2,
+                          wordBreak: 'break-word',
+                        }}
+                      >
                         {customer.customer_phone}
                       </Typography>
                     )}
@@ -712,10 +742,16 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               type="number"
               value={extraPrice}
               onChange={(e) => setExtraPrice(e.target.value)}
-              placeholder="Enter price for extra tiffin"
-              InputProps={{
-                startAdornment: <Typography sx={{ mr: 1 }}>CAD $</Typography>,
+              placeholder="Auto-filled from meal plan"
+              inputProps={{
+                step: '0.01',
+                min: '0',
+                inputMode: 'decimal',
               }}
+              InputProps={{
+                startAdornment: <Typography sx={{ mr: 1 }}>$</Typography>,
+              }}
+              helperText="Price is auto-filled from selected meal plan. You can modify it if needed."
             />
 
             <Typography variant="caption" color="text.secondary">
