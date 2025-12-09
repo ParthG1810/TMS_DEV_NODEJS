@@ -481,6 +481,20 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayOfWeek = dayNames[deliveryDate.getDay()];
 
+      // IMPORTANT: Delete any existing calendar entry for this date first
+      // This ensures we start with a clean state and the new order_id is correctly set
+      try {
+        await axios.delete('/api/calendar-entries', {
+          params: {
+            customer_id: extraOrderData.customer_id,
+            delivery_date: extraOrderData.delivery_date,
+          },
+        });
+      } catch (deleteError) {
+        // Ignore error if entry doesn't exist
+        console.log('No existing entry to delete (expected for new extra tiffins)');
+      }
+
       // Create a new order for the extra tiffin
       const orderResult = await axios.post('/api/customer-orders', {
         customer_id: extraOrderData.customer_id,
