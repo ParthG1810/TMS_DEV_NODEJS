@@ -218,34 +218,24 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     return dayOfWeek === 0 || dayOfWeek === 6;
   };
 
-  // Helper to parse YYYY-MM-DD date strings without timezone conversion
-  const parseDate = (dateStr: string): Date => {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    date.setHours(0, 0, 0, 0); // Normalize to midnight
-    return date;
-  };
-
   // Check if a date is covered by any order for the customer
   const isDateCoveredByOrder = (customer: ICalendarCustomerData, day: number): boolean => {
     if (!customer.orders || customer.orders.length === 0) {
       return false;
     }
 
-    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    // Use string format for reliable date comparison (YYYY-MM-DD)
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    // Get day of week for selected_days check
     const currentDate = new Date(year, month - 1, day);
-    currentDate.setHours(0, 0, 0, 0); // Normalize to midnight
     const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayName = dayNames[dayOfWeek];
 
     return customer.orders.some((order) => {
-      const startDate = parseDate(order.start_date); // Parse without timezone conversion
-      const endDate = parseDate(order.end_date); // Parse without timezone conversion
-
-      // Use date-only comparison (inclusive of both start and end dates)
-      const isInDateRange = currentDate.getTime() >= startDate.getTime() &&
-                            currentDate.getTime() <= endDate.getTime();
+      // String comparison for dates (YYYY-MM-DD format compares correctly)
+      const isInDateRange = dateStr >= order.start_date && dateStr <= order.end_date;
 
       // If order doesn't have selected_days, it covers all days in the range
       if (!order.selected_days || order.selected_days.length === 0) {
