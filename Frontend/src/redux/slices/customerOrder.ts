@@ -113,13 +113,24 @@ export function getCustomerOrder(id: number) {
 
 // ----------------------------------------------------------------------
 
+// Helper function to format Date objects to YYYY-MM-DD string without timezone conversion
+const formatDateForAPI = (date: Date | string): string => {
+  if (typeof date === 'string') return date;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export function createCustomerOrder(orderData: ICustomerOrderFormValues) {
   return async (dispatch: Dispatch) => {
     dispatch(slice.actions.startLoading());
     try {
-      // Ensure selected_days is an array
+      // Format dates and ensure selected_days is an array
       const payload = {
         ...orderData,
+        start_date: formatDateForAPI(orderData.start_date),
+        end_date: formatDateForAPI(orderData.end_date),
         selected_days: Array.isArray(orderData.selected_days)
           ? orderData.selected_days
           : [],
@@ -148,9 +159,11 @@ export function updateCustomerOrder(id: number, orderData: Partial<ICustomerOrde
   return async (dispatch: Dispatch) => {
     dispatch(slice.actions.startLoading());
     try {
-      // Ensure selected_days is an array if provided
+      // Format dates and ensure selected_days is an array if provided
       const payload = {
         ...orderData,
+        ...(orderData.start_date && { start_date: formatDateForAPI(orderData.start_date) }),
+        ...(orderData.end_date && { end_date: formatDateForAPI(orderData.end_date) }),
         ...(orderData.selected_days && {
           selected_days: Array.isArray(orderData.selected_days)
             ? orderData.selected_days
