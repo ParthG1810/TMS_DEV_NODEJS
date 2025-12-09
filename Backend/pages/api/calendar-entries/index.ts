@@ -190,12 +190,27 @@ async function handlePost(
     // Get pricing from the order's meal plan or use default
     let price = body.price || 0;
     if (!price || price === 0) {
-      const pricingRules = await query<any[]>(
-        'SELECT delivered_price, extra_price FROM pricing_rules WHERE is_default = TRUE LIMIT 1'
+      // Get price from the meal plan associated with the order
+      const orderPricing = await query<any[]>(
+        `SELECT mp.price
+         FROM customer_orders co
+         INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
+         WHERE co.id = ?
+         LIMIT 1`,
+        [body.order_id]
       );
 
-      if (pricingRules.length > 0) {
-        price = body.status === 'E' ? pricingRules[0].extra_price : pricingRules[0].delivered_price;
+      if (orderPricing.length > 0 && orderPricing[0].price) {
+        price = orderPricing[0].price;
+      } else {
+        // Fallback to default pricing if meal plan price not found
+        const pricingRules = await query<any[]>(
+          'SELECT delivered_price, extra_price FROM pricing_rules WHERE is_default = TRUE LIMIT 1'
+        );
+
+        if (pricingRules.length > 0) {
+          price = body.status === 'E' ? pricingRules[0].extra_price : pricingRules[0].delivered_price;
+        }
       }
     }
 
@@ -276,13 +291,32 @@ async function handleBatchUpdate(
       });
     }
 
-    // Get pricing rules
-    const pricingRules = await query<any[]>(
-      'SELECT delivered_price, extra_price FROM pricing_rules WHERE is_default = TRUE LIMIT 1'
+    // Get price from the meal plan associated with the order
+    const orderPricing = await query<any[]>(
+      `SELECT mp.price
+       FROM customer_orders co
+       INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
+       WHERE co.id = ?
+       LIMIT 1`,
+      [body.order_id]
     );
 
-    const deliveredPrice = pricingRules.length > 0 ? pricingRules[0].delivered_price : 50;
-    const extraPrice = pricingRules.length > 0 ? pricingRules[0].extra_price : 60;
+    let mealPlanPrice = 0;
+    if (orderPricing.length > 0 && orderPricing[0].price) {
+      mealPlanPrice = orderPricing[0].price;
+    } else {
+      // Fallback to default pricing
+      const pricingRules = await query<any[]>(
+        'SELECT delivered_price FROM pricing_rules WHERE is_default = TRUE LIMIT 1'
+      );
+      mealPlanPrice = pricingRules.length > 0 ? pricingRules[0].delivered_price : 50;
+    }
+
+    // Get extra price default (for 'E' status entries)
+    const extraPricingRules = await query<any[]>(
+      'SELECT extra_price FROM pricing_rules WHERE is_default = TRUE LIMIT 1'
+    );
+    const extraPrice = extraPricingRules.length > 0 ? extraPricingRules[0].extra_price : 60;
 
     // Batch insert/update entries
     const insertSql = `
@@ -299,7 +333,7 @@ async function handleBatchUpdate(
     `;
 
     for (const entry of body.entries) {
-      const price = entry.price || (entry.status === 'E' ? extraPrice : deliveredPrice);
+      const price = entry.price || (entry.status === 'E' ? extraPrice : mealPlanPrice);
       const quantity = entry.quantity || 1;
 
       await query(insertSql, [
