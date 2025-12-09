@@ -137,7 +137,13 @@ async function handlePut(
         [finalize.finalized_by, finalize.notes || null, id]
       );
 
-      // Create notification
+      // Delete any existing notifications for this billing (in case of re-finalize)
+      await query(
+        'DELETE FROM payment_notifications WHERE billing_id = ? AND notification_type = ?',
+        [id, 'billing_pending_approval']
+      );
+
+      // Create new notification
       const billing = await query<any[]>(
         'SELECT mb.customer_id, mb.billing_month, mb.total_amount, c.name AS customer_name FROM monthly_billing mb INNER JOIN customers c ON mb.customer_id = c.id WHERE mb.id = ?',
         [id]
