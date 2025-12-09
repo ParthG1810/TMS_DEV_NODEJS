@@ -320,7 +320,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           },
         });
 
-        const orderId = entryResponse.data?.data?.order_id;
+        // GET returns an array, so we need to get the first element
+        const entries = entryResponse.data?.data;
+        const orderId = entries && entries.length > 0 ? entries[0].order_id : null;
 
         // Delete the customer order (this will also cascade delete the calendar entry)
         if (orderId) {
