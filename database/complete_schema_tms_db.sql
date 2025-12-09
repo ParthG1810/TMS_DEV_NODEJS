@@ -216,7 +216,7 @@ CREATE TABLE IF NOT EXISTS monthly_billing (
 -- Payment Notifications Table
 CREATE TABLE IF NOT EXISTS payment_notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    notification_type ENUM('month_end_calculation', 'payment_received', 'payment_overdue') NOT NULL,
+    notification_type ENUM('month_end_calculation', 'payment_received', 'payment_overdue', 'billing_pending_approval') NOT NULL,
     billing_id INT NULL,
     customer_id INT NULL,
     billing_month VARCHAR(7) NULL,
