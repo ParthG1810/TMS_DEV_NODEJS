@@ -141,8 +141,9 @@ CREATE TABLE IF NOT EXISTS customer_orders (
     -- Prevent duplicate orders
     UNIQUE KEY unique_order (customer_id, meal_plan_id, start_date, end_date),
 
-    -- Ensure valid date range
-    CHECK (end_date > start_date),
+    -- Date validation is handled by triggers (see migration 006)
+    -- For 'Single' meal plans: allows end_date >= start_date
+    -- For other meal plans: requires end_date > start_date
     CHECK (quantity >= 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -215,7 +216,7 @@ CREATE TABLE IF NOT EXISTS monthly_billing (
 -- Payment Notifications Table
 CREATE TABLE IF NOT EXISTS payment_notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    notification_type ENUM('month_end_calculation', 'payment_received', 'payment_overdue') NOT NULL,
+    notification_type ENUM('month_end_calculation', 'payment_received', 'payment_overdue', 'billing_pending_approval') NOT NULL,
     billing_id INT NULL,
     customer_id INT NULL,
     billing_month VARCHAR(7) NULL,
@@ -423,14 +424,6 @@ BEGIN
     DECLARE v_base_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_extra_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_total_amount DECIMAL(10,2) DEFAULT 0.00;
-    DECLARE v_delivered_price DECIMAL(10,2) DEFAULT 50.00;
-    DECLARE v_extra_price DECIMAL(10,2) DEFAULT 60.00;
-
-    -- Get default pricing
-    SELECT delivered_price, extra_price INTO v_delivered_price, v_extra_price
-    FROM pricing_rules
-    WHERE is_default = TRUE
-    LIMIT 1;
 
     -- Count calendar entries for the month
     SELECT
@@ -443,9 +436,44 @@ BEGIN
     WHERE customer_id = p_customer_id
     AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
 
-    -- Calculate amounts
-    SET v_base_amount = v_total_delivered * v_delivered_price;
-    SET v_extra_amount = v_total_extra * v_extra_price;
+    -- Calculate base amount: For each order, calculate (order_price / total_plan_days) × delivered_count
+    -- This dynamically calculates per-tiffin price based on the order's monthly price and selected days
+    -- Example: $50 plan for Mon-Fri with 23 weekdays in month = $50/23 = $2.174 per tiffin
+    SELECT COALESCE(SUM(
+        (co.price / (
+            -- Count total plan days in the billing month for this order
+            SELECT COUNT(*)
+            FROM tiffin_calendar_entries tce_count
+            WHERE tce_count.order_id = co.id
+            AND DATE_FORMAT(tce_count.delivery_date, '%Y-%m') = p_billing_month
+            AND tce_count.status IN ('T', 'A')  -- Include both delivered and absent days in plan
+        )) * (
+            -- Count delivered days for this order
+            SELECT COUNT(*)
+            FROM tiffin_calendar_entries tce_delivered
+            WHERE tce_delivered.order_id = co.id
+            AND DATE_FORMAT(tce_delivered.delivery_date, '%Y-%m') = p_billing_month
+            AND tce_delivered.status = 'T'  -- Only delivered tiffins
+        )
+    ), 0)
+    INTO v_base_amount
+    FROM customer_orders co
+    WHERE co.customer_id = p_customer_id
+    AND EXISTS (
+        SELECT 1 FROM tiffin_calendar_entries tce
+        WHERE tce.order_id = co.id
+        AND DATE_FORMAT(tce.delivery_date, '%Y-%m') = p_billing_month
+        AND tce.status IN ('T', 'A')
+    );
+
+    -- Calculate extra amount using ACTUAL prices from calendar entries
+    -- This allows custom pricing for each extra tiffin order
+    SELECT COALESCE(SUM(CASE WHEN status = 'E' THEN price ELSE 0 END), 0)
+    INTO v_extra_amount
+    FROM tiffin_calendar_entries
+    WHERE customer_id = p_customer_id
+    AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
+
     SET v_total_amount = v_base_amount + v_extra_amount;
 
     -- Insert or update monthly billing

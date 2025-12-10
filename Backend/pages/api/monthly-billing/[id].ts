@@ -137,9 +137,15 @@ async function handlePut(
         [finalize.finalized_by, finalize.notes || null, id]
       );
 
-      // Create notification
+      // Delete any existing notifications for this billing (in case of re-finalize)
+      await query(
+        'DELETE FROM payment_notifications WHERE billing_id = ? AND notification_type = ?',
+        [id, 'billing_pending_approval']
+      );
+
+      // Create new notification
       const billing = await query<any[]>(
-        'SELECT customer_id, billing_month, total_amount FROM monthly_billing WHERE id = ?',
+        'SELECT mb.customer_id, mb.billing_month, mb.total_amount, c.name AS customer_name FROM monthly_billing mb INNER JOIN customers c ON mb.customer_id = c.id WHERE mb.id = ?',
         [id]
       );
 
@@ -153,14 +159,14 @@ async function handlePut(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `,
           [
-            'month_end_calculation',
+            'billing_pending_approval',
             id,
             billing[0].customer_id,
             billing[0].billing_month,
-            `Billing Finalized - ${billing[0].billing_month}`,
-            `Monthly billing has been finalized. Total amount: ₹${billing[0].total_amount}`,
+            `Billing Pending Approval - ${billing[0].customer_name}`,
+            `Billing for ${billing[0].customer_name} (${billing[0].billing_month}) has been finalized and is pending approval. Total amount: CAD $${Number(billing[0].total_amount).toFixed(2)}`,
             'high',
-            `/dashboard/tiffin/billing/${id}`,
+            `/dashboard/tiffin/billing-calendar?month=${billing[0].billing_month}`,
           ]
         );
       }

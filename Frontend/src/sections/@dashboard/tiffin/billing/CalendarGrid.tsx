@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 // @mui
 import {
   Card,
@@ -19,11 +19,15 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  TextField,
+  MenuItem,
 } from '@mui/material';
 import { styled, alpha } from '@mui/material/styles';
 // components
 import Iconify from '../../../../components/iconify';
 import { useSnackbar } from '../../../../components/snackbar';
+// utils
+import axios from '../../../../utils/axios';
 // redux
 import { useDispatch } from '../../../../redux/store';
 import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/payment';
@@ -33,7 +37,7 @@ import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/t
 // ----------------------------------------------------------------------
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  padding: theme.spacing(0.5),
+  padding: theme.spacing(0.25),
   textAlign: 'center',
   borderRight: `1px solid ${theme.palette.divider}`,
   '&:first-of-type': {
@@ -41,39 +45,53 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
     left: 0,
     backgroundColor: theme.palette.background.paper,
     zIndex: 2,
-    minWidth: 180,
-    maxWidth: 180,
+    minWidth: 90,
+    maxWidth: 90,
+    width: 90,
     borderRight: `2px solid ${theme.palette.divider}`,
+    textAlign: 'left',
+    paddingLeft: theme.spacing(0.5),
+    paddingRight: theme.spacing(0.5),
+    whiteSpace: 'normal',
+    wordWrap: 'break-word',
+    overflow: 'hidden',
   },
   '&:last-child': {
     position: 'sticky',
     right: 0,
     backgroundColor: theme.palette.background.paper,
     zIndex: 2,
-    minWidth: 120,
+    minWidth: 100,
     borderLeft: `2px solid ${theme.palette.divider}`,
   },
 }));
 
 const StyledHeaderCell = styled(TableCell)(({ theme }) => ({
-  padding: theme.spacing(1),
+  padding: theme.spacing(0.5, 0.25),
   textAlign: 'center',
   fontWeight: 'bold',
+  fontSize: 11,
   backgroundColor: theme.palette.grey[200],
   borderRight: `1px solid ${theme.palette.divider}`,
   '&:first-of-type': {
     position: 'sticky',
     left: 0,
     zIndex: 3,
-    minWidth: 180,
-    maxWidth: 180,
+    minWidth: 90,
+    maxWidth: 90,
+    width: 90,
     borderRight: `2px solid ${theme.palette.divider}`,
+    textAlign: 'left',
+    paddingLeft: theme.spacing(0.5),
+    paddingRight: theme.spacing(0.5),
+    whiteSpace: 'normal',
+    wordWrap: 'break-word',
   },
   '&:last-child': {
     position: 'sticky',
     right: 0,
     zIndex: 3,
-    minWidth: 120,
+    minWidth: 100,
     borderLeft: `2px solid ${theme.palette.divider}`,
   },
 }));
@@ -81,42 +99,54 @@ const StyledHeaderCell = styled(TableCell)(({ theme }) => ({
 interface DayCellProps {
   status: CalendarEntryStatus | null;
   onClick: () => void;
+  onDoubleClick?: () => void;
   isWeekend: boolean;
   disabled?: boolean;
+  isPlanDay?: boolean; // Whether this day is covered by a plan order
 }
 
 const DayCell = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'status' && prop !== 'isWeekend' && prop !== 'disabled',
-})<DayCellProps>(({ theme, status, isWeekend, disabled }) => ({
-  width: 32,
-  height: 32,
+  shouldForwardProp: (prop) => prop !== 'status' && prop !== 'isWeekend' && prop !== 'disabled' && prop !== 'isPlanDay',
+})<DayCellProps>(({ theme, status, isWeekend, disabled, isPlanDay }) => ({
+  width: 24,
+  height: 24,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  cursor: disabled ? 'not-allowed' : 'pointer',
+  cursor: disabled ? (isPlanDay ? 'not-allowed' : 'pointer') : 'pointer',
   borderRadius: theme.spacing(0.5),
-  fontSize: 12,
+  fontSize: 10,
   fontWeight: 'bold',
-  transition: 'all 0.2s',
-  opacity: disabled ? 0.3 : 1,
-  backgroundColor: disabled
+  transition: 'all 0.15s',
+  opacity: disabled && !isPlanDay ? 0.3 : 1,
+  backgroundColor: disabled && !isPlanDay
     ? alpha(theme.palette.grey[300], 0.2)
     : !status
-    ? isWeekend
+    ? isPlanDay
+      ? alpha(theme.palette.warning.light, 0.15) // Light yellow/orange for blank plan days
+      : isWeekend
       ? alpha(theme.palette.grey[300], 0.3)
       : 'transparent'
     : status === 'T'
     ? theme.palette.success.main
     : status === 'A'
-    ? theme.palette.grey[400]
+    ? theme.palette.error.main // Red for absent
     : theme.palette.info.main,
-  color: disabled ? theme.palette.text.disabled : status ? 'white' : theme.palette.text.primary,
-  border: `1px solid ${theme.palette.divider}`,
-  '&:hover': disabled
+  color: disabled && !isPlanDay
+    ? theme.palette.text.disabled
+    : status
+    ? 'white'
+    : isPlanDay
+    ? theme.palette.warning.dark
+    : theme.palette.text.primary,
+  border: isPlanDay && !status
+    ? `2px dashed ${theme.palette.warning.main}` // Dashed border for blank plan days
+    : `1px solid ${theme.palette.divider}`,
+  '&:hover': disabled && !isPlanDay
     ? {}
     : {
-        transform: 'scale(1.1)',
-        boxShadow: theme.shadows[4],
+        transform: 'scale(1.15)',
+        boxShadow: theme.shadows[3],
         zIndex: 1,
       },
 }));
@@ -138,6 +168,42 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const [openFinalizeDialog, setOpenFinalizeDialog] = useState(false);
   const [finalizingCustomerId, setFinalizingCustomerId] = useState<number | null>(null);
 
+  // Extra tiffin order dialog state
+  const [openExtraDialog, setOpenExtraDialog] = useState(false);
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  const [extraOrderData, setExtraOrderData] = useState<{
+    customer_id: number;
+    customer_name: string;
+    delivery_date: string;
+    order_id: number;
+  } | null>(null);
+  const [mealPlans, setMealPlans] = useState<any[]>([]);
+  const [selectedMealPlan, setSelectedMealPlan] = useState<number | null>(null);
+  const [extraPrice, setExtraPrice] = useState<string>('');
+
+  // Fetch meal plans on component mount
+  useEffect(() => {
+    const fetchMealPlans = async () => {
+      try {
+        const response = await axios.get('/api/meal-plans');
+        setMealPlans(response.data.data || []);
+      } catch (error) {
+        console.error('Error fetching meal plans:', error);
+      }
+    };
+    fetchMealPlans();
+  }, []);
+
+  // Auto-populate price when meal plan is selected
+  useEffect(() => {
+    if (selectedMealPlan && mealPlans.length > 0) {
+      const selectedPlan = mealPlans.find((plan) => plan.id === selectedMealPlan);
+      if (selectedPlan && selectedPlan.price) {
+        setExtraPrice(Number(selectedPlan.price).toFixed(2));
+      }
+    }
+  }, [selectedMealPlan, mealPlans]);
+
   // Get number of days in the month
   const daysInMonth = new Date(year, month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -158,13 +224,30 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       return false;
     }
 
-    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const currentDate = new Date(date);
+    // Use string format for reliable date comparison (YYYY-MM-DD)
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    // Get day of week for selected_days check
+    const currentDate = new Date(year, month - 1, day);
+    const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[dayOfWeek];
 
     return customer.orders.some((order) => {
-      const startDate = new Date(order.start_date);
-      const endDate = new Date(order.end_date);
-      return currentDate >= startDate && currentDate <= endDate;
+      // Ensure order dates are properly formatted for comparison
+      const orderStartDate = order.start_date?.split('T')[0] || order.start_date; // Handle datetime format
+      const orderEndDate = order.end_date?.split('T')[0] || order.end_date; // Handle datetime format
+
+      // String comparison for dates (YYYY-MM-DD format compares correctly)
+      const isInDateRange = dateStr >= orderStartDate && dateStr <= orderEndDate;
+
+      // If order doesn't have selected_days, it covers all days in the range
+      if (!order.selected_days || order.selected_days.length === 0) {
+        return isInDateRange;
+      }
+
+      // Check if the current day of week is in the selected_days array
+      return isInDateRange && order.selected_days.includes(dayName);
     });
   };
 
@@ -172,87 +255,215 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     customer: ICalendarCustomerData,
     day: number,
     currentStatus: CalendarEntryStatus | null,
-    isDisabled: boolean
+    isPlanDay: boolean
   ) => {
-    // Don't allow clicks on disabled dates
-    if (isDisabled) {
+    // Get customer's orders
+    const orders = customer.orders || [];
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    // Find an order that covers this date
+    const activeOrder = orders.find((order) => {
+      const orderStartDate = order.start_date?.split('T')[0] || order.start_date;
+      const orderEndDate = order.end_date?.split('T')[0] || order.end_date;
+      return date >= orderStartDate && date <= orderEndDate;
+    });
+
+    // For plan days: cycle through Blank → T → A → Blank
+    if (isPlanDay && activeOrder) {
+      // Determine next status in the cycle
+      let newStatus: CalendarEntryStatus | null = null;
+      let shouldDelete = false;
+
+      if (!currentStatus) {
+        // Blank → T
+        newStatus = 'T';
+      } else if (currentStatus === 'T') {
+        // T → A
+        newStatus = 'A';
+      } else if (currentStatus === 'A') {
+        // A → Blank (delete entry)
+        shouldDelete = true;
+      }
+
+      try {
+        if (shouldDelete) {
+          // Delete the entry to clear it
+          await axios.delete('/api/calendar-entries', {
+            params: {
+              customer_id: customer.customer_id,
+              delivery_date: date,
+            },
+          });
+          enqueueSnackbar('Status cleared', { variant: 'info' });
+        } else if (newStatus) {
+          // Create or update entry
+          const result = await dispatch(
+            createCalendarEntry({
+              customer_id: customer.customer_id,
+              order_id: activeOrder.id,
+              delivery_date: date,
+              status: newStatus,
+              quantity: 1,
+              price: 0, // Price will be calculated by the stored procedure
+            })
+          );
+
+          if (result.success) {
+            enqueueSnackbar(`Marked as ${newStatus === 'T' ? 'Delivered' : 'Absent'}`, {
+              variant: 'success'
+            });
+          } else {
+            enqueueSnackbar(result.error || 'Failed to update entry', { variant: 'error' });
+          }
+        }
+
+        // Revert billing status if it was finalized
+        await revertBillingIfFinalized(customer);
+
+        onUpdate(); // Refresh the calendar
+      } catch (error) {
+        console.error('Error updating calendar entry:', error);
+        enqueueSnackbar('Failed to update entry', { variant: 'error' });
+      }
+    }
+
+    // For non-plan days with 'E' status: remove the entry and delete the order
+    if (!isPlanDay && currentStatus === 'E') {
+      try {
+        // First, get the calendar entry to find the order_id
+        const entryResponse = await axios.get('/api/calendar-entries', {
+          params: {
+            customer_id: customer.customer_id,
+            delivery_date: date,
+          },
+        });
+
+        // GET returns an array, so we need to get the first element
+        const entries = entryResponse.data?.data;
+        const orderId = entries && entries.length > 0 ? entries[0].order_id : null;
+
+        if (orderId) {
+          // Get the order details to check if it's a Single day order (extra tiffin)
+          const orderResponse = await axios.get(`/api/customer-orders/${orderId}`);
+          const order = orderResponse.data?.data;
+
+          // Normalize dates to string format (YYYY-MM-DD) for comparison
+          const orderStartDate = order?.start_date?.split('T')[0] || order?.start_date;
+          const orderEndDate = order?.end_date?.split('T')[0] || order?.end_date;
+
+          // Only delete the order if it's a Single day order with meal_plan_days = 'Single'
+          // This prevents deleting the main plan order (Mon-Fri, Mon-Sat)
+          if (order && orderStartDate === orderEndDate && order.meal_plan_days === 'Single') {
+            // This is an extra tiffin order - safe to delete
+            await axios.delete(`/api/customer-orders/${orderId}`);
+            enqueueSnackbar('Extra tiffin order removed', { variant: 'info' });
+          } else {
+            // This is a plan order - just delete the calendar entry, not the order
+            await axios.delete('/api/calendar-entries', {
+              params: {
+                customer_id: customer.customer_id,
+                delivery_date: date,
+              },
+            });
+            enqueueSnackbar('Calendar entry removed', { variant: 'info' });
+          }
+        } else {
+          // Fallback: just delete the calendar entry if no order found
+          await axios.delete('/api/calendar-entries', {
+            params: {
+              customer_id: customer.customer_id,
+              delivery_date: date,
+            },
+          });
+          enqueueSnackbar('Extra tiffin removed', { variant: 'info' });
+        }
+
+        // Revert billing status if it was finalized
+        await revertBillingIfFinalized(customer);
+
+        onUpdate();
+      } catch (error) {
+        console.error('Error removing extra tiffin:', error);
+        enqueueSnackbar('Failed to remove extra tiffin', { variant: 'error' });
+      }
+    }
+  };
+
+  // Handle double-click on non-plan days for extra tiffin
+  const handleCellDoubleClick = (customer: ICalendarCustomerData, day: number, currentStatus: CalendarEntryStatus | null, isPlanDay: boolean) => {
+    // Only allow double-click on non-plan days
+    if (isPlanDay) {
       return;
     }
 
-    // Get customer's orders
-    const orders = customer.orders || [];
-
-    if (orders.length === 0) {
-      enqueueSnackbar('No active orders found for this customer.', {
-        variant: 'warning',
-      });
+    // If already has status 'E', single-click handles removal, so ignore double-click
+    if (currentStatus === 'E') {
       return;
     }
 
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-    // Find an order that covers this date
-    const activeOrder = orders.find((order) => {
-      const startDate = new Date(order.start_date);
-      const endDate = new Date(order.end_date);
-      const currentDate = new Date(date);
-      return currentDate >= startDate && currentDate <= endDate;
+    // Set data and show confirmation dialog
+    setExtraOrderData({
+      customer_id: customer.customer_id,
+      customer_name: customer.customer_name,
+      delivery_date: date,
+      order_id: 0, // Will be created
     });
+    setOpenConfirmDialog(true);
+  };
 
-    if (!activeOrder) {
-      enqueueSnackbar('No order covers this date.', {
-        variant: 'warning',
-      });
-      return;
-    }
+  const handleConfirmExtraTiffin = () => {
+    setOpenConfirmDialog(false);
+    setOpenExtraDialog(true);
+  };
 
-    // Cycle through statuses: null -> T -> A -> E -> null
-    let newStatus: CalendarEntryStatus | null = null;
+  const handleCancelExtraTiffin = () => {
+    setOpenConfirmDialog(false);
+    setExtraOrderData(null);
+  };
 
-    if (currentStatus === null) {
-      newStatus = 'T';
-    } else if (currentStatus === 'T') {
-      newStatus = 'A';
-    } else if (currentStatus === 'A') {
-      newStatus = 'E';
-    } else {
-      newStatus = null;
-    }
-
-    if (newStatus === null) {
-      // Delete entry - for now, we'll just set it to 'A' as a workaround
-      // In a real implementation, you'd call a delete endpoint
-      enqueueSnackbar('Entry cleared', { variant: 'info' });
-      onUpdate();
-      return;
-    }
-
-    try {
-      const result = await dispatch(
-        createCalendarEntry({
-          customer_id: customer.customer_id,
-          order_id: activeOrder.id,
-          delivery_date: date,
-          status: newStatus,
-          quantity: 1,
-          price: newStatus === 'E' ? 60 : 50, // Default prices
-        })
-      );
-
-      if (result.success) {
-        enqueueSnackbar('Entry updated successfully', { variant: 'success' });
-        onUpdate();
-      } else {
-        enqueueSnackbar(result.error || 'Failed to update entry', { variant: 'error' });
+  // Helper function to revert billing status if it was finalized
+  const revertBillingIfFinalized = async (customer: ICalendarCustomerData) => {
+    // Only revert if billing exists and is finalized or pending
+    if (
+      customer.billing_id &&
+      (customer.billing_status === 'pending' || customer.billing_status === 'finalized')
+    ) {
+      try {
+        await axios.put(`/api/monthly-billing/${customer.billing_id}`, {
+          status: 'calculating',
+        });
+        // Note: onUpdate() will be called by the parent to refresh the data
+      } catch (error) {
+        console.error('Error reverting billing status:', error);
+        // Don't show error to user - this is a background operation
       }
-    } catch (error) {
-      enqueueSnackbar('Failed to update entry', { variant: 'error' });
     }
   };
 
   const handleFinalize = async (customer: ICalendarCustomerData) => {
     if (!customer.billing_id) {
       enqueueSnackbar('No billing record found for this customer', { variant: 'warning' });
+      return;
+    }
+
+    // Validate that all plan days have a status (T or A)
+    const missingPlanDays: number[] = [];
+    days.forEach((day) => {
+      const isPlanDay = isDateCoveredByOrder(customer, day);
+      const status = getStatusForDate(customer, day);
+
+      if (isPlanDay && !status) {
+        missingPlanDays.push(day);
+      }
+    });
+
+    if (missingPlanDays.length > 0) {
+      enqueueSnackbar(
+        `Please mark all plan days before finalizing. Missing: ${missingPlanDays.join(', ')}`,
+        { variant: 'warning' }
+      );
       return;
     }
 
@@ -273,6 +484,90 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       enqueueSnackbar('Failed to finalize billing', { variant: 'error' });
     } finally {
       setFinalizingCustomerId(null);
+    }
+  };
+
+  const handleCreateExtraOrder = async () => {
+    if (!extraOrderData || !selectedMealPlan || !extraPrice) {
+      enqueueSnackbar('Please fill in all fields', { variant: 'warning' });
+      return;
+    }
+
+    const priceValue = parseFloat(extraPrice);
+    if (isNaN(priceValue) || priceValue <= 0) {
+      enqueueSnackbar('Please enter a valid price', { variant: 'warning' });
+      return;
+    }
+
+    try {
+      // Determine the day of week for the selected date
+      const deliveryDate = new Date(extraOrderData.delivery_date);
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayOfWeek = dayNames[deliveryDate.getDay()];
+
+      // IMPORTANT: Delete any existing calendar entry for this date first
+      // This ensures we start with a clean state and the new order_id is correctly set
+      try {
+        await axios.delete('/api/calendar-entries', {
+          params: {
+            customer_id: extraOrderData.customer_id,
+            delivery_date: extraOrderData.delivery_date,
+          },
+        });
+      } catch (deleteError) {
+        // Ignore error if entry doesn't exist
+        console.log('No existing entry to delete (expected for new extra tiffins)');
+      }
+
+      // Create a new order for the extra tiffin
+      const orderResult = await axios.post('/api/customer-orders', {
+        customer_id: extraOrderData.customer_id,
+        meal_plan_id: selectedMealPlan,
+        start_date: extraOrderData.delivery_date,
+        end_date: extraOrderData.delivery_date,
+        quantity: 1,
+        price: priceValue,
+        selected_days: [dayOfWeek], // Single day for extra tiffin
+      });
+
+      if (orderResult.data.success) {
+        const newOrderId = orderResult.data.data.id;
+
+        // Create the calendar entry with 'E' status
+        const result = await dispatch(
+          createCalendarEntry({
+            customer_id: extraOrderData.customer_id,
+            order_id: newOrderId,
+            delivery_date: extraOrderData.delivery_date,
+            status: 'E',
+            quantity: 1,
+            price: priceValue,
+          })
+        );
+
+        if (result.success) {
+          enqueueSnackbar('Extra tiffin order created successfully', { variant: 'success' });
+
+          // Find the customer and revert billing if finalized
+          const customer = customers.find((c) => c.customer_id === extraOrderData.customer_id);
+          if (customer) {
+            await revertBillingIfFinalized(customer);
+          }
+
+          setOpenExtraDialog(false);
+          setExtraOrderData(null);
+          setSelectedMealPlan(null);
+          setExtraPrice('');
+          onUpdate();
+        } else {
+          enqueueSnackbar(result.error || 'Failed to create calendar entry', { variant: 'error' });
+        }
+      } else {
+        enqueueSnackbar('Failed to create extra order', { variant: 'error' });
+      }
+    } catch (error) {
+      console.error('Error creating extra order:', error);
+      enqueueSnackbar('Failed to create extra order', { variant: 'error' });
     }
   };
 
@@ -302,20 +597,20 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         <Table stickyHeader>
           <TableHead>
             <TableRow>
-              <StyledHeaderCell>Customer Name</StyledHeaderCell>
+              <StyledHeaderCell>Customer</StyledHeaderCell>
               {days.map((day) => (
-                <StyledHeaderCell key={day} sx={{ minWidth: 40 }}>
-                  <Stack spacing={0.5}>
-                    <Typography variant="caption" fontWeight="bold">
+                <StyledHeaderCell key={day} sx={{ minWidth: 30, maxWidth: 30 }}>
+                  <Stack spacing={0.25}>
+                    <Typography variant="caption" fontWeight="bold" sx={{ fontSize: 10 }}>
                       {day}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: 9 }}>
+                    <Typography variant="caption" sx={{ fontSize: 8 }}>
                       {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][getDayOfWeek(day)]}
                     </Typography>
                   </Stack>
                 </StyledHeaderCell>
               ))}
-              <StyledHeaderCell>Summary</StyledHeaderCell>
+              <StyledHeaderCell sx={{ fontSize: 10 }}>Summary</StyledHeaderCell>
             </TableRow>
           </TableHead>
 
@@ -323,12 +618,32 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             {customers.map((customer) => (
               <TableRow key={customer.customer_id} hover>
                 <StyledTableCell>
-                  <Stack spacing={0.5} alignItems="flex-start">
-                    <Typography variant="body2" fontWeight="600">
+                  <Stack spacing={0.2} alignItems="flex-start">
+                    <Typography
+                      variant="caption"
+                      fontWeight="600"
+                      sx={{
+                        fontSize: 10.5,
+                        lineHeight: 1.3,
+                        wordBreak: 'break-word',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
                       {customer.customer_name}
                     </Typography>
                     {customer.customer_phone && (
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          fontSize: 7.5,
+                          lineHeight: 1.2,
+                          wordBreak: 'break-word',
+                        }}
+                      >
                         {customer.customer_phone}
                       </Typography>
                     )}
@@ -338,29 +653,33 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 {days.map((day) => {
                   const status = getStatusForDate(customer, day);
                   const weekend = isWeekend(day);
-                  const isCovered = isDateCoveredByOrder(customer, day);
-                  const disabled = !isCovered;
+                  const isPlanDay = isDateCoveredByOrder(customer, day);
+                  const disabled = !isPlanDay && !status;
 
                   return (
                     <StyledTableCell key={day}>
                       <Tooltip
                         title={
-                          disabled
-                            ? 'No order for this date'
-                            : status
-                            ? status === 'T'
-                              ? 'Delivered'
-                              : status === 'A'
-                              ? 'Absent'
-                              : 'Extra'
-                            : 'Click to mark'
+                          isPlanDay
+                            ? status
+                              ? status === 'T'
+                                ? 'Delivered - Click to mark Absent'
+                                : status === 'A'
+                                ? 'Absent - Click to clear'
+                                : ''
+                              : 'Plan day - Click to mark as Delivered'
+                            : status === 'E'
+                            ? 'Extra tiffin - Click to remove'
+                            : 'Double-click to add extra tiffin'
                         }
                       >
                         <DayCell
                           status={status}
                           isWeekend={weekend}
                           disabled={disabled}
-                          onClick={() => handleCellClick(customer, day, status, disabled)}
+                          isPlanDay={isPlanDay}
+                          onClick={() => handleCellClick(customer, day, status, isPlanDay)}
+                          onDoubleClick={() => handleCellDoubleClick(customer, day, status, isPlanDay)}
                         >
                           {status || ''}
                         </DayCell>
@@ -370,26 +689,26 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 })}
 
                 <StyledTableCell>
-                  <Stack spacing={1} alignItems="center">
-                    <Stack direction="row" spacing={1} justifyContent="center">
+                  <Stack spacing={0.5} alignItems="center">
+                    <Stack direction="row" spacing={0.5} justifyContent="center">
                       <Tooltip title="Delivered">
-                        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                          T: {customer.total_delivered}
+                        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'bold', fontSize: 9 }}>
+                          T:{customer.total_delivered}
                         </Typography>
                       </Tooltip>
                       <Tooltip title="Absent">
-                        <Typography variant="caption" sx={{ color: 'grey.600', fontWeight: 'bold' }}>
-                          A: {customer.total_absent}
+                        <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 'bold', fontSize: 9 }}>
+                          A:{customer.total_absent}
                         </Typography>
                       </Tooltip>
                       <Tooltip title="Extra">
-                        <Typography variant="caption" sx={{ color: 'info.main', fontWeight: 'bold' }}>
-                          E: {customer.total_extra}
+                        <Typography variant="caption" sx={{ color: 'info.main', fontWeight: 'bold', fontSize: 9 }}>
+                          E:{customer.total_extra}
                         </Typography>
                       </Tooltip>
                     </Stack>
 
-                    <Typography variant="body2" fontWeight="700" color="primary">
+                    <Typography variant="caption" fontWeight="700" color="primary" sx={{ fontSize: 11 }}>
                       CAD ${customer.total_amount.toFixed(2)}
                     </Typography>
 
@@ -402,12 +721,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                         disabled={finalizingCustomerId === customer.customer_id}
                         startIcon={
                           finalizingCustomerId === customer.customer_id ? (
-                            <CircularProgress size={16} />
+                            <CircularProgress size={12} />
                           ) : (
-                            <Iconify icon="eva:checkmark-circle-fill" width={16} />
+                            <Iconify icon="eva:checkmark-circle-fill" width={12} />
                           )
                         }
-                        sx={{ minWidth: 100, fontSize: 11 }}
+                        sx={{ minWidth: 70, fontSize: 9, py: 0.25 }}
                       >
                         Finalize
                       </Button>
@@ -417,9 +736,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                       <Typography
                         variant="caption"
                         sx={{
-                          px: 1,
-                          py: 0.5,
-                          borderRadius: 1,
+                          px: 0.75,
+                          py: 0.25,
+                          borderRadius: 0.5,
+                          fontSize: 9,
                           bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
                           color: `${getBillingStatusColor(customer.billing_status)}.darker`,
                           textTransform: 'capitalize',
@@ -443,6 +763,112 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           </Typography>
         </Box>
       )}
+
+      {/* Confirmation Dialog for Extra Tiffin */}
+      <Dialog open={openConfirmDialog} onClose={handleCancelExtraTiffin} maxWidth="xs" fullWidth>
+        <DialogTitle>Add Extra Tiffin?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Do you want to add an extra tiffin for {extraOrderData?.customer_name} on{' '}
+            {extraOrderData?.delivery_date}?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelExtraTiffin} color="inherit">
+            No
+          </Button>
+          <Button onClick={handleConfirmExtraTiffin} variant="contained" color="primary">
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Extra Tiffin Order Dialog */}
+      <Dialog open={openExtraDialog} onClose={() => setOpenExtraDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Create Extra Tiffin Order
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {extraOrderData?.customer_name} - {extraOrderData?.delivery_date}
+          </Typography>
+        </DialogTitle>
+
+        <DialogContent>
+          <Stack spacing={3} sx={{ pt: 2 }}>
+            <TextField
+              select
+              fullWidth
+              label="Select Meal Plan"
+              value={selectedMealPlan || ''}
+              onChange={(e) => setSelectedMealPlan(Number(e.target.value))}
+            >
+              {mealPlans.map((plan) => (
+                <MenuItem key={plan.id} value={plan.id}>
+                  {plan.meal_name} - CAD ${Number(plan.price).toFixed(2)}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              fullWidth
+              label="Price (CAD $)"
+              type="number"
+              value={extraPrice}
+              onChange={(e) => setExtraPrice(e.target.value)}
+              placeholder="Auto-filled from meal plan"
+              inputProps={{
+                step: '0.01',
+                min: '0',
+                inputMode: 'decimal',
+              }}
+              InputProps={{
+                startAdornment: <Typography sx={{ mr: 1 }}>$</Typography>,
+              }}
+              helperText="Price is auto-filled from selected meal plan. You can modify it if needed."
+            />
+
+            <Typography variant="caption" color="text.secondary">
+              This will create a new order for the extra tiffin on the selected date and add it to the billing
+              calculation.
+            </Typography>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={() => setOpenExtraDialog(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              // Make the cell blank by deleting any existing entry
+              if (extraOrderData) {
+                try {
+                  await axios.delete('/api/calendar-entries', {
+                    params: {
+                      customer_id: extraOrderData.customer_id,
+                      delivery_date: extraOrderData.delivery_date,
+                    },
+                  });
+                  enqueueSnackbar('Cell cleared', { variant: 'info' });
+                  setOpenExtraDialog(false);
+                  setExtraOrderData(null);
+                  setSelectedMealPlan(null);
+                  setExtraPrice('');
+                  onUpdate();
+                } catch (error) {
+                  enqueueSnackbar('Failed to clear cell', { variant: 'error' });
+                }
+              }
+            }}
+            color="warning"
+            variant="outlined"
+          >
+            Make Blank
+          </Button>
+          <Button onClick={handleCreateExtraOrder} variant="contained" color="primary">
+            Create Order
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 }
