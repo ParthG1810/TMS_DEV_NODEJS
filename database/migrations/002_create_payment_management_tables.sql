@@ -263,6 +263,13 @@ BEGIN
     DECLARE v_base_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_extra_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_total_amount DECIMAL(10,2) DEFAULT 0.00;
+    DECLARE v_delivered_price DECIMAL(10,2) DEFAULT 50.00;
+
+    -- Get default pricing for delivered tiffins
+    SELECT delivered_price INTO v_delivered_price
+    FROM pricing_rules
+    WHERE is_default = TRUE
+    LIMIT 1;
 
     -- Count calendar entries for the month
     SELECT
@@ -275,11 +282,12 @@ BEGIN
     WHERE customer_id = p_customer_id
     AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
 
-    -- Calculate amounts using ACTUAL prices from calendar entries
-    SELECT
-        COALESCE(SUM(CASE WHEN status = 'T' THEN price ELSE 0 END), 0),
-        COALESCE(SUM(CASE WHEN status = 'E' THEN price ELSE 0 END), 0)
-    INTO v_base_amount, v_extra_amount
+    -- Calculate base amount using pricing_rules (OLD method - was working)
+    SET v_base_amount = v_total_delivered * v_delivered_price;
+
+    -- Calculate extra amount using ACTUAL prices from calendar entries (NEW method - working now)
+    SELECT COALESCE(SUM(CASE WHEN status = 'E' THEN price ELSE 0 END), 0)
+    INTO v_extra_amount
     FROM tiffin_calendar_entries
     WHERE customer_id = p_customer_id
     AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
