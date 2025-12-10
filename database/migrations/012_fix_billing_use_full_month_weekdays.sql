@@ -35,37 +35,42 @@ BEGIN
     WHERE customer_id = p_customer_id
     AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
 
-    -- Calculate base amount using FULL MONTH weekdays
-    -- For each order: (order_price / total_weekdays_in_full_month) × delivered_count
+    -- Calculate base amount
+    -- Formula: (order_price / total_weekdays_in_full_month) × delivered_count
+    -- Example: $50 Mon-Fri plan, December has 23 Mon-Fri days
+    --          Per-tiffin: $50/23 = $2.17, Delivered: 16, Base: $2.17 × 16 = $34.78
     SELECT COALESCE(SUM(
-        (co.price / (
-            -- Count total weekdays in the FULL billing month based on meal plan
-            -- For Mon-Fri: count all Mon-Fri in the month
-            -- For Mon-Sat: count all Mon-Sat in the month
-            SELECT COUNT(*)
-            FROM (
-                SELECT DATE_ADD(CONCAT(p_billing_month, '-01'), INTERVAL n DAY) as check_date
-                FROM (
-                    SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6
-                    UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12
-                    UNION SELECT 13 UNION SELECT 14 UNION SELECT 15 UNION SELECT 16 UNION SELECT 17 UNION SELECT 18
-                    UNION SELECT 19 UNION SELECT 20 UNION SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24
-                    UNION SELECT 25 UNION SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29 UNION SELECT 30
-                ) days
-            ) dates
-            WHERE DATE_FORMAT(check_date, '%Y-%m') = p_billing_month
-            AND (
-                (mp.days = 'Mon-Fri' AND DAYOFWEEK(check_date) BETWEEN 2 AND 6) OR
-                (mp.days = 'Mon-Sat' AND DAYOFWEEK(check_date) BETWEEN 2 AND 7) OR
-                (mp.days = 'Single' AND 1=1)  -- For single day, just use 1
+        (co.price /
+            -- Calculate total weekdays in FULL month based on meal plan
+            -- Generate all dates in the billing month and count matching weekdays
+            (SELECT COUNT(*)
+             FROM (
+                 SELECT DATE_ADD(CONCAT(p_billing_month, '-01'), INTERVAL n DAY) as d
+                 FROM (
+                     SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
+                     UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
+                     UNION SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14
+                     UNION SELECT 15 UNION SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19
+                     UNION SELECT 20 UNION SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24
+                     UNION SELECT 25 UNION SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29
+                     UNION SELECT 30
+                 ) nums
+             ) dates
+             WHERE MONTH(d) = MONTH(CONCAT(p_billing_month, '-01'))
+             AND YEAR(d) = YEAR(CONCAT(p_billing_month, '-01'))
+             AND (
+                 (mp.days = 'Mon-Fri' AND DAYOFWEEK(d) BETWEEN 2 AND 6) OR
+                 (mp.days = 'Mon-Sat' AND DAYOFWEEK(d) BETWEEN 2 AND 7) OR
+                 (mp.days = 'Single')
+             )
             )
-        )) * (
-            -- Count delivered days for this order
-            SELECT COUNT(*)
-            FROM tiffin_calendar_entries tce_delivered
-            WHERE tce_delivered.order_id = co.id
-            AND DATE_FORMAT(tce_delivered.delivery_date, '%Y-%m') = p_billing_month
-            AND tce_delivered.status = 'T'  -- Only delivered tiffins
+        ) *
+        -- Multiply by actual delivered count
+        (SELECT COUNT(*)
+         FROM tiffin_calendar_entries tce
+         WHERE tce.order_id = co.id
+         AND DATE_FORMAT(tce.delivery_date, '%Y-%m') = p_billing_month
+         AND tce.status = 'T'
         )
     ), 0)
     INTO v_base_amount
@@ -76,7 +81,6 @@ BEGIN
         SELECT 1 FROM tiffin_calendar_entries tce
         WHERE tce.order_id = co.id
         AND DATE_FORMAT(tce.delivery_date, '%Y-%m') = p_billing_month
-        AND tce.status IN ('T', 'A')
     );
 
     -- Calculate extra amount using ACTUAL prices from calendar entries
