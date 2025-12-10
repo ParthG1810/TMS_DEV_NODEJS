@@ -424,13 +424,6 @@ BEGIN
     DECLARE v_base_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_extra_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_total_amount DECIMAL(10,2) DEFAULT 0.00;
-    DECLARE v_delivered_price DECIMAL(10,2) DEFAULT 50.00;
-
-    -- Get default pricing for delivered tiffins
-    SELECT delivered_price INTO v_delivered_price
-    FROM pricing_rules
-    WHERE is_default = TRUE
-    LIMIT 1;
 
     -- Count calendar entries for the month
     SELECT
@@ -443,10 +436,38 @@ BEGIN
     WHERE customer_id = p_customer_id
     AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
 
-    -- Calculate base amount using pricing_rules (OLD method - was working)
-    SET v_base_amount = v_total_delivered * v_delivered_price;
+    -- Calculate base amount: For each order, calculate (order_price / total_plan_days) × delivered_count
+    -- This dynamically calculates per-tiffin price based on the order's monthly price and selected days
+    -- Example: $50 plan for Mon-Fri with 23 weekdays in month = $50/23 = $2.174 per tiffin
+    SELECT COALESCE(SUM(
+        (co.price / (
+            -- Count total plan days in the billing month for this order
+            SELECT COUNT(*)
+            FROM tiffin_calendar_entries tce_count
+            WHERE tce_count.order_id = co.id
+            AND DATE_FORMAT(tce_count.delivery_date, '%Y-%m') = p_billing_month
+            AND tce_count.status IN ('T', 'A')  -- Include both delivered and absent days in plan
+        )) * (
+            -- Count delivered days for this order
+            SELECT COUNT(*)
+            FROM tiffin_calendar_entries tce_delivered
+            WHERE tce_delivered.order_id = co.id
+            AND DATE_FORMAT(tce_delivered.delivery_date, '%Y-%m') = p_billing_month
+            AND tce_delivered.status = 'T'  -- Only delivered tiffins
+        )
+    ), 0)
+    INTO v_base_amount
+    FROM customer_orders co
+    WHERE co.customer_id = p_customer_id
+    AND EXISTS (
+        SELECT 1 FROM tiffin_calendar_entries tce
+        WHERE tce.order_id = co.id
+        AND DATE_FORMAT(tce.delivery_date, '%Y-%m') = p_billing_month
+        AND tce.status IN ('T', 'A')
+    );
 
-    -- Calculate extra amount using ACTUAL prices from calendar entries (NEW method - working now)
+    -- Calculate extra amount using ACTUAL prices from calendar entries
+    -- This allows custom pricing for each extra tiffin order
     SELECT COALESCE(SUM(CASE WHEN status = 'E' THEN price ELSE 0 END), 0)
     INTO v_extra_amount
     FROM tiffin_calendar_entries
