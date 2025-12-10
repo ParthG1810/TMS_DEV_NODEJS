@@ -234,8 +234,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     const dayName = dayNames[dayOfWeek];
 
     return customer.orders.some((order) => {
+      // Ensure order dates are properly formatted for comparison
+      const orderStartDate = order.start_date?.split('T')[0] || order.start_date; // Handle datetime format
+      const orderEndDate = order.end_date?.split('T')[0] || order.end_date; // Handle datetime format
+
       // String comparison for dates (YYYY-MM-DD format compares correctly)
-      const isInDateRange = dateStr >= order.start_date && dateStr <= order.end_date;
+      const isInDateRange = dateStr >= orderStartDate && dateStr <= orderEndDate;
 
       // If order doesn't have selected_days, it covers all days in the range
       if (!order.selected_days || order.selected_days.length === 0) {
@@ -259,10 +263,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     // Find an order that covers this date
     const activeOrder = orders.find((order) => {
-      const startDate = new Date(order.start_date);
-      const endDate = new Date(order.end_date);
-      const currentDate = new Date(date);
-      return currentDate >= startDate && currentDate <= endDate;
+      const orderStartDate = order.start_date?.split('T')[0] || order.start_date;
+      const orderEndDate = order.end_date?.split('T')[0] || order.end_date;
+      return date >= orderStartDate && date <= orderEndDate;
     });
 
     // For plan days: cycle through Blank → T → A → Blank
@@ -339,10 +342,27 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         const entries = entryResponse.data?.data;
         const orderId = entries && entries.length > 0 ? entries[0].order_id : null;
 
-        // Delete the customer order (this will also cascade delete the calendar entry)
         if (orderId) {
-          await axios.delete(`/api/customer-orders/${orderId}`);
-          enqueueSnackbar('Extra tiffin order removed', { variant: 'info' });
+          // Get the order details to check if it's a Single day order (extra tiffin)
+          const orderResponse = await axios.get(`/api/customer-orders/${orderId}`);
+          const order = orderResponse.data?.data;
+
+          // Only delete the order if it's a Single day order (start_date === end_date and single selected day)
+          // This prevents deleting the main plan order
+          if (order && order.start_date === order.end_date && order.selected_days && order.selected_days.length === 1) {
+            // This is an extra tiffin order - safe to delete
+            await axios.delete(`/api/customer-orders/${orderId}`);
+            enqueueSnackbar('Extra tiffin order removed', { variant: 'info' });
+          } else {
+            // This is a plan order - just delete the calendar entry, not the order
+            await axios.delete('/api/calendar-entries', {
+              params: {
+                customer_id: customer.customer_id,
+                delivery_date: date,
+              },
+            });
+            enqueueSnackbar('Calendar entry removed', { variant: 'info' });
+          }
         } else {
           // Fallback: just delete the calendar entry if no order found
           await axios.delete('/api/calendar-entries', {
