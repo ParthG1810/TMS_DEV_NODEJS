@@ -351,9 +351,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           const orderStartDate = order?.start_date?.split('T')[0] || order?.start_date;
           const orderEndDate = order?.end_date?.split('T')[0] || order?.end_date;
 
-          // Only delete the order if it's a Single day order (start_date === end_date and single selected day)
-          // This prevents deleting the main plan order
-          if (order && orderStartDate === orderEndDate && order.selected_days && order.selected_days.length === 1) {
+          // Only delete the order if it's a Single day order with meal_plan_days = 'Single'
+          // This prevents deleting the main plan order (Mon-Fri, Mon-Sat)
+          if (order && orderStartDate === orderEndDate && order.meal_plan_days === 'Single') {
             // This is an extra tiffin order - safe to delete
             await axios.delete(`/api/customer-orders/${orderId}`);
             enqueueSnackbar('Extra tiffin order removed', { variant: 'info' });
