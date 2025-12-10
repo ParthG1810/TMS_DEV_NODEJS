@@ -364,6 +364,7 @@ export type ICalendarCustomerData = {
     id: number;
     start_date: string;
     end_date: string;
+    selected_days?: string[]; // Array of day names: ['Monday', 'Tuesday', etc.]
   }>;
 };
 

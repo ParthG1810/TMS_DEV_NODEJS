@@ -352,7 +352,10 @@ async function handleUpdateCustomerOrder(
 
 /**
  * DELETE /api/customer-orders/:id
- * Delete a customer order
+ * Delete a customer order and all related data:
+ * - Calendar entries (cascade)
+ * - Monthly billing for affected months
+ * - Payment notifications (cascade via billing deletion)
  */
 async function handleDeleteCustomerOrder(
   req: NextApiRequest,
@@ -360,10 +363,11 @@ async function handleDeleteCustomerOrder(
   id: number
 ) {
   try {
-    // Check if order exists
-    const existingOrders = (await query('SELECT * FROM customer_orders WHERE id = ?', [
-      id,
-    ])) as any[];
+    // Check if order exists and get order details
+    const existingOrders = (await query(
+      'SELECT customer_id, start_date, end_date FROM customer_orders WHERE id = ?',
+      [id]
+    )) as any[];
 
     if (existingOrders.length === 0) {
       return res.status(404).json({
@@ -372,12 +376,45 @@ async function handleDeleteCustomerOrder(
       });
     }
 
-    // Delete order
+    const order = existingOrders[0];
+    const customerId = order.customer_id;
+    const startDate = new Date(order.start_date);
+    const endDate = new Date(order.end_date);
+
+    // Generate list of affected billing months (YYYY-MM format)
+    const affectedMonths: string[] = [];
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      const yearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      if (!affectedMonths.includes(yearMonth)) {
+        affectedMonths.push(yearMonth);
+      }
+      // Move to next month
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    // Delete monthly billing for affected months
+    // This will CASCADE delete payment_notifications via billing_id FK
+    if (affectedMonths.length > 0) {
+      const placeholders = affectedMonths.map(() => '?').join(',');
+      await query(
+        `DELETE FROM monthly_billing
+         WHERE customer_id = ? AND billing_month IN (${placeholders})`,
+        [customerId, ...affectedMonths]
+      );
+    }
+
+    // Delete the customer order
+    // This will CASCADE delete tiffin_calendar_entries via order_id FK
     await query('DELETE FROM customer_orders WHERE id = ?', [id]);
 
     return res.status(200).json({
       success: true,
-      data: { message: 'Order deleted successfully' },
+      data: {
+        message: 'Order and all related data deleted successfully',
+        affected_months: affectedMonths,
+      },
     });
   } catch (error: any) {
     console.error('Error deleting customer order:', error);
