@@ -14,25 +14,22 @@ async function applyMigration() {
 
   try {
     console.log('Reading migration file...');
-    const migrationPath = path.join(__dirname, '../database/migrations/011_fix_null_handling_in_billing_calculation.sql');
+    const migrationPath = path.join(__dirname, '../database/migrations/012_fix_billing_use_full_month_weekdays.sql');
     let sql = await fs.readFile(migrationPath, 'utf8');
 
     console.log('Processing SQL (removing DELIMITER commands)...');
-    // Remove DELIMITER commands as they are MySQL client-specific
     sql = sql.replace(/DELIMITER\s+\$\$/gi, '');
     sql = sql.replace(/DELIMITER\s+;/gi, '');
-    // Replace $$ with ; for procedure end
     sql = sql.replace(/END\$\$/gi, 'END');
 
     console.log('Executing migration...');
     await connection.query(sql);
 
-    console.log('✓ Migration 011 applied successfully!');
-    console.log('✓ Calendar deletion error should now be fixed');
+    console.log('✓ Migration 012 applied successfully!');
+    console.log('✓ Billing now uses full month weekdays for calculation');
     console.log('');
-    console.log('Next steps:');
-    console.log('1. Test deleting a calendar entry - it should work without errors');
-    console.log('2. Run billing verification: mysql -u root -pMysql tms_db < database\\scripts\\verify-billing-calculations.sql');
+    console.log('Formula: per_tiffin = order_price / total_weekdays_in_month');
+    console.log('Example: $50 Mon-Fri in Dec (23 weekdays) = $50/23 = $2.17 per tiffin');
   } catch (error) {
     console.error('✗ Migration failed:', error.message);
     throw error;
