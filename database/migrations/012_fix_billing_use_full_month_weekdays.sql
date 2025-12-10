@@ -36,13 +36,12 @@ BEGIN
     AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
 
     -- Calculate base amount
-    -- Formula: (order_price / total_weekdays_in_full_month) × delivered_count
-    -- Example: $50 Mon-Fri plan, December has 23 Mon-Fri days
-    --          Per-tiffin: $50/23 = $2.17, Delivered: 16, Base: $2.17 × 16 = $34.78
+    -- Formula: (order_price / total_selected_days_in_full_month) × delivered_count
+    -- Example: Mon-Thu plan in December = 19 days (count all Mon-Thu in month)
+    --          $50 / 19 = $2.63 per tiffin
     SELECT COALESCE(SUM(
         (co.price /
-            -- Calculate total weekdays in FULL month based on meal plan
-            -- Generate all dates in the billing month and count matching weekdays
+            -- Count how many times the selected_days appear in the full billing month
             (SELECT COUNT(*)
              FROM (
                  SELECT DATE_ADD(CONCAT(p_billing_month, '-01'), INTERVAL n DAY) as d
@@ -59,9 +58,13 @@ BEGIN
              WHERE MONTH(d) = MONTH(CONCAT(p_billing_month, '-01'))
              AND YEAR(d) = YEAR(CONCAT(p_billing_month, '-01'))
              AND (
-                 (mp.days = 'Mon-Fri' AND DAYOFWEEK(d) BETWEEN 2 AND 6) OR
-                 (mp.days = 'Mon-Sat' AND DAYOFWEEK(d) BETWEEN 2 AND 7) OR
-                 (mp.days = 'Single')
+                 (JSON_CONTAINS(co.selected_days, '"Monday"') AND DAYNAME(d) = 'Monday') OR
+                 (JSON_CONTAINS(co.selected_days, '"Tuesday"') AND DAYNAME(d) = 'Tuesday') OR
+                 (JSON_CONTAINS(co.selected_days, '"Wednesday"') AND DAYNAME(d) = 'Wednesday') OR
+                 (JSON_CONTAINS(co.selected_days, '"Thursday"') AND DAYNAME(d) = 'Thursday') OR
+                 (JSON_CONTAINS(co.selected_days, '"Friday"') AND DAYNAME(d) = 'Friday') OR
+                 (JSON_CONTAINS(co.selected_days, '"Saturday"') AND DAYNAME(d) = 'Saturday') OR
+                 (JSON_CONTAINS(co.selected_days, '"Sunday"') AND DAYNAME(d) = 'Sunday')
              )
             )
         ) *
@@ -75,7 +78,6 @@ BEGIN
     ), 0)
     INTO v_base_amount
     FROM customer_orders co
-    INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
     WHERE co.customer_id = p_customer_id
     AND EXISTS (
         SELECT 1 FROM tiffin_calendar_entries tce
