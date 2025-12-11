@@ -347,44 +347,81 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           const orderResponse = await axios.get(`/api/customer-orders/${orderId}`);
           const order = orderResponse.data?.data;
 
+          console.log('Deleting extra tiffin - Order details:', {
+            order_id: orderId,
+            meal_plan_frequency: order?.meal_plan_frequency,
+            meal_plan_days: order?.meal_plan_days,
+            start_date: order?.start_date,
+            end_date: order?.end_date,
+          });
+
           // Normalize dates to string format (YYYY-MM-DD) for comparison
           const orderStartDate = order?.start_date?.split('T')[0] || order?.start_date;
           const orderEndDate = order?.end_date?.split('T')[0] || order?.end_date;
 
-          // Only delete the order if it's a Single day order with meal_plan_days = 'Single'
+          // Only delete the order if it's an extra tiffin order (frequency='Daily' and days='Single')
           // This prevents deleting the main plan order (Mon-Fri, Mon-Sat)
-          if (order && orderStartDate === orderEndDate && order.meal_plan_days === 'Single') {
-            // This is an extra tiffin order - safe to delete
-            await axios.delete(`/api/customer-orders/${orderId}`);
-            enqueueSnackbar('Extra tiffin order removed', { variant: 'info' });
+          if (order && orderStartDate === orderEndDate &&
+              order.meal_plan_frequency === 'Daily' &&
+              order.meal_plan_days === 'Single') {
+            console.log('Deleting extra tiffin order (frequency=Daily, days=Single)');
+            const deleteResult = await axios.delete(`/api/customer-orders/${orderId}`);
+            console.log('Delete order result:', deleteResult.data);
+
+            if (deleteResult.data?.success) {
+              enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
+            } else {
+              console.error('Delete failed:', deleteResult.data);
+              enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
+              return;
+            }
           } else {
+            console.log('Not an extra tiffin - just deleting calendar entry');
             // This is a plan order - just delete the calendar entry, not the order
-            await axios.delete('/api/calendar-entries', {
+            const deleteResult = await axios.delete('/api/calendar-entries', {
               params: {
                 customer_id: customer.customer_id,
                 delivery_date: date,
               },
             });
-            enqueueSnackbar('Calendar entry removed', { variant: 'info' });
+            console.log('Delete calendar entry result:', deleteResult.data);
+
+            if (deleteResult.data?.success) {
+              enqueueSnackbar('Calendar entry removed', { variant: 'success' });
+            } else {
+              console.error('Delete failed:', deleteResult.data);
+              enqueueSnackbar('Failed to remove entry: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
+              return;
+            }
           }
         } else {
+          console.log('No order ID found - deleting calendar entry only');
           // Fallback: just delete the calendar entry if no order found
-          await axios.delete('/api/calendar-entries', {
+          const deleteResult = await axios.delete('/api/calendar-entries', {
             params: {
               customer_id: customer.customer_id,
               delivery_date: date,
             },
           });
-          enqueueSnackbar('Extra tiffin removed', { variant: 'info' });
+          console.log('Delete calendar entry result:', deleteResult.data);
+
+          if (deleteResult.data?.success) {
+            enqueueSnackbar('Extra tiffin removed', { variant: 'success' });
+          } else {
+            console.error('Delete failed:', deleteResult.data);
+            enqueueSnackbar('Failed to remove entry: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
+            return;
+          }
         }
 
         // Revert billing status if it was finalized
         await revertBillingIfFinalized(customer);
 
         onUpdate();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error removing extra tiffin:', error);
-        enqueueSnackbar('Failed to remove extra tiffin', { variant: 'error' });
+        const errorMsg = error.response?.data?.error || error.message || 'Failed to remove extra tiffin';
+        enqueueSnackbar(errorMsg, { variant: 'error' });
       }
     }
   };
