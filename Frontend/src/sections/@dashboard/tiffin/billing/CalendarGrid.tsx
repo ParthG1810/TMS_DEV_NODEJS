@@ -388,14 +388,33 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             // Revert billing status if it was finalized
             await revertBillingIfFinalized(customer);
 
-            // Wait for database trigger to complete billing recalculation
-            // The CASCADE delete triggers tr_calendar_entry_after_delete which calls sp_calculate_monthly_billing
-            // Give it time to complete before refreshing the UI
-            enqueueSnackbar('Refreshing billing calculations...', { variant: 'info' });
-            setTimeout(() => {
+            // Explicitly recalculate billing to ensure accurate data
+            // This calls sp_calculate_monthly_billing stored procedure
+            try {
+              const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+              enqueueSnackbar('Recalculating billing...', { variant: 'info' });
+
+              const recalcResult = await axios.post('/api/monthly-billing', {
+                customer_id: customer.customer_id,
+                billing_month: billingMonth,
+              });
+
+              console.log('Billing recalculation result:', recalcResult.data);
+
+              if (recalcResult.data?.success) {
+                // Billing successfully recalculated, now refresh UI
+                onUpdate();
+              } else {
+                console.error('Recalculation failed:', recalcResult.data);
+                enqueueSnackbar('Billing recalculation failed - refreshing anyway', { variant: 'warning' });
+                onUpdate();
+              }
+            } catch (recalcError: any) {
+              console.error('Error recalculating billing:', recalcError);
+              enqueueSnackbar('Error recalculating billing - refreshing anyway', { variant: 'warning' });
               onUpdate();
-            }, 500);
-            return; // Exit early - refresh is scheduled
+            }
+            return; // Exit early
           } else {
             console.error('Delete failed:', deleteResult.data);
             enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
@@ -414,24 +433,41 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
           if (deleteResult.data?.success) {
             enqueueSnackbar('Calendar entry removed', { variant: 'success' });
+
+            // Revert billing status if it was finalized
+            await revertBillingIfFinalized(customer);
+
+            // Explicitly recalculate billing to ensure accurate data
+            try {
+              const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+              enqueueSnackbar('Recalculating billing...', { variant: 'info' });
+
+              const recalcResult = await axios.post('/api/monthly-billing', {
+                customer_id: customer.customer_id,
+                billing_month: billingMonth,
+              });
+
+              console.log('Billing recalculation result:', recalcResult.data);
+
+              if (recalcResult.data?.success) {
+                // Billing successfully recalculated, now refresh UI
+                onUpdate();
+              } else {
+                console.error('Recalculation failed:', recalcResult.data);
+                enqueueSnackbar('Billing recalculation failed - refreshing anyway', { variant: 'warning' });
+                onUpdate();
+              }
+            } catch (recalcError: any) {
+              console.error('Error recalculating billing:', recalcError);
+              enqueueSnackbar('Error recalculating billing - refreshing anyway', { variant: 'warning' });
+              onUpdate();
+            }
           } else {
             console.error('Delete failed:', deleteResult.data);
             enqueueSnackbar('Failed to remove entry: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
             return;
           }
         }
-
-        // Revert billing status if it was finalized
-        await revertBillingIfFinalized(customer);
-
-        // Wait for database trigger to complete billing recalculation
-        // The tr_calendar_entry_after_delete trigger calls sp_calculate_monthly_billing
-        // Give it time to complete before refreshing the UI
-        setTimeout(() => {
-          onUpdate();
-        }, 500);
-
-        enqueueSnackbar('Refreshing billing calculations...', { variant: 'info' });
       } catch (error: any) {
         console.error('Error removing extra tiffin:', error);
         const errorMsg = error.response?.data?.error || error.message || 'Failed to remove extra tiffin';
