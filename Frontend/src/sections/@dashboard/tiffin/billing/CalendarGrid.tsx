@@ -257,6 +257,15 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     currentStatus: CalendarEntryStatus | null,
     isPlanDay: boolean
   ) => {
+    // Block editing if billing is pending, finalized, or paid
+    if (customer.billing_status && ['pending', 'finalized', 'paid'].includes(customer.billing_status)) {
+      enqueueSnackbar(
+        `Cannot modify calendar - billing is ${customer.billing_status}. Please reject or approve billing first.`,
+        { variant: 'warning' }
+      );
+      return;
+    }
+
     // Get customer's orders
     const orders = customer.orders || [];
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -478,6 +487,15 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
   // Handle double-click on non-plan days for extra tiffin
   const handleCellDoubleClick = (customer: ICalendarCustomerData, day: number, currentStatus: CalendarEntryStatus | null, isPlanDay: boolean) => {
+    // Block editing if billing is pending, finalized, or paid
+    if (customer.billing_status && ['pending', 'finalized', 'paid'].includes(customer.billing_status)) {
+      enqueueSnackbar(
+        `Cannot add extra tiffin - billing is ${customer.billing_status}. Please reject or approve billing first.`,
+        { variant: 'warning' }
+      );
+      return;
+    }
+
     // Only allow double-click on non-plan days
     if (isPlanDay) {
       return;
@@ -767,13 +785,16 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                   const status = getStatusForDate(customer, day);
                   const weekend = isWeekend(day);
                   const isPlanDay = isDateCoveredByOrder(customer, day);
+                  const isLocked = customer.billing_status && ['pending', 'finalized', 'paid'].includes(customer.billing_status);
                   const disabled = !isPlanDay && !status;
 
                   return (
                     <StyledTableCell key={day}>
                       <Tooltip
                         title={
-                          isPlanDay
+                          isLocked
+                            ? `Billing ${customer.billing_status} - editing locked`
+                            : isPlanDay
                             ? status
                               ? status === 'T'
                                 ? 'Delivered - Click to mark Absent'
@@ -789,10 +810,15 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                         <DayCell
                           status={status}
                           isWeekend={weekend}
-                          disabled={disabled}
+                          disabled={disabled || isLocked}
                           isPlanDay={isPlanDay}
                           onClick={() => handleCellClick(customer, day, status, isPlanDay)}
                           onDoubleClick={() => handleCellDoubleClick(customer, day, status, isPlanDay)}
+                          sx={isLocked ? {
+                            opacity: 0.6,
+                            cursor: 'not-allowed !important',
+                            pointerEvents: 'auto'
+                          } : {}}
                         >
                           {status || ''}
                         </DayCell>
