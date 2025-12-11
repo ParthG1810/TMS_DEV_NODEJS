@@ -342,6 +342,13 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         const entries = entryResponse.data?.data;
         const orderId = entries && entries.length > 0 ? entries[0].order_id : null;
 
+        console.log('Calendar entry for deletion:', {
+          customer_id: customer.customer_id,
+          delivery_date: date,
+          entry: entries && entries.length > 0 ? entries[0] : null,
+          order_id: orderId,
+        });
+
         if (orderId) {
           // Get the order details to check if it's a Single day order (extra tiffin)
           const orderResponse = await axios.get(`/api/customer-orders/${orderId}`);
@@ -570,6 +577,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       if (orderResult.data.success) {
         const newOrderId = orderResult.data.data.id;
 
+        console.log('Created extra tiffin order:', {
+          order_id: newOrderId,
+          order_data: orderResult.data.data,
+          delivery_date: extraOrderData.delivery_date,
+        });
+
         // Create the calendar entry with 'E' status
         const result = await dispatch(
           createCalendarEntry({
@@ -581,6 +594,8 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             price: priceValue,
           })
         );
+
+        console.log('Calendar entry creation result:', result);
 
         if (result.success) {
           enqueueSnackbar('Extra tiffin order created successfully', { variant: 'success' });
