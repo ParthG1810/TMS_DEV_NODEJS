@@ -9,6 +9,7 @@ import {
   MenuItem,
   Chip,
   Box,
+  Tooltip,
 } from '@mui/material';
 // @types
 import { ICustomerOrder } from '../../../../../@types/tms';
@@ -16,6 +17,7 @@ import { ICustomerOrder } from '../../../../../@types/tms';
 import Iconify from '../../../../../components/iconify';
 import MenuPopover from '../../../../../components/menu-popover';
 import ConfirmDialog from '../../../../../components/confirm-dialog';
+import { useSnackbar } from '../../../../../components/snackbar';
 
 // ----------------------------------------------------------------------
 
@@ -44,10 +46,15 @@ export default function OrderTableRow({
     price,
     start_date,
     end_date,
+    payment_status,
   } = row;
 
+  const { enqueueSnackbar } = useSnackbar();
   const [openConfirm, setOpenConfirm] = useState(false);
   const [openPopover, setOpenPopover] = useState<HTMLElement | null>(null);
+
+  // Check if order is locked (billing is pending approval)
+  const isLocked = payment_status === 'pending';
 
   const handleOpenConfirm = () => {
     setOpenConfirm(true);
@@ -69,10 +76,27 @@ export default function OrderTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          <Tooltip title={isLocked ? 'Cannot select - billing is pending approval' : ''}>
+            <Checkbox
+              checked={selected}
+              onClick={onSelectRow}
+              disabled={isLocked}
+            />
+          </Tooltip>
         </TableCell>
 
-        <TableCell>{customer_name}</TableCell>
+        <TableCell>
+          {customer_name}
+          {isLocked && (
+            <Chip
+              label="Billing Pending"
+              size="small"
+              color="warning"
+              sx={{ ml: 1, fontSize: 10 }}
+              icon={<Iconify icon="eva:lock-outline" width={14} />}
+            />
+          )}
+        </TableCell>
 
         <TableCell>{meal_plan_name}</TableCell>
 
@@ -135,16 +159,33 @@ export default function OrderTableRow({
           </MenuItem>
         )}
 
-        <MenuItem
-          onClick={() => {
-            handleOpenConfirm();
-            handleClosePopover();
-          }}
-          sx={{ color: 'error.main' }}
+        <Tooltip
+          title={isLocked ? 'Cannot delete - billing is pending approval' : ''}
+          placement="left"
         >
-          <Iconify icon="eva:trash-2-outline" />
-          Delete
-        </MenuItem>
+          <MenuItem
+            onClick={() => {
+              if (isLocked) {
+                enqueueSnackbar(
+                  'Cannot delete order - billing is pending approval. Please reject or approve the billing first.',
+                  { variant: 'warning' }
+                );
+                handleClosePopover();
+                return;
+              }
+              handleOpenConfirm();
+              handleClosePopover();
+            }}
+            sx={{
+              color: isLocked ? 'text.disabled' : 'error.main',
+              cursor: isLocked ? 'not-allowed' : 'pointer',
+              opacity: isLocked ? 0.5 : 1,
+            }}
+          >
+            <Iconify icon={isLocked ? 'eva:lock-outline' : 'eva:trash-2-outline'} />
+            {isLocked ? 'Locked' : 'Delete'}
+          </MenuItem>
+        </Tooltip>
       </MenuPopover>
 
       <ConfirmDialog
