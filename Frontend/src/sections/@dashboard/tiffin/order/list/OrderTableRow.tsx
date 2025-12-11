@@ -136,15 +136,33 @@ export default function OrderTableRow({
         arrow="right-top"
         sx={{ width: 160 }}
       >
-        <MenuItem
-          onClick={() => {
-            onEditRow();
-            handleClosePopover();
-          }}
+        <Tooltip
+          title={isLocked ? 'Cannot edit - billing is pending approval' : ''}
+          placement="left"
         >
-          <Iconify icon="eva:edit-fill" />
-          Edit
-        </MenuItem>
+          <MenuItem
+            onClick={() => {
+              if (isLocked) {
+                enqueueSnackbar(
+                  'Cannot edit order - billing is pending approval. Please reject or approve the billing first.',
+                  { variant: 'warning' }
+                );
+                handleClosePopover();
+                return;
+              }
+              onEditRow();
+              handleClosePopover();
+            }}
+            sx={{
+              color: isLocked ? 'text.disabled' : 'inherit',
+              cursor: isLocked ? 'not-allowed' : 'pointer',
+              opacity: isLocked ? 0.5 : 1,
+            }}
+          >
+            <Iconify icon={isLocked ? 'eva:lock-outline' : 'eva:edit-fill'} />
+            {isLocked ? 'Locked' : 'Edit'}
+          </MenuItem>
+        </Tooltip>
 
         {onCalculateBilling && (
           <MenuItem
@@ -152,10 +170,10 @@ export default function OrderTableRow({
               onCalculateBilling();
               handleClosePopover();
             }}
-            sx={{ color: 'info.main' }}
+            sx={{ color: isLocked ? 'warning.main' : 'info.main' }}
           >
-            <Iconify icon="eva:calculator-fill" />
-            Calculate
+            <Iconify icon={isLocked ? 'eva:clock-outline' : 'eva:calculator-fill'} />
+            {isLocked ? 'Pending Approval' : 'Calculate'}
           </MenuItem>
         )}
 
