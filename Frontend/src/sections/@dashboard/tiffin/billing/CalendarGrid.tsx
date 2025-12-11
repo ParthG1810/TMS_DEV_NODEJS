@@ -939,12 +939,18 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               label="Select Meal Plan"
               value={selectedMealPlan || ''}
               onChange={(e) => setSelectedMealPlan(Number(e.target.value))}
+              helperText="Only showing meal plans with frequency='Daily' and days='Single'"
             >
-              {mealPlans.map((plan) => (
-                <MenuItem key={plan.id} value={plan.id}>
-                  {plan.meal_name} - CAD ${Number(plan.price).toFixed(2)}
-                </MenuItem>
-              ))}
+              {mealPlans
+                .filter((plan) => plan.frequency === 'Daily' && plan.days === 'Single')
+                .map((plan) => (
+                  <MenuItem key={plan.id} value={plan.id}>
+                    {plan.meal_name} - CAD ${Number(plan.price).toFixed(2)}
+                  </MenuItem>
+                ))}
+              {mealPlans.filter((plan) => plan.frequency === 'Daily' && plan.days === 'Single').length === 0 && (
+                <MenuItem disabled>No Daily/Single meal plans available</MenuItem>
+              )}
             </TextField>
 
             <TextField
