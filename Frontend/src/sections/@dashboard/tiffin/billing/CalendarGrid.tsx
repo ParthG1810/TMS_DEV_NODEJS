@@ -598,6 +598,24 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         console.log('Calendar entry creation result:', result);
 
         if (result.success) {
+          // Verify the calendar entry was created with correct order_id
+          const verifyResponse = await axios.get('/api/calendar-entries', {
+            params: {
+              customer_id: extraOrderData.customer_id,
+              delivery_date: extraOrderData.delivery_date,
+            },
+          });
+
+          const verifyEntries = verifyResponse.data?.data;
+          const verifyEntry = verifyEntries && verifyEntries.length > 0 ? verifyEntries[0] : null;
+
+          console.log('Verification - Calendar entry after creation:', {
+            expected_order_id: newOrderId,
+            actual_order_id: verifyEntry?.order_id,
+            full_entry: verifyEntry,
+            matches: verifyEntry?.order_id === newOrderId,
+          });
+
           enqueueSnackbar('Extra tiffin order created successfully', { variant: 'success' });
 
           // Find the customer and revert billing if finalized
