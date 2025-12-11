@@ -384,6 +384,18 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
           if (deleteResult.data?.success) {
             enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
+
+            // Revert billing status if it was finalized
+            await revertBillingIfFinalized(customer);
+
+            // Wait for database trigger to complete billing recalculation
+            // The CASCADE delete triggers tr_calendar_entry_after_delete which calls sp_calculate_monthly_billing
+            // Give it time to complete before refreshing the UI
+            enqueueSnackbar('Refreshing billing calculations...', { variant: 'info' });
+            setTimeout(() => {
+              onUpdate();
+            }, 500);
+            return; // Exit early - refresh is scheduled
           } else {
             console.error('Delete failed:', deleteResult.data);
             enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
@@ -412,7 +424,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         // Revert billing status if it was finalized
         await revertBillingIfFinalized(customer);
 
-        onUpdate();
+        // Wait for database trigger to complete billing recalculation
+        // The tr_calendar_entry_after_delete trigger calls sp_calculate_monthly_billing
+        // Give it time to complete before refreshing the UI
+        setTimeout(() => {
+          onUpdate();
+        }, 500);
+
+        enqueueSnackbar('Refreshing billing calculations...', { variant: 'info' });
       } catch (error: any) {
         console.error('Error removing extra tiffin:', error);
         const errorMsg = error.response?.data?.error || error.message || 'Failed to remove extra tiffin';
