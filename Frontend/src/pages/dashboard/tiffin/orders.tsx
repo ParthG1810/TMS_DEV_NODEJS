@@ -114,7 +114,14 @@ export default function OrdersPage() {
 
   const handleDeleteRow = async (id: number) => {
     try {
-      await dispatch(deleteCustomerOrder(id));
+      const result = await dispatch(deleteCustomerOrder(id));
+
+      // Check if deletion was successful
+      if (result && result.success === false) {
+        enqueueSnackbar(result.error || 'Failed to delete order', { variant: 'error' });
+        return;
+      }
+
       const deleteRow = tableData.filter((row) => row.id !== id);
       setTableData(deleteRow);
       enqueueSnackbar('Delete success!');
@@ -126,13 +133,40 @@ export default function OrdersPage() {
       }
     } catch (error: any) {
       console.error(error);
-      enqueueSnackbar(error.message || 'Failed to delete order', { variant: 'error' });
+      const errorMsg = error.response?.data?.error || error.error || error.message || 'Failed to delete order';
+      enqueueSnackbar(errorMsg, { variant: 'error' });
     }
   };
 
   const handleDeleteRows = async (selectedRows: number[]) => {
     try {
-      await Promise.all(selectedRows.map((id) => dispatch(deleteCustomerOrder(id))));
+      // Check for locked orders (payment_status='pending')
+      const lockedOrders = tableData.filter(
+        (row) => selectedRows.includes(row.id) && row.payment_status === 'pending'
+      );
+
+      if (lockedOrders.length > 0) {
+        enqueueSnackbar(
+          `Cannot delete ${lockedOrders.length} order(s) - billing is pending approval. Please reject or approve the billing first.`,
+          { variant: 'warning' }
+        );
+        return;
+      }
+
+      const results = await Promise.all(
+        selectedRows.map((id) => dispatch(deleteCustomerOrder(id)))
+      );
+
+      // Check if any deletions failed
+      const failed = results.filter((r: any) => r && r.success === false);
+      if (failed.length > 0) {
+        enqueueSnackbar(
+          `Failed to delete ${failed.length} order(s). ${failed[0]?.error || ''}`,
+          { variant: 'error' }
+        );
+        return;
+      }
+
       const deleteRows = tableData.filter((row) => !selectedRows.includes(row.id));
       setTableData(deleteRows);
       setSelected([]);
@@ -148,9 +182,10 @@ export default function OrdersPage() {
           setPage(newPage);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      enqueueSnackbar('Failed to delete orders', { variant: 'error' });
+      const errorMsg = error.response?.data?.error || error.error || error.message || 'Failed to delete orders';
+      enqueueSnackbar(errorMsg, { variant: 'error' });
     }
   };
 
