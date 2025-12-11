@@ -122,7 +122,22 @@ async function handlePut(
         });
       }
 
-      // Update to finalized status
+      // Get billing info first (we need customer_id and billing_month)
+      const billingInfo = await query<any[]>(
+        'SELECT mb.customer_id, mb.billing_month, mb.total_amount, c.name AS customer_name FROM monthly_billing mb INNER JOIN customers c ON mb.customer_id = c.id WHERE mb.id = ?',
+        [id]
+      );
+
+      if (billingInfo.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Billing record not found',
+        });
+      }
+
+      const { customer_id, billing_month } = billingInfo[0];
+
+      // Update monthly_billing to pending status
       await query(
         `
           UPDATE monthly_billing
@@ -137,17 +152,35 @@ async function handlePut(
         [finalize.finalized_by, finalize.notes || null, id]
       );
 
+      // Update all customer_orders for this customer in this month to payment_status='pending'
+      // This ensures orders are marked as pending when billing is finalized
+      const [year, month] = billing_month.split('-');
+      const firstDay = `${billing_month}-01`;
+      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+      const lastDayStr = `${billing_month}-${String(lastDay).padStart(2, '0')}`;
+
+      await query(
+        `
+          UPDATE customer_orders
+          SET payment_status = 'pending',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE customer_id = ?
+            AND (
+              (start_date <= ? AND end_date >= ?)
+              OR (start_date >= ? AND start_date <= ?)
+            )
+        `,
+        [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
+      );
+
       // Delete any existing notifications for this billing (in case of re-finalize)
       await query(
         'DELETE FROM payment_notifications WHERE billing_id = ? AND notification_type = ?',
         [id, 'billing_pending_approval']
       );
 
-      // Create new notification
-      const billing = await query<any[]>(
-        'SELECT mb.customer_id, mb.billing_month, mb.total_amount, c.name AS customer_name FROM monthly_billing mb INNER JOIN customers c ON mb.customer_id = c.id WHERE mb.id = ?',
-        [id]
-      );
+      // Use the billing info we already fetched
+      const billing = billingInfo;
 
       if (billing.length > 0) {
         await query(
