@@ -330,80 +330,68 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     // For non-plan days with 'E' status: remove the entry and delete the order
     if (!isPlanDay && currentStatus === 'E') {
       try {
-        // First, get the calendar entry to find the order_id
-        const entryResponse = await axios.get('/api/calendar-entries', {
+        // Get all orders for this customer in the current month
+        const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+        const ordersResponse = await axios.get('/api/customer-orders', {
           params: {
-            customer_id: customer.customer_id,
-            delivery_date: date,
+            filter: 'monthly',
+            month: monthStr,
           },
         });
 
-        // GET returns an array, so we need to get the first element
-        const entries = entryResponse.data?.data;
-        const orderId = entries && entries.length > 0 ? entries[0].order_id : null;
+        const allOrders = ordersResponse.data?.data?.orders || [];
 
-        console.log('Calendar entry for deletion:', {
+        console.log('All customer orders for month:', {
+          month: monthStr,
           customer_id: customer.customer_id,
-          delivery_date: date,
-          entry: entries && entries.length > 0 ? entries[0] : null,
-          order_id: orderId,
+          total_orders: allOrders.length,
+          orders: allOrders,
         });
 
-        if (orderId) {
-          // Get the order details to check if it's a Single day order (extra tiffin)
-          const orderResponse = await axios.get(`/api/customer-orders/${orderId}`);
-          const order = orderResponse.data?.data;
+        // Filter to find the extra tiffin order matching this exact date
+        const customerOrders = allOrders.filter((order: any) => order.customer_id === customer.customer_id);
 
-          console.log('Deleting extra tiffin - Order details:', {
-            order_id: orderId,
-            meal_plan_frequency: order?.meal_plan_frequency,
-            meal_plan_days: order?.meal_plan_days,
-            start_date: order?.start_date,
-            end_date: order?.end_date,
+        const extraTiffinOrder = customerOrders.find((order: any) => {
+          const orderStartDate = order.start_date?.split('T')[0] || order.start_date;
+          const orderEndDate = order.end_date?.split('T')[0] || order.end_date;
+
+          return (
+            orderStartDate === date &&
+            orderEndDate === date &&
+            order.meal_plan_frequency === 'Daily' &&
+            order.meal_plan_days === 'Single'
+          );
+        });
+
+        console.log('Extra tiffin order search:', {
+          date: date,
+          customer_orders_count: customerOrders.length,
+          found_extra_order: extraTiffinOrder,
+          order_id: extraTiffinOrder?.id,
+        });
+
+        if (extraTiffinOrder) {
+          console.log('Deleting extra tiffin order:', {
+            order_id: extraTiffinOrder.id,
+            start_date: extraTiffinOrder.start_date,
+            end_date: extraTiffinOrder.end_date,
+            frequency: extraTiffinOrder.meal_plan_frequency,
+            days: extraTiffinOrder.meal_plan_days,
           });
 
-          // Normalize dates to string format (YYYY-MM-DD) for comparison
-          const orderStartDate = order?.start_date?.split('T')[0] || order?.start_date;
-          const orderEndDate = order?.end_date?.split('T')[0] || order?.end_date;
+          const deleteResult = await axios.delete(`/api/customer-orders/${extraTiffinOrder.id}`);
+          console.log('Delete order result:', deleteResult.data);
 
-          // Only delete the order if it's an extra tiffin order (frequency='Daily' and days='Single')
-          // This prevents deleting the main plan order (Mon-Fri, Mon-Sat)
-          if (order && orderStartDate === orderEndDate &&
-              order.meal_plan_frequency === 'Daily' &&
-              order.meal_plan_days === 'Single') {
-            console.log('Deleting extra tiffin order (frequency=Daily, days=Single)');
-            const deleteResult = await axios.delete(`/api/customer-orders/${orderId}`);
-            console.log('Delete order result:', deleteResult.data);
-
-            if (deleteResult.data?.success) {
-              enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
-            } else {
-              console.error('Delete failed:', deleteResult.data);
-              enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
-              return;
-            }
+          if (deleteResult.data?.success) {
+            enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
           } else {
-            console.log('Not an extra tiffin - just deleting calendar entry');
-            // This is a plan order - just delete the calendar entry, not the order
-            const deleteResult = await axios.delete('/api/calendar-entries', {
-              params: {
-                customer_id: customer.customer_id,
-                delivery_date: date,
-              },
-            });
-            console.log('Delete calendar entry result:', deleteResult.data);
-
-            if (deleteResult.data?.success) {
-              enqueueSnackbar('Calendar entry removed', { variant: 'success' });
-            } else {
-              console.error('Delete failed:', deleteResult.data);
-              enqueueSnackbar('Failed to remove entry: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
-              return;
-            }
+            console.error('Delete failed:', deleteResult.data);
+            enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
+            return;
           }
         } else {
-          console.log('No order ID found - deleting calendar entry only');
-          // Fallback: just delete the calendar entry if no order found
+          console.log('No extra tiffin order found - just deleting calendar entry');
+          // Fallback: just delete the calendar entry if no matching order found
           const deleteResult = await axios.delete('/api/calendar-entries', {
             params: {
               customer_id: customer.customer_id,
@@ -413,7 +401,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           console.log('Delete calendar entry result:', deleteResult.data);
 
           if (deleteResult.data?.success) {
-            enqueueSnackbar('Extra tiffin removed', { variant: 'success' });
+            enqueueSnackbar('Calendar entry removed', { variant: 'success' });
           } else {
             console.error('Delete failed:', deleteResult.data);
             enqueueSnackbar('Failed to remove entry: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
