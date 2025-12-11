@@ -365,7 +365,7 @@ async function handleDeleteCustomerOrder(
   try {
     // Check if order exists and get order details
     const existingOrders = (await query(
-      'SELECT customer_id, start_date, end_date FROM customer_orders WHERE id = ?',
+      'SELECT customer_id, start_date, end_date, payment_status FROM customer_orders WHERE id = ?',
       [id]
     )) as any[];
 
@@ -377,6 +377,14 @@ async function handleDeleteCustomerOrder(
     }
 
     const order = existingOrders[0];
+
+    // Prevent deletion if payment_status is 'pending' (billing is finalized)
+    if (order.payment_status === 'pending') {
+      return res.status(403).json({
+        success: false,
+        error: 'Cannot delete order - billing is pending approval. Please reject or approve the billing first.',
+      });
+    }
     const customerId = order.customer_id;
     const startDate = new Date(order.start_date);
     const endDate = new Date(order.end_date);
