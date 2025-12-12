@@ -135,6 +135,7 @@ export default function BillingDetailsPage() {
   const [eTransferEmail, setETransferEmail] = useState('admin@tiffinservice.com');
   const [companyName, setCompanyName] = useState('TIFFIN MANAGEMENT SYSTEM');
   const [companyLogo, setCompanyLogo] = useState('');
+  const [logoDataUrl, setLogoDataUrl] = useState('');
   const [showPdfPreview, setShowPdfPreview] = useState(false);
 
   // Load billing details and settings
@@ -151,7 +152,30 @@ export default function BillingDetailsPage() {
       if (response.data.success) {
         setETransferEmail(response.data.data.etransfer_email);
         setCompanyName(response.data.data.company_name);
-        setCompanyLogo(response.data.data.company_logo || '');
+        const logoUrl = response.data.data.company_logo || '';
+        setCompanyLogo(logoUrl);
+
+        // Convert logo to data URL for PDF rendering
+        if (logoUrl) {
+          try {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL('image/png');
+                setLogoDataUrl(dataUrl);
+              }
+            };
+            img.src = logoUrl;
+          } catch (error) {
+            console.error('Error converting logo to data URL:', error);
+          }
+        }
       }
     } catch (error: any) {
       console.error('Error fetching settings:', error);
@@ -211,12 +235,11 @@ export default function BillingDetailsPage() {
   };
 
   const handlePrint = () => {
-    // Switch to customer preview tab before printing
-    setCurrentTab('customer-preview');
-    // Small delay to ensure tab content is rendered
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    // Open PDF in new window for printing
+    if (billingDetails) {
+      setShowPdfPreview(true);
+      // Note: User can use the PDF viewer's print button
+    }
   };
 
   if (loading) {
@@ -363,7 +386,7 @@ export default function BillingDetailsPage() {
                     billingData={billingDetails}
                     companyName={companyName}
                     eTransferEmail={eTransferEmail}
-                    companyLogo={companyLogo}
+                    companyLogo={logoDataUrl}
                   />
                 }
                 fileName={`Invoice-${billing.customer_name.replace(/\s+/g, '-')}-${billing.billing_month}.pdf`}
@@ -379,13 +402,6 @@ export default function BillingDetailsPage() {
                   </Button>
                 )}
               </PDFDownloadLink>
-              <Button
-                variant="outlined"
-                startIcon={<Iconify icon="eva:printer-outline" />}
-                onClick={handlePrint}
-              >
-                Print
-              </Button>
               {billing.status === 'pending' && (
                 <>
                   <Button
@@ -481,7 +497,7 @@ export default function BillingDetailsPage() {
                 billingData={billingDetails}
                 companyName={companyName}
                 eTransferEmail={eTransferEmail}
-                companyLogo={companyLogo}
+                companyLogo={logoDataUrl}
               />
             </PDFViewer>
           </DialogContent>
@@ -653,7 +669,7 @@ function MyUseTab({
                   textColor = theme.palette.info.main;
                 }
 
-                const statusText = isDelivered ? 'T' : isAbsent ? 'A' : isExtra ? 'E' : '';
+                const statusText = isDelivered ? '✓' : isAbsent ? '✗' : isExtra ? '+' : '';
 
                 return (
                   <Box
@@ -1028,7 +1044,7 @@ function CustomerPreviewTab({
               textColor = '#2196f3'; // Blue text
             }
 
-            const statusText = isDelivered ? 'T' : isAbsent ? 'A' : isExtra ? 'E' : '';
+            const statusText = isDelivered ? '✓' : isAbsent ? '✗' : isExtra ? '+' : '';
 
             return (
               <Box
