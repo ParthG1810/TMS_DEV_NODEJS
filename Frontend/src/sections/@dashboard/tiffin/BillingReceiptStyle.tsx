@@ -109,9 +109,9 @@ export const styles = StyleSheet.create({
   },
 
   calendarHeaderCell: {
-    width: '13.5%', // Slightly less than 14.28% to allow for margins
-    margin: '1px',
-    padding: 3,
+    width: '13.5%', // Slightly less than 14.28% to allow for margins (gap: 0.5 in My Use)
+    margin: '2px', // gap: 0.5 from My Use tab (0.5 * 8px = 4px, so 2px margin on each side)
+    padding: 4,
     backgroundColor: 'transparent',
     textAlign: 'center',
     fontSize: 7,
@@ -119,12 +119,12 @@ export const styles = StyleSheet.create({
   },
 
   calendarCell: {
-    width: '13.5%', // Slightly less than 14.28% to allow for margins
-    margin: '1px',
-    padding: 4,
-    minHeight: 22,
+    width: '13.5%', // Slightly less than 14.28% to allow for margins (gap: 0.5 in My Use)
+    margin: '2px', // gap: 0.5 from My Use tab (0.5 * 8px = 4px, so 2px margin on each side)
+    padding: 5, // p: 1 from My Use tab (1 * 8px = 8px, scaled down for PDF)
+    minHeight: 24,
     border: '1px solid #e0e0e0',
-    borderRadius: 2,
+    borderRadius: 4, // borderRadius: 1 from My Use tab (1 * 4px = 4px or 1 * 8px = 8px)
     textAlign: 'center',
     fontSize: 7,
     backgroundColor: 'transparent',
@@ -140,32 +140,32 @@ export const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
   },
 
-  // Status colors for calendar cells - matching My Use tab
+  // Status colors for calendar cells - matching My Use tab exactly
   deliveredCell: {
-    backgroundColor: '#c8e6c9', // Light green (Material green[100])
-    borderColor: '#81c784', // Darker green border
+    backgroundColor: 'rgba(76, 175, 80, 0.2)', // alpha(theme.palette.success.main, 0.2)
+    borderColor: 'rgba(76, 175, 80, 0.4)', // alpha(theme.palette.success.main, 0.4)
   },
 
   absentCell: {
-    backgroundColor: '#ffcdd2', // Light red (Material red[100])
-    borderColor: '#e57373', // Darker red border
+    backgroundColor: 'rgba(244, 67, 54, 0.2)', // alpha(theme.palette.error.main, 0.2)
+    borderColor: 'rgba(244, 67, 54, 0.4)', // alpha(theme.palette.error.main, 0.4)
   },
 
   extraCell: {
-    backgroundColor: '#b3e5fc', // Light blue (Material lightBlue[100])
-    borderColor: '#64b5f6', // Darker blue border
+    backgroundColor: 'rgba(33, 150, 243, 0.2)', // alpha(theme.palette.info.main, 0.2)
+    borderColor: 'rgba(33, 150, 243, 0.4)', // alpha(theme.palette.info.main, 0.4)
   },
 
   deliveredText: {
-    color: '#2e7d32', // Dark green
+    color: '#4caf50', // theme.palette.success.main
   },
 
   absentText: {
-    color: '#c62828', // Dark red
+    color: '#f44336', // theme.palette.error.main
   },
 
   extraText: {
-    color: '#1565c0', // Dark blue
+    color: '#2196f3', // theme.palette.info.main
   },
 
   // Legend
