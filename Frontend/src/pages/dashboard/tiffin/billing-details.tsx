@@ -202,7 +202,12 @@ export default function BillingDetailsPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    // Switch to customer preview tab before printing
+    setCurrentTab('customer-preview');
+    // Small delay to ensure tab content is rendered
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   if (loading) {
@@ -267,9 +272,72 @@ export default function BillingDetailsPage() {
     <>
       <Head>
         <title>Billing Details | Tiffin Management</title>
+        <style>{`
+          @media print {
+            /* Hide everything except customer preview */
+            body * {
+              visibility: hidden;
+            }
+
+            #customer-preview-content,
+            #customer-preview-content * {
+              visibility: visible;
+            }
+
+            #customer-preview-content {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              background: white !important;
+              padding: 15mm;
+            }
+
+            /* Page setup for A4/Letter */
+            @page {
+              size: A4;
+              margin: 10mm;
+            }
+
+            /* Base styles - white background and black text */
+            #customer-preview-content {
+              background: white !important;
+            }
+
+            #customer-preview-content > * {
+              background: transparent !important;
+            }
+
+            /* Keep calendar cell colors */
+            .print-calendar-cell {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+
+            /* Ensure text is black by default */
+            #customer-preview-content h1,
+            #customer-preview-content h2,
+            #customer-preview-content h3,
+            #customer-preview-content h4,
+            #customer-preview-content h5,
+            #customer-preview-content h6,
+            #customer-preview-content p,
+            #customer-preview-content div {
+              color: black !important;
+            }
+
+            /* Hide Card borders */
+            #customer-preview-content .MuiCard-root,
+            #customer-preview-content .MuiPaper-root {
+              box-shadow: none !important;
+              border: none !important;
+            }
+          }
+        `}</style>
       </Head>
 
-      <Container maxWidth={themeStretch ? false : 'xl'}>
+      <Container maxWidth={themeStretch ? false : 'xl'} className="no-print">
         <CustomBreadcrumbs
           heading="Billing Invoice Details"
           links={[
@@ -791,11 +859,17 @@ function CustomerPreviewTab({
 
   return (
     <Box
+      id="customer-preview-content"
       sx={{
         bgcolor: isDark ? '#1a1a1a' : '#f5f5f5',
         color: isDark ? '#fff' : '#000',
         p: 4,
         minHeight: '100vh',
+        '@media print': {
+          bgcolor: 'white !important',
+          color: 'black !important',
+          p: 0,
+        },
       }}
     >
       {/* Header */}
@@ -844,8 +918,8 @@ function CustomerPreviewTab({
           sx={{
             display: 'grid',
             gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: 0.5,
-            maxWidth: 600,
+            gap: 0.25,
+            maxWidth: 500,
             margin: '0 auto',
           }}
         >
@@ -853,10 +927,10 @@ function CustomerPreviewTab({
             <Box
               key={i}
               sx={{
-                p: 1,
+                p: 0.5,
                 textAlign: 'center',
                 fontWeight: 'bold',
-                fontSize: '0.75rem',
+                fontSize: '0.65rem',
                 bgcolor: isDark ? '#333' : '#e0e0e0',
               }}
             >
@@ -895,19 +969,25 @@ function CustomerPreviewTab({
             return (
               <Box
                 key={day}
+                className="print-calendar-cell"
                 sx={{
-                  p: 1,
+                  p: 0.5,
                   textAlign: 'center',
                   bgcolor: bgColor,
                   border: `1px solid ${borderColor}`,
-                  borderRadius: 1,
-                  fontSize: '0.875rem',
+                  borderRadius: 0.5,
+                  fontSize: '0.75rem',
                   fontWeight: status ? 'bold' : 'normal',
+                  minHeight: '40px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
                 }}
               >
                 <div>{day}</div>
                 {statusText && (
-                  <div style={{ fontSize: '0.75rem', marginTop: 2, fontWeight: 'bold', color: textColor }}>
+                  <div style={{ fontSize: '0.65rem', marginTop: 1, fontWeight: 'bold', color: textColor }}>
                     {statusText}
                   </div>
                 )}
