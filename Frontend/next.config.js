@@ -33,4 +33,13 @@ module.exports = withTM({
     AUTH0_DOMAIN: '',
     AUTH0_CLIENT_ID: '',
   },
+  // Proxy /uploads requests to backend server
+  async rewrites() {
+    return [
+      {
+        source: '/uploads/:path*',
+        destination: 'http://localhost:3000/uploads/:path*',
+      },
+    ];
+  },
 });

@@ -9,6 +9,7 @@ import {
   MenuItem,
   Chip,
   Box,
+  Tooltip,
 } from '@mui/material';
 // @types
 import { ICustomerOrder } from '../../../../../@types/tms';
@@ -16,6 +17,7 @@ import { ICustomerOrder } from '../../../../../@types/tms';
 import Iconify from '../../../../../components/iconify';
 import MenuPopover from '../../../../../components/menu-popover';
 import ConfirmDialog from '../../../../../components/confirm-dialog';
+import { useSnackbar } from '../../../../../components/snackbar';
 
 // ----------------------------------------------------------------------
 
@@ -25,6 +27,7 @@ type Props = {
   onEditRow: VoidFunction;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
+  onCalculateBilling?: VoidFunction;
 };
 
 export default function OrderTableRow({
@@ -33,6 +36,7 @@ export default function OrderTableRow({
   onEditRow,
   onSelectRow,
   onDeleteRow,
+  onCalculateBilling,
 }: Props) {
   const {
     customer_name,
@@ -42,10 +46,65 @@ export default function OrderTableRow({
     price,
     start_date,
     end_date,
+    payment_status,
   } = row;
 
+  const { enqueueSnackbar } = useSnackbar();
   const [openConfirm, setOpenConfirm] = useState(false);
   const [openPopover, setOpenPopover] = useState<HTMLElement | null>(null);
+
+  // Check if order is locked based on payment status
+  // Status flow: calculating → pending → finalized → paid/partial_paid
+  const isLocked = payment_status && ['finalized', 'paid', 'partial_paid'].includes(payment_status);
+  const isPending = payment_status === 'pending';
+  const isCalculating = !payment_status || payment_status === 'calculating';
+
+  // Get status display info
+  const getStatusInfo = () => {
+    if (payment_status === 'pending') {
+      return {
+        label: 'Pending Approval',
+        color: 'warning' as const,
+        icon: 'eva:clock-outline',
+        tooltip: 'Billing is pending approval - cannot delete',
+      };
+    }
+    if (payment_status === 'finalized') {
+      return {
+        label: 'Approved (Locked)',
+        color: 'info' as const,
+        icon: 'eva:lock-outline',
+        tooltip: 'Billing approved - order is locked',
+      };
+    }
+    if (payment_status === 'paid') {
+      return {
+        label: 'Paid (Locked)',
+        color: 'success' as const,
+        icon: 'eva:checkmark-circle-2-outline',
+        tooltip: 'Payment completed - order is read-only',
+      };
+    }
+    if (payment_status === 'partial_paid') {
+      return {
+        label: 'Partial Paid (Locked)',
+        color: 'secondary' as const,
+        icon: 'eva:checkmark-outline',
+        tooltip: 'Partial payment received - order is read-only',
+      };
+    }
+    if (payment_status === 'calculating') {
+      return {
+        label: 'Calculating',
+        color: 'default' as const,
+        icon: 'eva:refresh-outline',
+        tooltip: 'Billing is being calculated',
+      };
+    }
+    return null;
+  };
+
+  const statusInfo = getStatusInfo();
 
   const handleOpenConfirm = () => {
     setOpenConfirm(true);
@@ -67,10 +126,27 @@ export default function OrderTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          <Tooltip title={isLocked ? `Cannot select - ${statusInfo?.tooltip}` : ''}>
+            <Checkbox
+              checked={selected}
+              onClick={onSelectRow}
+              disabled={isLocked}
+            />
+          </Tooltip>
         </TableCell>
 
-        <TableCell>{customer_name}</TableCell>
+        <TableCell>
+          {customer_name}
+          {statusInfo && (
+            <Chip
+              label={statusInfo.label}
+              size="small"
+              color={statusInfo.color}
+              sx={{ ml: 1, fontSize: 10 }}
+              icon={<Iconify icon={statusInfo.icon} width={14} />}
+            />
+          )}
+        </TableCell>
 
         <TableCell>{meal_plan_name}</TableCell>
 
@@ -91,7 +167,7 @@ export default function OrderTableRow({
           </Box>
         </TableCell>
 
-        <TableCell align="right">₹{Number(price).toFixed(2)}</TableCell>
+        <TableCell align="right">CAD ${Number(price).toFixed(2)}</TableCell>
 
         <TableCell>
           {format(new Date(start_date), 'dd MMM yyyy')} - {format(new Date(end_date), 'dd MMM yyyy')}
@@ -108,28 +184,76 @@ export default function OrderTableRow({
         open={openPopover}
         onClose={handleClosePopover}
         arrow="right-top"
-        sx={{ width: 140 }}
+        sx={{ width: 160 }}
       >
-        <MenuItem
-          onClick={() => {
-            onEditRow();
-            handleClosePopover();
-          }}
+        <Tooltip
+          title={isLocked ? `Cannot edit - ${statusInfo?.tooltip}` : ''}
+          placement="left"
         >
-          <Iconify icon="eva:edit-fill" />
-          Edit
-        </MenuItem>
+          <MenuItem
+            onClick={() => {
+              if (isLocked) {
+                enqueueSnackbar(
+                  `Cannot edit order - ${statusInfo?.tooltip}`,
+                  { variant: 'warning' }
+                );
+                handleClosePopover();
+                return;
+              }
+              onEditRow();
+              handleClosePopover();
+            }}
+            sx={{
+              color: isLocked ? 'text.disabled' : 'inherit',
+              cursor: isLocked ? 'not-allowed' : 'pointer',
+              opacity: isLocked ? 0.5 : 1,
+            }}
+          >
+            <Iconify icon={isLocked ? 'eva:lock-outline' : 'eva:edit-fill'} />
+            {isLocked ? 'Locked' : 'Edit'}
+          </MenuItem>
+        </Tooltip>
 
-        <MenuItem
-          onClick={() => {
-            handleOpenConfirm();
-            handleClosePopover();
-          }}
-          sx={{ color: 'error.main' }}
+        {onCalculateBilling && (
+          <MenuItem
+            onClick={() => {
+              onCalculateBilling();
+              handleClosePopover();
+            }}
+            sx={{ color: statusInfo ? statusInfo.color + '.main' : 'info.main' }}
+          >
+            <Iconify icon={statusInfo ? statusInfo.icon : 'eva:calculator-fill'} />
+            {statusInfo ? statusInfo.label : 'Calculate'}
+          </MenuItem>
+        )}
+
+        <Tooltip
+          title={(isPending || isLocked) ? `Cannot delete - ${statusInfo?.tooltip}` : ''}
+          placement="left"
         >
-          <Iconify icon="eva:trash-2-outline" />
-          Delete
-        </MenuItem>
+          <MenuItem
+            onClick={() => {
+              if (isPending || isLocked) {
+                enqueueSnackbar(
+                  `Cannot delete order - ${statusInfo?.tooltip}`,
+                  { variant: 'warning' }
+                );
+                handleClosePopover();
+                return;
+              }
+              handleOpenConfirm();
+              handleClosePopover();
+            }}
+            sx={{
+              color: (isPending || isLocked) ? 'text.disabled' : 'error.main',
+              cursor: (isPending || isLocked) ? 'not-allowed' : 'pointer',
+              opacity: (isPending || isLocked) ? 0.5 : 1,
+            }}
+          >
+            <Iconify icon={(isPending || isLocked) ? 'eva:lock-outline' : 'eva:trash-2-outline'} />
+            {(isPending || isLocked) ? 'Locked' : 'Delete'}
+          </MenuItem>
+        </Tooltip>
       </MenuPopover>
 
       <ConfirmDialog

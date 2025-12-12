@@ -121,6 +121,10 @@ export const PATH_DASHBOARD = {
     dailyCount: path(ROOTS_DASHBOARD, '/tiffin/daily-count'),
     monthlyList: path(ROOTS_DASHBOARD, '/tiffin/monthly-list'),
     completeList: path(ROOTS_DASHBOARD, '/tiffin/complete-list'),
+    billingCalendar: path(ROOTS_DASHBOARD, '/tiffin/billing-calendar'),
+    billingStatus: path(ROOTS_DASHBOARD, '/tiffin/billing-status'),
+    billingDetails: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/billing-details?id=${id}`),
+    settings: path(ROOTS_DASHBOARD, '/tiffin/settings'),
   },
 };
 
