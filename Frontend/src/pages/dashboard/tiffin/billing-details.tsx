@@ -274,23 +274,28 @@ export default function BillingDetailsPage() {
         <title>Billing Details | Tiffin Management</title>
         <style>{`
           @media print {
-            /* Hide everything except customer preview */
-            body * {
-              visibility: hidden;
+            /* Hide header, breadcrumbs, tabs, and buttons */
+            .no-print,
+            header,
+            .MuiTabs-root,
+            .MuiTab-root {
+              display: none !important;
             }
 
-            #customer-preview-content,
-            #customer-preview-content * {
-              visibility: visible;
+            /* Show only customer preview */
+            body {
+              background: white !important;
+              margin: 0;
+              padding: 0;
             }
 
             #customer-preview-content {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
+              position: relative !important;
+              width: 100% !important;
               background: white !important;
-              padding: 15mm;
+              color: black !important;
+              padding: 15mm !important;
+              margin: 0 !important;
             }
 
             /* Page setup for A4/Letter */
@@ -299,37 +304,22 @@ export default function BillingDetailsPage() {
               margin: 10mm;
             }
 
-            /* Base styles - white background and black text */
-            #customer-preview-content {
-              background: white !important;
-            }
-
-            #customer-preview-content > * {
-              background: transparent !important;
-            }
-
-            /* Keep calendar cell colors */
+            /* Keep calendar cell colors visible */
             .print-calendar-cell {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               color-adjust: exact !important;
             }
 
-            /* Ensure text is black by default */
-            #customer-preview-content h1,
-            #customer-preview-content h2,
-            #customer-preview-content h3,
-            #customer-preview-content h4,
-            #customer-preview-content h5,
-            #customer-preview-content h6,
-            #customer-preview-content p,
-            #customer-preview-content div {
-              color: black !important;
+            /* Dividers should be visible */
+            hr, .MuiDivider-root {
+              border-color: #e0e0e0 !important;
+              opacity: 1 !important;
             }
 
-            /* Hide Card borders */
-            #customer-preview-content .MuiCard-root,
-            #customer-preview-content .MuiPaper-root {
+            /* Remove shadows and unnecessary styling */
+            .MuiCard-root,
+            .MuiPaper-root {
               box-shadow: none !important;
               border: none !important;
             }
@@ -337,8 +327,12 @@ export default function BillingDetailsPage() {
         `}</style>
       </Head>
 
-      <Container maxWidth={themeStretch ? false : 'xl'} className="no-print">
+      <Container
+        maxWidth={themeStretch ? false : 'xl'}
+        sx={{ '@media print': { maxWidth: '100% !important', padding: '0 !important' } }}
+      >
         <CustomBreadcrumbs
+          className="no-print"
           heading="Billing Invoice Details"
           links={[
             { name: 'Dashboard', href: PATH_DASHBOARD.root },
@@ -346,7 +340,7 @@ export default function BillingDetailsPage() {
             { name: billing.customer_name },
           ]}
           action={
-            <Stack direction="row" spacing={2}>
+            <Stack direction="row" spacing={2} className="no-print">
               <Button
                 variant="outlined"
                 startIcon={<Iconify icon="eva:printer-outline" />}
@@ -378,10 +372,11 @@ export default function BillingDetailsPage() {
           }
         />
 
-        <Card>
+        <Card sx={{ '@media print': { boxShadow: 'none', border: 'none' } }}>
           <Tabs
             value={currentTab}
             onChange={handleTabChange}
+            className="no-print"
             sx={{
               px: 2,
               bgcolor: 'background.neutral',
@@ -396,10 +391,10 @@ export default function BillingDetailsPage() {
             ))}
           </Tabs>
 
-          <Divider />
+          <Divider className="no-print" />
 
           {/* Tab Content */}
-          <Box sx={{ p: 3 }} ref={componentRef}>
+          <Box sx={{ p: 3, '@media print': { p: 0 } }} ref={componentRef}>
             {currentTab === 'my-use' ? (
               <MyUseTab
                 billing={billing}
