@@ -199,7 +199,7 @@ async function handlePut(
             `Billing Pending Approval - ${billing[0].customer_name}`,
             `Billing for ${billing[0].customer_name} (${billing[0].billing_month}) has been finalized and is pending approval. Total amount: CAD $${Number(billing[0].total_amount).toFixed(2)}`,
             'high',
-            `/dashboard/tiffin/billing-calendar?month=${billing[0].billing_month}`,
+            `/dashboard/tiffin/billing-details?id=${id}`,
           ]
         );
       }

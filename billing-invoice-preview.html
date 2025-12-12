@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Invoice Preview - Tiffin Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: #2c3e50;
+        }
+
+        .preview-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .action-bar {
+            background: #2c3e50;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #2196f3;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .invoice-content {
+            padding: 40px;
+        }
+
+        /* Header Section */
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 32px;
+            border-bottom: 3px solid #2c3e50;
+            margin-bottom: 32px;
+        }
+
+        .company-info h1 {
+            font-size: 32px;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .company-info h2 {
+            font-size: 18px;
+            color: #7f8c8d;
+            font-weight: normal;
+        }
+
+        .invoice-meta {
+            text-align: right;
+        }
+
+        .invoice-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .invoice-date {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        /* Billing Info Section */
+        .billing-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .info-box h3 {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .info-box p {
+            margin: 4px 0;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+
+        .status-pending {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .status-approved {
+            background: #e3f2fd;
+            color: #0d47a1;
+        }
+
+        .status-paid {
+            background: #e8f5e9;
+            color: #1b5e20;
+        }
+
+        /* Orders Table */
+        .section-title {
+            font-size: 20px;
+            color: #2c3e50;
+            margin: 32px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+        }
+
+        th {
+            background: #ecf0f1;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #2c3e50;
+            border-bottom: 2px solid #bdc3c7;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ecf0f1;
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .day-chip {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 12px;
+            font-size: 11px;
+            margin: 2px;
+        }
+
+        /* Calendar Section */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .calendar-header {
+            background: #2c3e50;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .calendar-day {
+            border: 1px solid #ecf0f1;
+            padding: 8px;
+            text-align: center;
+            font-size: 13px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .day-delivered {
+            background: #4caf50;
+            color: white;
+            font-weight: bold;
+        }
+
+        .day-absent {
+            background: #f44336;
+            color: white;
+            font-weight: bold;
+        }
+
+        .day-extra {
+            background: #2196f3;
+            color: white;
+            font-weight: bold;
+        }
+
+        .day-empty {
+            background: #fafafa;
+            color: #bdc3c7;
+        }
+
+        .calendar-legend {
+            display: flex;
+            gap: 24px;
+            justify-content: center;
+            margin-top: 16px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        /* Calculation Breakdown */
+        .calculation-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .calc-step {
+            margin-bottom: 20px;
+            padding-left: 16px;
+            border-left: 3px solid #2196f3;
+        }
+
+        .calc-step h4 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .calc-detail {
+            color: #7f8c8d;
+            font-size: 13px;
+            margin: 4px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .calc-result {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .total-section {
+            background: #2c3e50;
+            color: white;
+            padding: 24px;
+            border-radius: 8px;
+            text-align: right;
+            margin-top: 24px;
+        }
+
+        .total-section h3 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            opacity: 0.9;
+        }
+
+        .total-amount {
+            font-size: 36px;
+            font-weight: bold;
+        }
+
+        /* Payment Info */
+        .payment-info {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 24px;
+        }
+
+        .payment-methods {
+            margin-top: 12px;
+        }
+
+        .payment-methods li {
+            margin: 8px 0;
+            color: #5d4037;
+        }
+
+        /* Footer */
+        .invoice-footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 2px solid #ecf0f1;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 13px;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .action-bar {
+                display: none;
+            }
+
+            .preview-container {
+                box-shadow: none;
+            }
+
+            .btn {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="preview-container">
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <div>
+                <strong>Preview Mode</strong> - Billing Invoice & Details
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-secondary" onclick="window.print()">
+                    📄 Export PDF
+                </button>
+                <button class="btn btn-secondary">
+                    📝 Export DOC
+                </button>
+                <button class="btn btn-secondary">
+                    ✉️ Email to Customer
+                </button>
+                <button class="btn btn-primary">
+                    ✓ Approve
+                </button>
+                <button class="btn btn-danger">
+                    ✗ Reject
+                </button>
+            </div>
+        </div>
+
+        <!-- Invoice Content -->
+        <div class="invoice-content">
+            <!-- Header -->
+            <div class="invoice-header">
+                <div class="company-info">
+                    <h1>TIFFIN MANAGEMENT SYSTEM</h1>
+                    <h2>Invoice & Billing Details</h2>
+                    <p style="margin-top: 12px; color: #7f8c8d;">
+                        123 Main Street, Toronto, ON M5V 1A1<br>
+                        Phone: +1 (416) 555-0123<br>
+                        Email: billing@tiffin.com
+                    </p>
+                </div>
+                <div class="invoice-meta">
+                    <div class="invoice-number">INV-2025-12-001</div>
+                    <div class="invoice-date">December 12, 2025</div>
+                </div>
+            </div>
+
+            <!-- Billing Information -->
+            <div class="billing-info">
+                <div class="info-box">
+                    <h3>Bill To</h3>
+                    <p><strong style="font-size: 18px;">Rajesh Kumar</strong></p>
+                    <p>📞 +1 (416) 555-7890</p>
+                    <p>📍 456 Oak Avenue, Toronto, ON M4B 2C3</p>
+                </div>
+                <div class="info-box">
+                    <h3>Billing Period</h3>
+                    <p><strong>December 2025</strong></p>
+                    <p>From: December 1, 2025</p>
+                    <p>To: December 31, 2025</p>
+                    <span class="status-badge status-pending">
+                        🕐 Pending Approval
+                    </span>
+                </div>
+            </div>
+
+            <!-- Order Details -->
+            <h2 class="section-title">Order Details</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Meal Plan</th>
+                        <th>Period</th>
+                        <th>Days</th>
+                        <th style="text-align: center;">Qty</th>
+                        <th style="text-align: right;">Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td><strong>Standard Lunch Box</strong></td>
+                        <td>Dec 8 - Dec 30, 2025</td>
+                        <td>
+                            <span class="day-chip">Mon</span>
+                            <span class="day-chip">Tue</span>
+                            <span class="day-chip">Wed</span>
+                            <span class="day-chip">Thu</span>
+                            <span class="day-chip">Fri</span>
+                        </td>
+                        <td style="text-align: center;">1</td>
+                        <td style="text-align: right;"><strong>CAD $50.00</strong></td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td><strong>Extra Tiffin</strong></td>
+                        <td>Dec 14, 2025</td>
+                        <td>
+                            <span class="day-chip">Single</span>
+                        </td>
+                        <td style="text-align: center;">1</td>
+                        <td style="text-align: right;"><strong>CAD $5.00</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Delivery Calendar -->
+            <h2 class="section-title">Delivery Calendar - December 2025</h2>
+            <div class="calendar-grid">
+                <div class="calendar-header">Mon</div>
+                <div class="calendar-header">Tue</div>
+                <div class="calendar-header">Wed</div>
+                <div class="calendar-header">Thu</div>
+                <div class="calendar-header">Fri</div>
+                <div class="calendar-header">Sat</div>
+                <div class="calendar-header">Sun</div>
+
+                <div class="calendar-day day-empty">1</div>
+                <div class="calendar-day day-empty">2</div>
+                <div class="calendar-day day-empty">3</div>
+                <div class="calendar-day day-empty">4</div>
+                <div class="calendar-day day-empty">5</div>
+                <div class="calendar-day day-empty">6</div>
+                <div class="calendar-day day-empty">7</div>
+
+                <div class="calendar-day day-delivered">8<br>T</div>
+                <div class="calendar-day day-absent">9<br>A</div>
+                <div class="calendar-day day-delivered">10<br>T</div>
+                <div class="calendar-day day-delivered">11<br>T</div>
+                <div class="calendar-day day-delivered">12<br>T</div>
+                <div class="calendar-day day-empty">13</div>
+                <div class="calendar-day day-extra">14<br>E</div>
+
+                <div class="calendar-day day-delivered">15<br>T</div>
+                <div class="calendar-day day-delivered">16<br>T</div>
+                <div class="calendar-day day-delivered">17<br>T</div>
+                <div class="calendar-day day-delivered">18<br>T</div>
+                <div class="calendar-day day-delivered">19<br>T</div>
+                <div class="calendar-day day-empty">20</div>
+                <div class="calendar-day day-empty">21</div>
+
+                <div class="calendar-day day-delivered">22<br>T</div>
+                <div class="calendar-day day-delivered">23<br>T</div>
+                <div class="calendar-day day-delivered">24<br>T</div>
+                <div class="calendar-day day-delivered">25<br>T</div>
+                <div class="calendar-day day-delivered">26<br>T</div>
+                <div class="calendar-day day-empty">27</div>
+                <div class="calendar-day day-empty">28</div>
+
+                <div class="calendar-day day-delivered">29<br>T</div>
+                <div class="calendar-day day-delivered">30<br>T</div>
+                <div class="calendar-day day-empty">31</div>
+            </div>
+
+            <div class="calendar-legend">
+                <div class="legend-item">
+                    <div class="legend-box" style="background: #4caf50;"></div>
+                    <span><strong>T</strong> = Delivered (16 days)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background: #f44336;"></div>
+                    <span><strong>A</strong> = Absent (1 day)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background: #2196f3;"></div>
+                    <span><strong>E</strong> = Extra Tiffin (1 day)</span>
+                </div>
+            </div>
+
+            <!-- Calculation Breakdown -->
+            <h2 class="section-title">Billing Calculation Breakdown</h2>
+            <div class="calculation-box">
+                <div class="calc-step">
+                    <h4>Base Order: Standard Lunch Box (Mon-Fri)</h4>
+                    <div class="calc-detail">├─ Order Price: CAD $50.00</div>
+                    <div class="calc-detail">├─ Total Mon-Fri days in December: 23 days</div>
+                    <div class="calc-detail">├─ Per-Tiffin Price: $50.00 ÷ 23 = $2.17/tiffin</div>
+                    <div class="calc-detail">└─ Order covers: Dec 8-30 (16 weekdays)</div>
+                </div>
+
+                <div class="calc-step">
+                    <h4>Delivered Tiffins</h4>
+                    <div class="calc-detail">├─ Count: 16 tiffins delivered</div>
+                    <div class="calc-detail">├─ Calculation: 16 × $2.17 = $34.72</div>
+                    <div class="calc-result">└─ Subtotal: CAD $34.72</div>
+                </div>
+
+                <div class="calc-step">
+                    <h4>Absent Days (Deduction)</h4>
+                    <div class="calc-detail">├─ Count: 1 day absent (Dec 9)</div>
+                    <div class="calc-detail">├─ Calculation: 1 × $2.17 = -$2.17</div>
+                    <div class="calc-result">└─ Deduction: CAD -$2.17</div>
+                </div>
+
+                <div class="calc-step">
+                    <h4>Extra Tiffins</h4>
+                    <div class="calc-detail">├─ Count: 1 extra tiffin (Dec 14)</div>
+                    <div class="calc-detail">├─ Price: $5.00/tiffin</div>
+                    <div class="calc-result">└─ Addition: CAD +$5.00</div>
+                </div>
+            </div>
+
+            <div class="total-section">
+                <h3>TOTAL AMOUNT DUE</h3>
+                <div class="total-amount">CAD $37.55</div>
+            </div>
+
+            <!-- Payment Information -->
+            <div class="payment-info">
+                <h3 style="color: #e65100; margin-bottom: 12px;">Payment Information</h3>
+                <p style="color: #5d4037;"><strong>Status:</strong> 🟠 Pending Approval</p>
+                <p style="color: #5d4037;"><strong>Amount Due:</strong> CAD $37.55</p>
+                <p style="color: #5d4037;"><strong>Due Date:</strong> January 5, 2026</p>
+                <div class="payment-methods">
+                    <p style="color: #5d4037; margin-bottom: 8px;"><strong>Payment Methods:</strong></p>
+                    <ul style="margin-left: 20px;">
+                        <li>Bank Transfer: Account #12345678 (Royal Bank of Canada)</li>
+                        <li>E-Transfer: payments@tiffin.com</li>
+                        <li>Cash/Cheque: Accepted at our location</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="invoice-footer">
+                <p>Thank you for your business!</p>
+                <p style="margin-top: 8px;">
+                    For questions about this invoice, please contact us at billing@tiffin.com or call +1 (416) 555-0123
+                </p>
+                <p style="margin-top: 12px; font-size: 11px;">
+                    Terms: Payment is due within 30 days. Late payments may incur a 2% monthly fee.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add interactivity for buttons
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (!this.onclick) {
+                    alert('Button clicked: ' + this.textContent.trim());
+                }
+            });
+        });
+    </script>
+</body>
+</html>
