@@ -106,28 +106,28 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 6,
-    border: '1px solid #e0e0e0',
   },
 
   calendarHeaderCell: {
-    width: '14.28%', // 7 columns (100% / 7)
-    padding: 2,
-    backgroundColor: '#f5f5f5',
-    borderRight: '1px solid #e0e0e0',
-    borderBottom: '1px solid #e0e0e0',
+    width: '13.5%', // Slightly less than 14.28% to allow for margins
+    margin: '1px',
+    padding: 3,
+    backgroundColor: 'transparent',
     textAlign: 'center',
     fontSize: 7,
     fontFamily: 'Helvetica-Bold',
   },
 
   calendarCell: {
-    width: '14.28%', // 7 columns
-    padding: 3,
+    width: '13.5%', // Slightly less than 14.28% to allow for margins
+    margin: '1px',
+    padding: 4,
     minHeight: 22,
-    borderRight: '1px solid #e0e0e0',
-    borderBottom: '1px solid #e0e0e0',
+    border: '1px solid #e0e0e0',
+    borderRadius: 2,
     textAlign: 'center',
     fontSize: 7,
+    backgroundColor: 'transparent',
   },
 
   calendarDayNumber: {
@@ -143,14 +143,17 @@ export const styles = StyleSheet.create({
   // Status colors for calendar cells - matching My Use tab
   deliveredCell: {
     backgroundColor: '#c8e6c9', // Light green (Material green[100])
+    borderColor: '#81c784', // Darker green border
   },
 
   absentCell: {
     backgroundColor: '#ffcdd2', // Light red (Material red[100])
+    borderColor: '#e57373', // Darker red border
   },
 
   extraCell: {
     backgroundColor: '#b3e5fc', // Light blue (Material lightBlue[100])
+    borderColor: '#64b5f6', // Darker blue border
   },
 
   deliveredText: {
