@@ -12,6 +12,7 @@ export interface AppSettings {
   company_phone: string;
   company_email: string;
   company_address: string;
+  company_logo: string;
 
   // Payment Settings
   etransfer_email: string;
@@ -88,6 +89,7 @@ async function handleGet(
       company_phone: settingsObj.company_phone || '+1-123-456-7890',
       company_email: settingsObj.company_email || 'admin@tiffinservice.com',
       company_address: settingsObj.company_address || '123 Main Street, City, Province, Postal Code',
+      company_logo: settingsObj.company_logo || process.env.DEFAULT_COMPANY_LOGO || '',
 
       // Payment Settings
       etransfer_email: settingsObj.etransfer_email || 'admin@tiffinservice.com',
@@ -136,6 +138,7 @@ async function handlePut(
       'company_phone',
       'company_email',
       'company_address',
+      'company_logo',
       'etransfer_email',
       'default_currency',
       'default_timezone',
