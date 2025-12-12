@@ -669,7 +669,7 @@ function MyUseTab({
                   textColor = theme.palette.info.main;
                 }
 
-                const statusText = isDelivered ? 'T' : isAbsent ? 'A' : isExtra ? 'E' : '';
+                const statusText = isDelivered ? '✓' : isAbsent ? '✗' : isExtra ? '+' : '';
 
                 return (
                   <Box
@@ -1044,7 +1044,7 @@ function CustomerPreviewTab({
               textColor = '#2196f3'; // Blue text
             }
 
-            const statusText = isDelivered ? 'T' : isAbsent ? 'A' : isExtra ? 'E' : '';
+            const statusText = isDelivered ? '✓' : isAbsent ? '✗' : isExtra ? '+' : '';
 
             return (
               <Box
