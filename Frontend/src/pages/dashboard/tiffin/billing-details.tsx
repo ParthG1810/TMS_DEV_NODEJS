@@ -158,9 +158,11 @@ export default function BillingDetailsPage() {
         // Convert logo to data URL for PDF rendering
         if (logoUrl) {
           try {
-            // Fetch the image and convert to base64
-            const response = await fetch(logoUrl);
-            const blob = await response.blob();
+            // Fetch the image using axios to avoid CORS issues
+            const imageResponse = await axios.get(logoUrl, {
+              responseType: 'blob',
+            });
+            const blob = imageResponse.data;
             const reader = new FileReader();
             reader.onloadend = () => {
               const base64data = reader.result as string;
@@ -173,6 +175,7 @@ export default function BillingDetailsPage() {
             reader.readAsDataURL(blob);
           } catch (error) {
             console.error('Error converting logo to data URL:', error);
+            // Continue without logo if conversion fails
           }
         }
       }
