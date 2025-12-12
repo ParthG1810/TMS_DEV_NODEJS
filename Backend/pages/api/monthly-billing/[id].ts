@@ -226,7 +226,7 @@ async function handlePut(
         isRejection,
       });
 
-      if (body.status && ['calculating', 'pending', 'finalized', 'paid'].includes(body.status)) {
+      if (body.status && ['calculating', 'pending', 'finalized', 'paid', 'partial_paid'].includes(body.status)) {
         updates.push('status = ?');
         params.push(body.status);
       }

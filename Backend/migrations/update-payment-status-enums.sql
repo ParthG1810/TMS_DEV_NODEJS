@@ -4,16 +4,17 @@
 --              use the correct enum values for the application workflow
 
 -- Update monthly_billing table status column
--- Valid values: 'calculating', 'pending', 'finalized', 'paid'
+-- Valid values: 'calculating', 'pending', 'finalized', 'paid', 'partial_paid'
 ALTER TABLE monthly_billing
-MODIFY COLUMN status ENUM('calculating', 'pending', 'finalized', 'paid')
+MODIFY COLUMN status ENUM('calculating', 'pending', 'finalized', 'paid', 'partial_paid')
 NOT NULL DEFAULT 'calculating';
 
 -- Update customer_orders table payment_status column
--- Valid values: 'calculating', 'pending', 'finalized', 'paid'
+-- Valid values: 'calculating', 'pending', 'finalized', 'paid', 'partial_paid'
+-- Default is 'calculating' - orders start in calculating state when created
 ALTER TABLE customer_orders
-MODIFY COLUMN payment_status ENUM('calculating', 'pending', 'finalized', 'paid')
-NOT NULL DEFAULT 'pending';
+MODIFY COLUMN payment_status ENUM('calculating', 'pending', 'finalized', 'paid', 'partial_paid')
+NOT NULL DEFAULT 'calculating';
 
 -- Add index on status columns for better query performance
 CREATE INDEX IF NOT EXISTS idx_monthly_billing_status ON monthly_billing(status);

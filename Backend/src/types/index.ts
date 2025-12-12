@@ -415,8 +415,9 @@ export interface DailyTiffinSummary {
 
 /**
  * Payment status enum
+ * Flow: calculating → pending → finalized → paid/partial_paid
  */
-export type PaymentStatus = 'pending' | 'received' | 'calculating';
+export type PaymentStatus = 'calculating' | 'pending' | 'finalized' | 'paid' | 'partial_paid';
 
 /**
  * Calendar entry status enum
@@ -428,8 +429,9 @@ export type CalendarEntryStatus = 'T' | 'A' | 'E';
 
 /**
  * Billing status enum
+ * Flow: calculating → pending → finalized → paid/partial_paid
  */
-export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid';
+export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid' | 'partial_paid';
 
 /**
  * Notification type enum

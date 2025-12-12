@@ -8,7 +8,7 @@
 
 ALTER TABLE customer_orders
 ADD COLUMN payment_id INT NULL AFTER price,
-ADD COLUMN payment_status ENUM('pending', 'received', 'calculating') DEFAULT 'calculating' AFTER payment_id,
+ADD COLUMN payment_status ENUM('calculating', 'pending', 'finalized', 'paid', 'partial_paid') DEFAULT 'calculating' AFTER payment_id,
 ADD INDEX idx_payment_status (payment_status);
 
 -- =====================================================
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS monthly_billing (
     base_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     extra_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-    status ENUM('calculating', 'pending', 'finalized', 'paid') DEFAULT 'calculating',
+    status ENUM('calculating', 'pending', 'finalized', 'paid', 'partial_paid') DEFAULT 'calculating',
     calculated_at TIMESTAMP NULL,
     finalized_at TIMESTAMP NULL,
     finalized_by VARCHAR(100) NULL,
