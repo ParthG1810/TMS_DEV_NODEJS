@@ -150,6 +150,7 @@ const navConfig = [
           { title: 'Daily Count', path: PATH_DASHBOARD.tiffin.dailyCount },
           { title: 'Monthly List', path: PATH_DASHBOARD.tiffin.monthlyList },
           { title: 'Complete List', path: PATH_DASHBOARD.tiffin.completeList },
+          { title: 'Settings', path: PATH_DASHBOARD.tiffin.settings },
         ],
       },
     ],
