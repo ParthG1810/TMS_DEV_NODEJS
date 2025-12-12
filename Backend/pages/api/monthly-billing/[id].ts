@@ -219,6 +219,13 @@ async function handlePut(
       // Check if status is being changed to 'finalized' (approval)
       const isApproval = body.status === 'finalized' && existing[0].status !== 'finalized';
 
+      console.log('Status Update Debug:', {
+        currentStatus: existing[0].status,
+        newStatus: body.status,
+        isApproval,
+        isRejection,
+      });
+
       if (body.status && ['calculating', 'pending', 'finalized', 'paid'].includes(body.status)) {
         updates.push('status = ?');
         params.push(body.status);
@@ -292,6 +299,8 @@ async function handlePut(
 
       // Handle approval: update customer orders to 'finalized' status
       if (isApproval) {
+        console.log('Approval triggered - updating customer orders to finalized');
+
         // Get billing info for customer_id and billing_month
         const billingInfo = await query<any[]>(
           'SELECT customer_id, billing_month FROM monthly_billing WHERE id = ?',
@@ -300,6 +309,7 @@ async function handlePut(
 
         if (billingInfo.length > 0) {
           const { customer_id, billing_month } = billingInfo[0];
+          console.log('Updating orders for customer:', customer_id, 'billing_month:', billing_month);
 
           // Update customer_orders payment_status to 'finalized' for this billing period
           const [year, month] = billing_month.split('-');
@@ -307,7 +317,7 @@ async function handlePut(
           const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
           const lastDayStr = `${billing_month}-${String(lastDay).padStart(2, '0')}`;
 
-          await query(
+          const result = await query(
             `
               UPDATE customer_orders
               SET payment_status = 'finalized',
@@ -320,7 +330,13 @@ async function handlePut(
             `,
             [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
           );
+
+          console.log('Customer orders update result:', result);
+        } else {
+          console.log('No billing info found for id:', id);
         }
+      } else {
+        console.log('Approval NOT triggered');
       }
     }
 
