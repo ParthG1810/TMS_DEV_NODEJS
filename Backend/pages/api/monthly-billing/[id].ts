@@ -213,6 +213,9 @@ async function handlePut(
         params.push(body.notes || null);
       }
 
+      // Check if status is being changed to 'calculating' (rejection)
+      const isRejection = body.status === 'calculating' && existing[0].status !== 'calculating';
+
       if (body.status && ['calculating', 'pending', 'finalized', 'paid'].includes(body.status)) {
         updates.push('status = ?');
         params.push(body.status);
@@ -232,6 +235,57 @@ async function handlePut(
         `UPDATE monthly_billing SET ${updates.join(', ')} WHERE id = ?`,
         params
       );
+
+      // Handle rejection: delete notifications and reset related statuses
+      if (isRejection) {
+        // Get billing info for customer_id and billing_month
+        const billingInfo = await query<any[]>(
+          'SELECT customer_id, billing_month FROM monthly_billing WHERE id = ?',
+          [id]
+        );
+
+        if (billingInfo.length > 0) {
+          const { customer_id, billing_month } = billingInfo[0];
+
+          // Delete all notifications related to this billing
+          await query(
+            'DELETE FROM payment_notifications WHERE billing_id = ?',
+            [id]
+          );
+
+          // Reset customer_orders payment_status back to 'pending' for this billing period
+          const [year, month] = billing_month.split('-');
+          const firstDay = `${billing_month}-01`;
+          const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+          const lastDayStr = `${billing_month}-${String(lastDay).padStart(2, '0')}`;
+
+          await query(
+            `
+              UPDATE customer_orders
+              SET payment_status = 'pending',
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE customer_id = ?
+                AND (
+                  (start_date <= ? AND end_date >= ?)
+                  OR (start_date >= ? AND start_date <= ?)
+                )
+            `,
+            [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
+          );
+
+          // Trigger recalculation by clearing finalized_at and finalized_by
+          await query(
+            `
+              UPDATE monthly_billing
+              SET finalized_at = NULL,
+                  finalized_by = NULL,
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `,
+            [id]
+          );
+        }
+      }
     }
 
     // Fetch updated billing
