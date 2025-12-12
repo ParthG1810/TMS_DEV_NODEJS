@@ -1,5 +1,6 @@
 import { noCase } from 'change-case';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 // @mui
 import {
   Box,
@@ -45,6 +46,7 @@ interface PaymentNotification {
 }
 
 export default function NotificationsPopover() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
   const [openPopover, setOpenPopover] = useState<HTMLElement | null>(null);
   const { enqueueSnackbar } = useSnackbar();
@@ -128,12 +130,13 @@ export default function NotificationsPopover() {
         await fetchNotifications();
       }
 
-      // Navigate to action URL
-      if (notification.action_url) {
-        window.location.href = notification.action_url;
-      }
-
+      // Close popover
       handleClosePopover();
+
+      // Navigate to action URL using Next.js router
+      if (notification.action_url) {
+        router.push(notification.action_url);
+      }
     } catch (error) {
       console.error('Error handling notification click:', error);
     }
