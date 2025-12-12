@@ -93,6 +93,7 @@ export const styles = StyleSheet.create({
   // Calendar section
   calendarSection: {
     marginBottom: 10,
+    alignItems: 'center', // Center the calendar
   },
 
   sectionTitle: {
@@ -100,43 +101,48 @@ export const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
     marginBottom: 6,
     color: '#333333',
+    textAlign: 'left',
+    alignSelf: 'flex-start',
+    marginLeft: 80, // Align with calendar grid
   },
 
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 6,
+    width: 280, // Fixed width to match My Use tab compact size (7 cells * ~40px each)
+    alignSelf: 'center',
   },
 
   calendarHeaderCell: {
-    width: '13.5%', // Slightly less than 14.28% to allow for margins (gap: 0.5 in My Use)
-    margin: '2px', // gap: 0.5 from My Use tab (0.5 * 8px = 4px, so 2px margin on each side)
-    padding: 4,
+    width: '13%', // Compact size to fit within 280px width
+    margin: '1.5px', // Tight spacing like My Use tab
+    padding: 3,
     backgroundColor: 'transparent',
     textAlign: 'center',
-    fontSize: 7,
+    fontSize: 6,
     fontFamily: 'Helvetica-Bold',
   },
 
   calendarCell: {
-    width: '13.5%', // Slightly less than 14.28% to allow for margins (gap: 0.5 in My Use)
-    margin: '2px', // gap: 0.5 from My Use tab (0.5 * 8px = 4px, so 2px margin on each side)
-    padding: 5, // p: 1 from My Use tab (1 * 8px = 8px, scaled down for PDF)
-    minHeight: 24,
+    width: '13%', // Compact size to fit within 280px width
+    margin: '1.5px', // Tight spacing like My Use tab
+    padding: 4, // Compact padding
+    minHeight: 20,
     border: '1px solid #e0e0e0',
-    borderRadius: 4, // borderRadius: 1 from My Use tab (1 * 4px = 4px or 1 * 8px = 8px)
+    borderRadius: 3, // Subtle rounded corners
     textAlign: 'center',
-    fontSize: 7,
+    fontSize: 6.5,
     backgroundColor: 'transparent',
   },
 
   calendarDayNumber: {
-    marginBottom: 1,
-    fontSize: 7,
+    marginBottom: 0.5,
+    fontSize: 6.5,
   },
 
   calendarDayStatus: {
-    fontSize: 7,
+    fontSize: 6.5,
     fontFamily: 'Helvetica-Bold',
   },
 
@@ -175,6 +181,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 5,
     gap: 10,
+    alignSelf: 'center',
   },
 
   legendItem: {
