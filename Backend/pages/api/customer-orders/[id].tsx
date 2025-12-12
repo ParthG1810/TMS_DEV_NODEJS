@@ -378,11 +378,18 @@ async function handleDeleteCustomerOrder(
 
     const order = existingOrders[0];
 
-    // Prevent deletion if payment_status is 'pending' (billing is finalized)
-    if (order.payment_status === 'pending') {
+    // Prevent deletion if payment_status is in locked states
+    if (order.payment_status && ['pending', 'received', 'paid'].includes(order.payment_status)) {
+      const statusMessages: { [key: string]: string } = {
+        pending: 'billing is pending approval. Please reject or approve the billing first.',
+        received: 'billing is approved and waiting for payment.',
+        paid: 'payment has been completed. Order is read-only.',
+      };
+      const message = statusMessages[order.payment_status] || 'order is locked.';
+
       return res.status(403).json({
         success: false,
-        error: 'Cannot delete order - billing is pending approval. Please reject or approve the billing first.',
+        error: `Cannot delete order - ${message}`,
       });
     }
     const customerId = order.customer_id;

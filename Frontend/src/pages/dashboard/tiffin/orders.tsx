@@ -140,14 +140,25 @@ export default function OrdersPage() {
 
   const handleDeleteRows = async (selectedRows: number[]) => {
     try {
-      // Check for locked orders (payment_status='pending')
+      // Check for locked orders (payment_status in 'pending', 'received', or 'paid')
       const lockedOrders = tableData.filter(
-        (row) => selectedRows.includes(row.id) && row.payment_status === 'pending'
+        (row) => selectedRows.includes(row.id) && row.payment_status && ['pending', 'received', 'paid'].includes(row.payment_status)
       );
 
       if (lockedOrders.length > 0) {
+        const statusCounts = {
+          pending: lockedOrders.filter(o => o.payment_status === 'pending').length,
+          received: lockedOrders.filter(o => o.payment_status === 'received').length,
+          paid: lockedOrders.filter(o => o.payment_status === 'paid').length,
+        };
+        const statusMsg = [
+          statusCounts.pending > 0 && `${statusCounts.pending} pending approval`,
+          statusCounts.received > 0 && `${statusCounts.received} approved awaiting payment`,
+          statusCounts.paid > 0 && `${statusCounts.paid} paid`,
+        ].filter(Boolean).join(', ');
+
         enqueueSnackbar(
-          `Cannot delete ${lockedOrders.length} order(s) - billing is pending approval. Please reject or approve the billing first.`,
+          `Cannot delete ${lockedOrders.length} order(s): ${statusMsg}. Orders are locked.`,
           { variant: 'warning' }
         );
         return;
