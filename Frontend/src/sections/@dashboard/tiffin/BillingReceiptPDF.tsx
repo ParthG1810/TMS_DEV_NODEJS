@@ -212,13 +212,6 @@ export default function BillingReceiptPDF({
               <Text style={styles.summaryValue}>{formatCurrency(deliveredAmount)}</Text>
             </View>
 
-            {billing.total_absent > 0 && (
-              <View style={[styles.summaryRow, styles.summaryRowBorder]}>
-                <Text style={styles.summaryLabel}>Absent ({billing.total_absent} days)</Text>
-                <Text style={styles.summaryValue}>-{formatCurrency(absentDeduction)}</Text>
-              </View>
-            )}
-
             {billing.total_extra > 0 && (
               <View style={[styles.summaryRow, styles.summaryRowBorder]}>
                 <Text style={styles.summaryLabel}>Extra ({billing.total_extra} tiffins)</Text>
