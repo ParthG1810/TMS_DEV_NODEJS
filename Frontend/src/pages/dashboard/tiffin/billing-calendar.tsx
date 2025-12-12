@@ -309,10 +309,13 @@ export default function BillingCalendarPage() {
             year={selectedYear}
             month={selectedMonth}
             customers={calendarData.customers}
-            onUpdate={() => {
+            onUpdate={async () => {
               const monthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-              dispatch(getCalendarGrid(monthStr));
-              dispatch(getMonthlyBillings(monthStr));
+              // Wait for both dispatches to complete before returning
+              await Promise.all([
+                dispatch(getCalendarGrid(monthStr)),
+                dispatch(getMonthlyBillings(monthStr)),
+              ]);
             }}
           />
         )}

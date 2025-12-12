@@ -157,7 +157,7 @@ interface CalendarGridProps {
   year: number;
   month: number; // 1-12
   customers: ICalendarCustomerData[];
-  onUpdate: () => void;
+  onUpdate: () => void | Promise<void>;
 }
 
 export default function CalendarGrid({ year, month, customers, onUpdate }: CalendarGridProps) {
@@ -581,13 +581,18 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
       if (result.success) {
         enqueueSnackbar('Billing finalized successfully', { variant: 'success' });
-        onUpdate();
+
+        // Wait for UI to refresh before clearing loading state
+        await onUpdate();
+
+        // Clear finalizing state after refresh completes
+        setFinalizingCustomerId(null);
       } else {
         enqueueSnackbar(result.error || 'Failed to finalize billing', { variant: 'error' });
+        setFinalizingCustomerId(null);
       }
     } catch (error) {
       enqueueSnackbar('Failed to finalize billing', { variant: 'error' });
-    } finally {
       setFinalizingCustomerId(null);
     }
   };
