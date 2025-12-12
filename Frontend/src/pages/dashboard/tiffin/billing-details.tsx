@@ -22,8 +22,12 @@ import {
   Paper,
   IconButton,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
 } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
+import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import Scrollbar from '../../../components/scrollbar';
@@ -34,6 +38,8 @@ import axios from '../../../utils/axios';
 import { useSnackbar } from '../../../components/snackbar';
 import { fCurrency } from '../../../utils/formatNumber';
 import { fDate } from '../../../utils/formatTime';
+import { format } from 'date-fns';
+import BillingReceiptPDF from '../../../sections/@dashboard/tiffin/BillingReceiptPDF';
 
 // ----------------------------------------------------------------------
 
@@ -128,6 +134,15 @@ export default function BillingDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [eTransferEmail, setETransferEmail] = useState('admin@tiffinservice.com');
   const [companyName, setCompanyName] = useState('TIFFIN MANAGEMENT SYSTEM');
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [companySettings, setCompanySettings] = useState({
+    company_name: 'TIFFIN MANAGEMENT SYSTEM',
+    company_logo_url: '/logo/logo_full.jpg',
+    company_email: 'admin@tiffinservice.com',
+    company_phone: '+1-123-456-7890',
+    company_address: '123 Main Street, City, Province, Postal Code',
+    etransfer_email: 'admin@tiffinservice.com',
+  });
 
   // Load billing details and settings
   useEffect(() => {
@@ -141,8 +156,17 @@ export default function BillingDetailsPage() {
     try {
       const response = await axios.get('/api/settings');
       if (response.data.success) {
-        setETransferEmail(response.data.data.etransfer_email);
-        setCompanyName(response.data.data.company_name);
+        const settings = response.data.data;
+        setETransferEmail(settings.etransfer_email);
+        setCompanyName(settings.company_name);
+        setCompanySettings({
+          company_name: settings.company_name,
+          company_logo_url: settings.company_logo_url,
+          company_email: settings.company_email,
+          company_phone: settings.company_phone,
+          company_address: settings.company_address,
+          etransfer_email: settings.etransfer_email,
+        });
       }
     } catch (error: any) {
       console.error('Error fetching settings:', error);
@@ -343,10 +367,43 @@ export default function BillingDetailsPage() {
             <Stack direction="row" spacing={2} className="no-print">
               <Button
                 variant="outlined"
+                startIcon={<Iconify icon="eva:eye-outline" />}
+                onClick={() => setPdfPreviewOpen(true)}
+              >
+                Preview PDF
+              </Button>
+              <PDFDownloadLink
+                document={
+                  <BillingReceiptPDF
+                    data={{
+                      billing,
+                      calendar,
+                      companySettings,
+                    }}
+                  />
+                }
+                fileName={`Invoice-${billing.customer_name.replace(/\s+/g, '-')}-${format(
+                  new Date(billing.billing_month),
+                  'MMM-yyyy'
+                )}.pdf`}
+                style={{ textDecoration: 'none' }}
+              >
+                {({ loading: pdfLoading }) => (
+                  <Button
+                    variant="contained"
+                    startIcon={<Iconify icon="eva:download-outline" />}
+                    disabled={pdfLoading}
+                  >
+                    {pdfLoading ? 'Generating PDF...' : 'Download PDF'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+              <Button
+                variant="outlined"
                 startIcon={<Iconify icon="eva:printer-outline" />}
                 onClick={handlePrint}
               >
-                Export PDF
+                Print
               </Button>
               {billing.status === 'pending' && (
                 <>
@@ -421,6 +478,34 @@ export default function BillingDetailsPage() {
           </Box>
         </Card>
       </Container>
+
+      {/* PDF Preview Dialog */}
+      <Dialog
+        open={pdfPreviewOpen}
+        onClose={() => setPdfPreviewOpen(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">PDF Preview</Typography>
+            <IconButton onClick={() => setPdfPreviewOpen(false)}>
+              <Iconify icon="eva:close-outline" />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent sx={{ height: '80vh', p: 0 }}>
+          <PDFViewer width="100%" height="100%" style={{ border: 'none' }}>
+            <BillingReceiptPDF
+              data={{
+                billing,
+                calendar,
+                companySettings,
+              }}
+            />
+          </PDFViewer>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

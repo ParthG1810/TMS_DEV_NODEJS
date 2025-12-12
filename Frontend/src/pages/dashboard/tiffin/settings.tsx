@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import {
   Container,
@@ -20,6 +20,7 @@ import { useSettingsContext } from '../../../components/settings';
 import axios from '../../../utils/axios';
 import { useSnackbar } from '../../../components/snackbar';
 import Iconify from '../../../components/iconify';
+import { Upload } from '../../../components/upload';
 
 // ----------------------------------------------------------------------
 
@@ -29,6 +30,7 @@ interface AppSettings {
   company_phone: string;
   company_email: string;
   company_address: string;
+  company_logo_url: string;
 
   // Payment Settings
   etransfer_email: string;
@@ -61,6 +63,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -111,6 +114,38 @@ export default function SettingsPage() {
       });
     }
   };
+
+  const handleLogoUpload = useCallback(
+    async (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
+
+      try {
+        setUploadingLogo(true);
+        const formData = new FormData();
+        formData.append('logo', acceptedFiles[0]);
+
+        const response = await axios.post('/api/uploads/logo', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        if (response.data.success) {
+          const logoUrl = response.data.data.logoUrl;
+          setSettings((prev) => (prev ? { ...prev, company_logo_url: logoUrl } : null));
+          enqueueSnackbar('Logo uploaded successfully', { variant: 'success' });
+        } else {
+          enqueueSnackbar(response.data.error || 'Failed to upload logo', { variant: 'error' });
+        }
+      } catch (error: any) {
+        console.error('Error uploading logo:', error);
+        enqueueSnackbar(error.message || 'Failed to upload logo', { variant: 'error' });
+      } finally {
+        setUploadingLogo(false);
+      }
+    },
+    [enqueueSnackbar]
+  );
 
   if (loading) {
     return (
@@ -196,6 +231,35 @@ export default function SettingsPage() {
                   onChange={handleChange('company_address')}
                   multiline
                   rows={2}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Company Logo
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                  Upload your company logo (JPEG, PNG, GIF, or WebP, max 5MB). This will appear on invoices and receipts.
+                </Typography>
+                {settings.company_logo_url && (
+                  <Box sx={{ mb: 2 }}>
+                    <img
+                      src={settings.company_logo_url}
+                      alt="Company Logo"
+                      style={{ maxHeight: 100, maxWidth: 300, objectFit: 'contain' }}
+                    />
+                  </Box>
+                )}
+                <Upload
+                  accept={{
+                    'image/jpeg': ['.jpg', '.jpeg'],
+                    'image/png': ['.png'],
+                    'image/gif': ['.gif'],
+                    'image/webp': ['.webp'],
+                  }}
+                  file={null}
+                  onDrop={handleLogoUpload}
+                  disabled={uploadingLogo}
+                  helperText={uploadingLogo ? 'Uploading logo...' : undefined}
                 />
               </Grid>
             </Grid>
