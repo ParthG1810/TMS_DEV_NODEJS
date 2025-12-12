@@ -22,8 +22,13 @@ import {
   Paper,
   IconButton,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
+import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import Scrollbar from '../../../components/scrollbar';
@@ -34,6 +39,7 @@ import axios from '../../../utils/axios';
 import { useSnackbar } from '../../../components/snackbar';
 import { fCurrency } from '../../../utils/formatNumber';
 import { fDate } from '../../../utils/formatTime';
+import BillingReceiptPDF from '../../../sections/@dashboard/tiffin/BillingReceiptPDF';
 
 // ----------------------------------------------------------------------
 
@@ -128,6 +134,8 @@ export default function BillingDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [eTransferEmail, setETransferEmail] = useState('admin@tiffinservice.com');
   const [companyName, setCompanyName] = useState('TIFFIN MANAGEMENT SYSTEM');
+  const [companyLogo, setCompanyLogo] = useState('');
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
 
   // Load billing details and settings
   useEffect(() => {
@@ -143,6 +151,7 @@ export default function BillingDetailsPage() {
       if (response.data.success) {
         setETransferEmail(response.data.data.etransfer_email);
         setCompanyName(response.data.data.company_name);
+        setCompanyLogo(response.data.data.company_logo || '');
       }
     } catch (error: any) {
       console.error('Error fetching settings:', error);
@@ -343,10 +352,39 @@ export default function BillingDetailsPage() {
             <Stack direction="row" spacing={2} className="no-print">
               <Button
                 variant="outlined"
+                startIcon={<Iconify icon="eva:eye-outline" />}
+                onClick={() => setShowPdfPreview(true)}
+              >
+                Preview PDF
+              </Button>
+              <PDFDownloadLink
+                document={
+                  <BillingReceiptPDF
+                    billingData={billingDetails}
+                    companyName={companyName}
+                    eTransferEmail={eTransferEmail}
+                    companyLogo={companyLogo}
+                  />
+                }
+                fileName={`Invoice-${billing.customer_name.replace(/\s+/g, '-')}-${billing.billing_month}.pdf`}
+                style={{ textDecoration: 'none' }}
+              >
+                {({ loading: pdfLoading }) => (
+                  <Button
+                    variant="contained"
+                    startIcon={<Iconify icon="eva:download-outline" />}
+                    disabled={pdfLoading}
+                  >
+                    {pdfLoading ? 'Preparing...' : 'Download PDF'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+              <Button
+                variant="outlined"
                 startIcon={<Iconify icon="eva:printer-outline" />}
                 onClick={handlePrint}
               >
-                Export PDF
+                Print
               </Button>
               {billing.status === 'pending' && (
                 <>
@@ -420,6 +458,37 @@ export default function BillingDetailsPage() {
             )}
           </Box>
         </Card>
+
+        {/* PDF Preview Dialog */}
+        <Dialog
+          open={showPdfPreview}
+          onClose={() => setShowPdfPreview(false)}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle>
+            PDF Preview
+            <IconButton
+              onClick={() => setShowPdfPreview(false)}
+              sx={{ position: 'absolute', right: 8, top: 8 }}
+            >
+              <Iconify icon="eva:close-outline" />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ height: '80vh', p: 0 }}>
+            <PDFViewer width="100%" height="100%" showToolbar>
+              <BillingReceiptPDF
+                billingData={billingDetails}
+                companyName={companyName}
+                eTransferEmail={eTransferEmail}
+                companyLogo={companyLogo}
+              />
+            </PDFViewer>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowPdfPreview(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </>
   );
