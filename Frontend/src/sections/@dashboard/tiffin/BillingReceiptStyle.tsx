@@ -101,9 +101,8 @@ export const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
     marginBottom: 6,
     color: '#333333',
-    textAlign: 'left',
-    alignSelf: 'flex-start',
-    marginLeft: 80, // Align with calendar grid
+    textAlign: 'center',
+    alignSelf: 'center',
   },
 
   calendarGrid: {
@@ -129,7 +128,6 @@ export const styles = StyleSheet.create({
     margin: '1.5px', // Tight spacing like My Use tab
     padding: 4, // Compact padding
     minHeight: 20,
-    border: '1px solid #e0e0e0',
     borderRadius: 3, // Subtle rounded corners
     textAlign: 'center',
     fontSize: 6.5,
@@ -146,20 +144,17 @@ export const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
   },
 
-  // Status colors for calendar cells - matching My Use tab exactly
+  // Status colors for calendar cells - matching My Use tab exactly (no borders)
   deliveredCell: {
     backgroundColor: 'rgba(76, 175, 80, 0.2)', // alpha(theme.palette.success.main, 0.2)
-    borderColor: 'rgba(76, 175, 80, 0.4)', // alpha(theme.palette.success.main, 0.4)
   },
 
   absentCell: {
     backgroundColor: 'rgba(244, 67, 54, 0.2)', // alpha(theme.palette.error.main, 0.2)
-    borderColor: 'rgba(244, 67, 54, 0.4)', // alpha(theme.palette.error.main, 0.4)
   },
 
   extraCell: {
     backgroundColor: 'rgba(33, 150, 243, 0.2)', // alpha(theme.palette.info.main, 0.2)
-    borderColor: 'rgba(33, 150, 243, 0.4)', // alpha(theme.palette.info.main, 0.4)
   },
 
   deliveredText: {
