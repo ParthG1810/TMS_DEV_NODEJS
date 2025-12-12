@@ -162,33 +162,46 @@ export default function BillingDetailsPage() {
         // Convert logo to data URL for PDF rendering
         if (logoUrl) {
           try {
-            // Extract path from full URL if needed (e.g., http://localhost:3000/uploads/... -> /uploads/...)
+            // Normalize URL to relative path
+            // Handles both full URLs (http://...) and relative paths (/uploads/...)
             let logoPath = logoUrl;
-            try {
-              const url = new URL(logoUrl);
-              logoPath = url.pathname; // Extract just the path part
-            } catch {
-              // If URL parsing fails, assume it's already a path
-              logoPath = logoUrl;
+
+            // If it's a full URL, extract just the pathname
+            if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
+              try {
+                const url = new URL(logoUrl);
+                logoPath = url.pathname;
+              } catch (e) {
+                console.warn('Failed to parse logo URL, using as-is:', logoUrl);
+              }
             }
 
-            // Fetch the image using axios with relative path to avoid CORS issues
+            console.log('Fetching company logo from:', logoPath);
+
+            // Fetch the image - the proxy will handle /uploads/* requests
             const imageResponse = await axios.get(logoPath, {
               responseType: 'blob',
             });
+
+            // Convert blob to base64 data URL for PDF rendering
             const blob = imageResponse.data;
             const reader = new FileReader();
+
             reader.onloadend = () => {
               const base64data = reader.result as string;
               setLogoDataUrl(base64data);
-              console.log('Logo converted to base64 successfully');
+              console.log('✅ Logo converted to base64 successfully');
             };
+
             reader.onerror = (error) => {
-              console.error('Error reading logo file:', error);
+              console.error('❌ Error reading logo file:', error);
+              setLogoDataUrl(''); // Clear on error
             };
+
             reader.readAsDataURL(blob);
-          } catch (error) {
-            console.error('Error converting logo to data URL:', error);
+          } catch (error: any) {
+            console.error('❌ Error fetching/converting logo:', error.message || error);
+            setLogoDataUrl(''); // Clear on error
             // Continue without logo if conversion fails
           }
         }
