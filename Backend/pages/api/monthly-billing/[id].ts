@@ -216,6 +216,9 @@ async function handlePut(
       // Check if status is being changed to 'calculating' (rejection)
       const isRejection = body.status === 'calculating' && existing[0].status !== 'calculating';
 
+      // Check if status is being changed to 'finalized' (approval)
+      const isApproval = body.status === 'finalized' && existing[0].status !== 'finalized';
+
       if (body.status && ['calculating', 'pending', 'finalized', 'paid'].includes(body.status)) {
         updates.push('status = ?');
         params.push(body.status);
@@ -283,6 +286,39 @@ async function handlePut(
               WHERE id = ?
             `,
             [id]
+          );
+        }
+      }
+
+      // Handle approval: update customer orders to 'finalized' status
+      if (isApproval) {
+        // Get billing info for customer_id and billing_month
+        const billingInfo = await query<any[]>(
+          'SELECT customer_id, billing_month FROM monthly_billing WHERE id = ?',
+          [id]
+        );
+
+        if (billingInfo.length > 0) {
+          const { customer_id, billing_month } = billingInfo[0];
+
+          // Update customer_orders payment_status to 'finalized' for this billing period
+          const [year, month] = billing_month.split('-');
+          const firstDay = `${billing_month}-01`;
+          const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+          const lastDayStr = `${billing_month}-${String(lastDay).padStart(2, '0')}`;
+
+          await query(
+            `
+              UPDATE customer_orders
+              SET payment_status = 'finalized',
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE customer_id = ?
+                AND (
+                  (start_date <= ? AND end_date >= ?)
+                  OR (start_date >= ? AND start_date <= ?)
+                )
+            `,
+            [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
           );
         }
       }
