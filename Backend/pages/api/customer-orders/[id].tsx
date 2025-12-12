@@ -160,7 +160,7 @@ async function handleUpdateCustomerOrder(
       selected_days = daysArray as any;
     }
 
-    // Check if order exists
+    // Check if order exists and get payment_status
     const existingOrders = (await query('SELECT * FROM customer_orders WHERE id = ?', [
       id,
     ])) as any[];
@@ -169,6 +169,21 @@ async function handleUpdateCustomerOrder(
       return res.status(404).json({
         success: false,
         error: 'Order not found',
+      });
+    }
+
+    // LOCK: Prevent editing if order is in locked states (finalized or paid)
+    const order = existingOrders[0];
+    if (order.payment_status && ['finalized', 'paid'].includes(order.payment_status)) {
+      const statusMessages: { [key: string]: string } = {
+        finalized: 'This order is locked because the billing has been approved. The order cannot be modified.',
+        paid: 'This order is locked because payment has been completed. The order is read-only.',
+      };
+      const message = statusMessages[order.payment_status] || 'This order is locked and cannot be modified.';
+
+      return res.status(403).json({
+        success: false,
+        error: message,
       });
     }
 
@@ -379,11 +394,11 @@ async function handleDeleteCustomerOrder(
     const order = existingOrders[0];
 
     // Prevent deletion if payment_status is in locked states
-    if (order.payment_status && ['pending', 'received', 'paid'].includes(order.payment_status)) {
+    if (order.payment_status && ['pending', 'finalized', 'paid'].includes(order.payment_status)) {
       const statusMessages: { [key: string]: string } = {
         pending: 'billing is pending approval. Please reject or approve the billing first.',
-        received: 'billing is approved and waiting for payment.',
-        paid: 'payment has been completed. Order is read-only.',
+        finalized: 'billing has been approved. The order is locked and cannot be deleted.',
+        paid: 'payment has been completed. The order is read-only and cannot be deleted.',
       };
       const message = statusMessages[order.payment_status] || 'order is locked.';
 
