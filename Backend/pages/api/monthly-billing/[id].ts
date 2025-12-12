@@ -253,7 +253,7 @@ async function handlePut(
             [id]
           );
 
-          // Reset customer_orders payment_status back to 'pending' for this billing period
+          // Reset customer_orders payment_status back to 'calculating' for this billing period
           const [year, month] = billing_month.split('-');
           const firstDay = `${billing_month}-01`;
           const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
@@ -262,7 +262,7 @@ async function handlePut(
           await query(
             `
               UPDATE customer_orders
-              SET payment_status = 'pending',
+              SET payment_status = 'calculating',
                   updated_at = CURRENT_TIMESTAMP
               WHERE customer_id = ?
                 AND (
