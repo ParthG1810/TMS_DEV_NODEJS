@@ -190,7 +190,19 @@ export default async function handler(
     }
 
     // 5. Build calculation breakdown by order
-    const breakdownByOrder = orders.map((order) => {
+    // Filter to only include base/recurring orders (exclude single-day extra orders)
+    const baseOrders = orders.filter((order) => {
+      const orderStart = new Date(order.start_date);
+      const orderEnd = new Date(order.end_date);
+      const daysDiff = Math.ceil((orderEnd.getTime() - orderStart.getTime()) / (1000 * 60 * 60 * 24));
+      // Only include orders that span more than 1 day (exclude single-day extra orders)
+      return daysDiff > 0;
+    });
+
+    // Get all extra entries for this customer in this month (regardless of order)
+    const allExtraEntries = calendar.filter((e) => e.status === 'extra');
+
+    const breakdownByOrder = baseOrders.map((order) => {
       const orderEntries = calendar.filter((entry) => entry.order_id === order.id);
 
       // Determine applicable days (days within month and order period)
@@ -222,17 +234,21 @@ export default async function handler(
       const divisor = order.weekdays_only ? totalWeekdays : lastDay;
       const perTiffinPrice = divisor > 0 ? order.price / divisor : 0;
 
-      // Count delivered, absent, extra
+      // Count delivered and absent for THIS order only
       const deliveredCount = orderEntries.filter((e) => e.status === 'delivered').length;
       const absentCount = orderEntries.filter((e) => e.status === 'absent').length;
-      const extraCount = orderEntries.filter((e) => e.status === 'extra').length;
+
+      // For the FIRST base order, include ALL extra entries
+      // For subsequent orders, don't count extras (to avoid duplication)
+      const isFirstOrder = baseOrders[0].id === order.id;
+      const extraCount = isFirstOrder ? allExtraEntries.length : 0;
+      const extraAmount = isFirstOrder
+        ? allExtraEntries.reduce((sum, e) => sum + (e.price || 0), 0)
+        : 0;
 
       // Calculate amounts
       const deliveredAmount = deliveredCount * perTiffinPrice;
       const absentDeduction = absentCount * perTiffinPrice;
-      const extraAmount = orderEntries
-        .filter((e) => e.status === 'extra')
-        .reduce((sum, e) => sum + (e.price || 0), 0);
 
       const orderTotal = deliveredAmount - absentDeduction + extraAmount;
 
