@@ -46,7 +46,7 @@ const TABLE_HEAD = [
   { id: 'meal_plan_name', label: 'Meal Plan', align: 'left' },
   { id: 'quantity', label: 'Qty', align: 'center' },
   { id: 'selected_days', label: 'Days', align: 'left' },
-  { id: 'price', label: 'Price (₹)', align: 'right' },
+  { id: 'price', label: 'Price (CAD $)', align: 'right' },
   { id: 'dates', label: 'Period', align: 'left' },
   { id: '' },
 ];
@@ -114,7 +114,14 @@ export default function OrdersPage() {
 
   const handleDeleteRow = async (id: number) => {
     try {
-      await dispatch(deleteCustomerOrder(id));
+      const result = await dispatch(deleteCustomerOrder(id));
+
+      // Check if deletion was successful
+      if (result && result.success === false) {
+        enqueueSnackbar(result.error || 'Failed to delete order', { variant: 'error' });
+        return;
+      }
+
       const deleteRow = tableData.filter((row) => row.id !== id);
       setTableData(deleteRow);
       enqueueSnackbar('Delete success!');
@@ -126,13 +133,51 @@ export default function OrdersPage() {
       }
     } catch (error: any) {
       console.error(error);
-      enqueueSnackbar(error.message || 'Failed to delete order', { variant: 'error' });
+      const errorMsg = error.response?.data?.error || error.error || error.message || 'Failed to delete order';
+      enqueueSnackbar(errorMsg, { variant: 'error' });
     }
   };
 
   const handleDeleteRows = async (selectedRows: number[]) => {
     try {
-      await Promise.all(selectedRows.map((id) => dispatch(deleteCustomerOrder(id))));
+      // Check for locked orders (payment_status in 'pending', 'received', or 'paid')
+      const lockedOrders = tableData.filter(
+        (row) => selectedRows.includes(row.id) && row.payment_status && ['pending', 'received', 'paid'].includes(row.payment_status)
+      );
+
+      if (lockedOrders.length > 0) {
+        const statusCounts = {
+          pending: lockedOrders.filter(o => o.payment_status === 'pending').length,
+          received: lockedOrders.filter(o => o.payment_status === 'received').length,
+          paid: lockedOrders.filter(o => o.payment_status === 'paid').length,
+        };
+        const statusMsg = [
+          statusCounts.pending > 0 && `${statusCounts.pending} pending approval`,
+          statusCounts.received > 0 && `${statusCounts.received} approved awaiting payment`,
+          statusCounts.paid > 0 && `${statusCounts.paid} paid`,
+        ].filter(Boolean).join(', ');
+
+        enqueueSnackbar(
+          `Cannot delete ${lockedOrders.length} order(s): ${statusMsg}. Orders are locked.`,
+          { variant: 'warning' }
+        );
+        return;
+      }
+
+      const results = await Promise.all(
+        selectedRows.map((id) => dispatch(deleteCustomerOrder(id)))
+      );
+
+      // Check if any deletions failed
+      const failed = results.filter((r: any) => r && r.success === false);
+      if (failed.length > 0) {
+        enqueueSnackbar(
+          `Failed to delete ${failed.length} order(s). ${failed[0]?.error || ''}`,
+          { variant: 'error' }
+        );
+        return;
+      }
+
       const deleteRows = tableData.filter((row) => !selectedRows.includes(row.id));
       setTableData(deleteRows);
       setSelected([]);
@@ -148,14 +193,22 @@ export default function OrdersPage() {
           setPage(newPage);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      enqueueSnackbar('Failed to delete orders', { variant: 'error' });
+      const errorMsg = error.response?.data?.error || error.error || error.message || 'Failed to delete orders';
+      enqueueSnackbar(errorMsg, { variant: 'error' });
     }
   };
 
   const handleEditRow = (id: number) => {
     push(PATH_DASHBOARD.tiffin.orderEdit(String(id)));
+  };
+
+  const handleCalculateBilling = (customerId: number) => {
+    // Get current month in YYYY-MM format
+    const today = new Date();
+    const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    push(`/dashboard/tiffin/billing-calendar?customer_id=${customerId}&month=${currentMonth}`);
   };
 
   const handleResetFilter = () => {
@@ -243,6 +296,7 @@ export default function OrdersPage() {
                         onSelectRow={() => onSelectRow(String(row.id))}
                         onDeleteRow={() => handleDeleteRow(row.id)}
                         onEditRow={() => handleEditRow(row.id)}
+                        onCalculateBilling={() => handleCalculateBilling(row.customer_id)}
                       />
                     ))}
 

@@ -235,10 +235,10 @@ async function handleCreateCustomerOrder(
     const selectedDaysJson = JSON.stringify(daysArray);
     console.log('[v2] Storing in database as JSON:', selectedDaysJson);
 
-    // Insert customer order
+    // Insert customer order with payment_status='calculating' (initial state)
     const result = (await query(
-      'INSERT INTO customer_orders (customer_id, meal_plan_id, quantity, selected_days, price, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [customer_id, meal_plan_id, quantity, selectedDaysJson, price, formattedStartDate, formattedEndDate]
+      'INSERT INTO customer_orders (customer_id, meal_plan_id, quantity, selected_days, price, start_date, end_date, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [customer_id, meal_plan_id, quantity, selectedDaysJson, price, formattedStartDate, formattedEndDate, 'calculating']
     )) as any;
 
     const orderId = result.insertId;
@@ -380,8 +380,9 @@ async function validateCustomerOrderInput(
       errors.push('Invalid end date format');
     }
 
-    if (endDate <= startDate) {
-      errors.push('End date must be after start date');
+    // Allow same-day orders (for daily/extra tiffins)
+    if (endDate < startDate) {
+      errors.push('End date cannot be before start date');
     }
   }
 
