@@ -158,8 +158,18 @@ export default function BillingDetailsPage() {
         // Convert logo to data URL for PDF rendering
         if (logoUrl) {
           try {
-            // Fetch the image using axios to avoid CORS issues
-            const imageResponse = await axios.get(logoUrl, {
+            // Extract path from full URL if needed (e.g., http://localhost:3000/uploads/... -> /uploads/...)
+            let logoPath = logoUrl;
+            try {
+              const url = new URL(logoUrl);
+              logoPath = url.pathname; // Extract just the path part
+            } catch {
+              // If URL parsing fails, assume it's already a path
+              logoPath = logoUrl;
+            }
+
+            // Fetch the image using axios with relative path to avoid CORS issues
+            const imageResponse = await axios.get(logoPath, {
               responseType: 'blob',
             });
             const blob = imageResponse.data;
