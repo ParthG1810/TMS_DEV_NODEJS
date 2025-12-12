@@ -172,12 +172,13 @@ async function handleUpdateCustomerOrder(
       });
     }
 
-    // LOCK: Prevent editing if order is in locked states (finalized or paid)
+    // LOCK: Prevent editing if order is in locked states (finalized, paid, or partial_paid)
     const order = existingOrders[0];
-    if (order.payment_status && ['finalized', 'paid'].includes(order.payment_status)) {
+    if (order.payment_status && ['finalized', 'paid', 'partial_paid'].includes(order.payment_status)) {
       const statusMessages: { [key: string]: string } = {
         finalized: 'This order is locked because the billing has been approved. The order cannot be modified.',
         paid: 'This order is locked because payment has been completed. The order is read-only.',
+        partial_paid: 'This order is locked because partial payment has been received. The order is read-only.',
       };
       const message = statusMessages[order.payment_status] || 'This order is locked and cannot be modified.';
 
@@ -394,11 +395,12 @@ async function handleDeleteCustomerOrder(
     const order = existingOrders[0];
 
     // Prevent deletion if payment_status is in locked states
-    if (order.payment_status && ['pending', 'finalized', 'paid'].includes(order.payment_status)) {
+    if (order.payment_status && ['pending', 'finalized', 'paid', 'partial_paid'].includes(order.payment_status)) {
       const statusMessages: { [key: string]: string } = {
         pending: 'billing is pending approval. Please reject or approve the billing first.',
         finalized: 'billing has been approved. The order is locked and cannot be deleted.',
         paid: 'payment has been completed. The order is read-only and cannot be deleted.',
+        partial_paid: 'partial payment has been received. The order is read-only and cannot be deleted.',
       };
       const message = statusMessages[order.payment_status] || 'order is locked.';
 
