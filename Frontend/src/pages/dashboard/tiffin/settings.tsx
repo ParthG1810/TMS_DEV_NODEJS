@@ -29,6 +29,7 @@ interface AppSettings {
   company_phone: string;
   company_email: string;
   company_address: string;
+  company_logo: string;
 
   // Payment Settings
   etransfer_email: string;
@@ -61,6 +62,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string>('');
 
   useEffect(() => {
     fetchSettings();
@@ -72,6 +75,7 @@ export default function SettingsPage() {
       const response = await axios.get('/api/settings');
       if (response.data.success) {
         setSettings(response.data.data);
+        setLogoPreview(response.data.data.company_logo || '');
       } else {
         enqueueSnackbar(response.data.error || 'Failed to load settings', { variant: 'error' });
       }
@@ -109,6 +113,84 @@ export default function SettingsPage() {
         ...settings,
         [field]: event.target.value,
       });
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      enqueueSnackbar('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.', {
+        variant: 'error',
+      });
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      enqueueSnackbar('File size exceeds 5MB limit', { variant: 'error' });
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      // Create form data
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      // Upload to server
+      const response = await axios.post('/api/settings/upload-logo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data.success) {
+        const logoUrl = response.data.data.url;
+        setLogoPreview(logoUrl);
+        if (settings) {
+          setSettings({
+            ...settings,
+            company_logo: logoUrl,
+          });
+        }
+        enqueueSnackbar('Logo uploaded successfully', { variant: 'success' });
+      } else {
+        enqueueSnackbar(response.data.error || 'Failed to upload logo', { variant: 'error' });
+      }
+    } catch (error: any) {
+      console.error('Error uploading logo:', error);
+      enqueueSnackbar(error.message || 'Failed to upload logo', { variant: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    try {
+      setUploading(true);
+      const response = await axios.delete('/api/settings/upload-logo');
+      if (response.data.success) {
+        setLogoPreview('');
+        if (settings) {
+          setSettings({
+            ...settings,
+            company_logo: '',
+          });
+        }
+        enqueueSnackbar('Logo deleted successfully', { variant: 'success' });
+      } else {
+        enqueueSnackbar(response.data.error || 'Failed to delete logo', { variant: 'error' });
+      }
+    } catch (error: any) {
+      console.error('Error deleting logo:', error);
+      enqueueSnackbar(error.message || 'Failed to delete logo', { variant: 'error' });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -162,6 +244,60 @@ export default function SettingsPage() {
             </Typography>
             <Divider sx={{ mb: 3 }} />
             <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Company Logo
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  {logoPreview && (
+                    <Box
+                      component="img"
+                      src={logoPreview}
+                      alt="Company Logo"
+                      sx={{
+                        width: 100,
+                        height: 100,
+                        objectFit: 'contain',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        p: 1,
+                      }}
+                    />
+                  )}
+                  <Stack spacing={1}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={<Iconify icon="eva:upload-outline" />}
+                      disabled={uploading}
+                    >
+                      {uploading ? 'Uploading...' : 'Upload Logo'}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                      />
+                    </Button>
+                    {logoPreview && (
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        startIcon={<Iconify icon="eva:trash-2-outline" />}
+                        onClick={handleLogoDelete}
+                        disabled={uploading}
+                      >
+                        Remove Logo
+                      </Button>
+                    )}
+                    <Typography variant="caption" color="text.secondary">
+                      Recommended: Square image, max 5MB (JPG, PNG, GIF, WebP)
+                    </Typography>
+                  </Stack>
+                </Box>
+              </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
