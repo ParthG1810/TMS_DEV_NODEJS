@@ -240,9 +240,9 @@ export type ICustomerOrderState = {
 // Payment Management Types
 // ----------------------------------------------------------------------
 
-export type PaymentStatus = 'pending' | 'received' | 'calculating';
+export type PaymentStatus = 'calculating' | 'pending' | 'finalized' | 'paid' | 'partial_paid';
 export type CalendarEntryStatus = 'T' | 'A' | 'E';
-export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid';
+export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid' | 'partial_paid';
 export type NotificationType = 'month_end_calculation' | 'payment_received' | 'payment_overdue';
 export type NotificationPriority = 'low' | 'medium' | 'high';
 
