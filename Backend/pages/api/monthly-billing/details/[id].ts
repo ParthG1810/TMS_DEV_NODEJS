@@ -234,13 +234,16 @@ export default async function handler(
       const divisor = order.weekdays_only ? totalWeekdays : lastDay;
       const perTiffinPrice = divisor > 0 ? order.price / divisor : 0;
 
-      // Count delivered and absent for THIS order only
-      const deliveredCount = orderEntries.filter((e) => e.status === 'delivered').length;
-      const absentCount = orderEntries.filter((e) => e.status === 'absent').length;
-
-      // For the FIRST base order, include ALL extra entries
-      // For subsequent orders, don't count extras (to avoid duplication)
+      // For the FIRST base order, include ALL delivered, absent, and extra entries for the entire month
+      // For subsequent orders, don't count any (to avoid duplication)
       const isFirstOrder = baseOrders[0].id === order.id;
+
+      // Get all delivered and absent entries (not just for this order)
+      const allDeliveredEntries = calendar.filter((e) => e.status === 'delivered');
+      const allAbsentEntries = calendar.filter((e) => e.status === 'absent');
+
+      const deliveredCount = isFirstOrder ? allDeliveredEntries.length : 0;
+      const absentCount = isFirstOrder ? allAbsentEntries.length : 0;
       const extraCount = isFirstOrder ? allExtraEntries.length : 0;
       const extraAmount = isFirstOrder
         ? allExtraEntries.reduce((sum, e) => sum + (e.price || 0), 0)
