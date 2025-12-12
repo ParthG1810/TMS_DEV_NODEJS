@@ -71,7 +71,7 @@ interface BillingDetails {
     end_date: string;
     price: number;
     payment_status: string;
-    order_type: string;
+    days?: string;
   }>;
   calendar: Array<{
     delivery_date: string;
@@ -624,7 +624,7 @@ function MyUseTab({
                     <TableRow key={order.id}>
                       <TableCell>{order.meal_plan_name}</TableCell>
                       <TableCell>
-                        <Chip label={order.order_type} size="small" variant="outlined" />
+                        <Chip label={order.days || order.meal_plan_type} size="small" variant="outlined" />
                       </TableCell>
                       <TableCell>
                         {fDate(order.start_date)} - {fDate(order.end_date)}
