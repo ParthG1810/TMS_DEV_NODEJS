@@ -37,6 +37,9 @@ import { PATH_DASHBOARD } from '../../../routes/paths';
 import { useSettingsContext } from '../../../components/settings';
 import axios from '../../../utils/axios';
 import { useSnackbar } from '../../../components/snackbar';
+import { useDispatch } from '../../../redux/store';
+import { getPaymentNotifications, getMonthlyBillings } from '../../../redux/slices/payment';
+import { getCustomerOrders } from '../../../redux/slices/customerOrder';
 import { fCurrency } from '../../../utils/formatNumber';
 import { fDate } from '../../../utils/formatTime';
 import BillingReceiptPDF from '../../../sections/@dashboard/tiffin/BillingReceiptPDF';
@@ -125,6 +128,7 @@ export default function BillingDetailsPage() {
   const theme = useTheme();
   const { themeStretch } = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
+  const dispatch = useDispatch();
   const componentRef = useRef<HTMLDivElement>(null);
 
   const { id } = router.query;
@@ -226,6 +230,11 @@ export default function BillingDetailsPage() {
       if (response.data.success) {
         enqueueSnackbar('Billing approved successfully', { variant: 'success' });
         fetchBillingDetails();
+
+        // Refresh all related data throughout the application
+        dispatch(getPaymentNotifications()); // Refresh notifications
+        dispatch(getCustomerOrders()); // Refresh customer orders with updated payment status
+        dispatch(getMonthlyBillings()); // Refresh billing list
       }
     } catch (error: any) {
       enqueueSnackbar(error.message || 'Failed to approve billing', { variant: 'error' });
@@ -239,7 +248,14 @@ export default function BillingDetailsPage() {
       });
       if (response.data.success) {
         enqueueSnackbar('Billing rejected and reset to calculating', { variant: 'success' });
-        fetchBillingDetails();
+
+        // Refresh all related data throughout the application
+        dispatch(getPaymentNotifications()); // Refresh notifications (deleted ones will disappear)
+        dispatch(getCustomerOrders()); // Refresh customer orders with reset payment status
+        dispatch(getMonthlyBillings()); // Refresh billing list
+
+        // Redirect to billing calendar since this record is now in calculating status
+        router.push(PATH_DASHBOARD.tiffin.billingCalendar);
       }
     } catch (error: any) {
       enqueueSnackbar(error.message || 'Failed to reject billing', { variant: 'error' });
@@ -271,6 +287,29 @@ export default function BillingDetailsPage() {
   }
 
   const { billing, orders, calendar, calculations } = billingDetails;
+
+  // Access control: Only allow access if status is pending, finalized, or paid
+  if (billing.status === 'calculating') {
+    return (
+      <Container maxWidth={themeStretch ? false : 'xl'}>
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>
+            Access Restricted
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            This billing record is currently being calculated. Access is only available when the
+            billing is finalized and pending approval, or when it has been paid.
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => router.push(PATH_DASHBOARD.tiffin.billingCalendar)}
+          >
+            Return to Billing Calendar
+          </Button>
+        </Box>
+      </Container>
+    );
+  }
 
   // Generate calendar grid
   const [year, month] = billing.billing_month.split('-').map(Number);
