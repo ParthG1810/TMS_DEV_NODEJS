@@ -255,7 +255,10 @@ export default async function handler(
       const deliveredAmount = deliveredCount * perTiffinPrice;
       const absentDeduction = absentCount * perTiffinPrice;
 
-      const orderTotal = deliveredAmount - absentDeduction + extraAmount;
+      // Order total = delivered tiffins + extra tiffins
+      // We DON'T subtract absent days because we only charge for delivered tiffins
+      // Absent deduction is shown for informational purposes only
+      const orderTotal = deliveredAmount + extraAmount;
 
       return {
         order_id: order.id,

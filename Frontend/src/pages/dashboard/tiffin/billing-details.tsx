@@ -599,16 +599,13 @@ function MyUseTab({
                       {breakdown.absent_count > 0 && (
                         <>
                           <Typography variant="body2" fontWeight="bold">
-                            Absent Days (Deduction):
+                            Absent Days (Not Charged):
                           </Typography>
                           <Typography variant="body2">
                             ├─ Count: {breakdown.absent_count} day{breakdown.absent_count > 1 ? 's' : ''} absent
                           </Typography>
-                          <Typography variant="body2">
-                            ├─ Calculation: {breakdown.absent_count} × {fCurrency(breakdown.per_tiffin_price)} = -{fCurrency(breakdown.absent_deduction)}
-                          </Typography>
                           <Typography variant="body2" sx={{ mb: 1.5 }}>
-                            └─ Deduction: {fCurrency(-breakdown.absent_deduction)}
+                            └─ Note: No charge for absent days
                           </Typography>
                         </>
                       )}
