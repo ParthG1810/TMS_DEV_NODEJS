@@ -866,23 +866,31 @@ function CustomerPreviewTab({
           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
             const status = calendarGrid[day];
 
+            // Handle both database values ('T', 'A', 'E') and full names
+            const isDelivered = status === 'T' || status === 'delivered';
+            const isAbsent = status === 'A' || status === 'absent';
+            const isExtra = status === 'E' || status === 'extra';
+
             // Use color-coded backgrounds matching the "My Use" tab
             let bgColor = 'transparent';
             let borderColor = isDark ? '#555' : '#e0e0e0';
+            let textColor = isDark ? '#fff' : '#000';
 
-            if (status === 'delivered') {
+            if (isDelivered) {
               bgColor = isDark ? 'rgba(76, 175, 80, 0.2)' : 'rgba(76, 175, 80, 0.15)'; // Green
               borderColor = isDark ? 'rgba(76, 175, 80, 0.4)' : 'rgba(76, 175, 80, 0.3)';
-            } else if (status === 'absent') {
+              textColor = '#4caf50'; // Green text
+            } else if (isAbsent) {
               bgColor = isDark ? 'rgba(244, 67, 54, 0.2)' : 'rgba(244, 67, 54, 0.15)'; // Red
               borderColor = isDark ? 'rgba(244, 67, 54, 0.4)' : 'rgba(244, 67, 54, 0.3)';
-            } else if (status === 'extra') {
+              textColor = '#f44336'; // Red text
+            } else if (isExtra) {
               bgColor = isDark ? 'rgba(33, 150, 243, 0.2)' : 'rgba(33, 150, 243, 0.15)'; // Blue
               borderColor = isDark ? 'rgba(33, 150, 243, 0.4)' : 'rgba(33, 150, 243, 0.3)';
+              textColor = '#2196f3'; // Blue text
             }
 
-            const statusText =
-              status === 'delivered' ? 'T' : status === 'absent' ? 'A' : status === 'extra' ? 'E' : '';
+            const statusText = isDelivered ? 'T' : isAbsent ? 'A' : isExtra ? 'E' : '';
 
             return (
               <Box
@@ -899,7 +907,9 @@ function CustomerPreviewTab({
               >
                 <div>{day}</div>
                 {statusText && (
-                  <div style={{ fontSize: '0.75rem', marginTop: 2 }}>{statusText}</div>
+                  <div style={{ fontSize: '0.75rem', marginTop: 2, fontWeight: 'bold', color: textColor }}>
+                    {statusText}
+                  </div>
                 )}
               </Box>
             );
