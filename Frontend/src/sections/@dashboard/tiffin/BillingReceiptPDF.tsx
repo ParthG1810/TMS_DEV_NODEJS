@@ -180,7 +180,7 @@ export default function BillingReceiptPDF({
                 textStyle.push(styles.extraText);
               }
 
-              const statusText = isDelivered ? '✓ Delivered' : isAbsent ? '✗ Absent' : isExtra ? '+ Extra' : '';
+              const statusText = isDelivered ? '✓' : isAbsent ? '✗' : isExtra ? '+' : '';
 
               return (
                 <View key={day} style={cellStyle}>
