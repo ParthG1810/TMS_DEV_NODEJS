@@ -494,17 +494,34 @@ function MyUseTab({
               ))}
               {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
                 const status = calendarGrid[day];
-                const bgColor =
-                  status === 'delivered'
-                    ? theme.palette.success.main
-                    : status === 'absent'
-                    ? theme.palette.error.main
-                    : status === 'extra'
-                    ? theme.palette.info.main
-                    : theme.palette.grey[300];
 
-                const statusText =
-                  status === 'delivered' ? 'T' : status === 'absent' ? 'A' : status === 'extra' ? 'E' : '';
+                // Handle both database values ('T', 'A', 'E') and full names
+                const isDelivered = status === 'T' || status === 'delivered';
+                const isAbsent = status === 'A' || status === 'absent';
+                const isExtra = status === 'E' || status === 'extra';
+
+                let bgColor = 'transparent';
+                let borderColor = theme.palette.mode === 'dark' ? '#555' : '#e0e0e0';
+                let textColor = theme.palette.text.primary;
+
+                if (isDelivered) {
+                  // Green for delivered
+                  bgColor = alpha(theme.palette.success.main, 0.2);
+                  borderColor = alpha(theme.palette.success.main, 0.4);
+                  textColor = theme.palette.success.main;
+                } else if (isAbsent) {
+                  // Red for absent
+                  bgColor = alpha(theme.palette.error.main, 0.2);
+                  borderColor = alpha(theme.palette.error.main, 0.4);
+                  textColor = theme.palette.error.main;
+                } else if (isExtra) {
+                  // Blue for extra
+                  bgColor = alpha(theme.palette.info.main, 0.2);
+                  borderColor = alpha(theme.palette.info.main, 0.4);
+                  textColor = theme.palette.info.main;
+                }
+
+                const statusText = isDelivered ? 'T' : isAbsent ? 'A' : isExtra ? 'E' : '';
 
                 return (
                   <Box
@@ -512,15 +529,15 @@ function MyUseTab({
                     sx={{
                       p: 1,
                       textAlign: 'center',
-                      bgcolor: status ? alpha(bgColor, 0.2) : 'transparent',
-                      border: `1px solid ${alpha(bgColor, 0.4)}`,
+                      bgcolor: bgColor,
+                      border: `1px solid ${borderColor}`,
                       borderRadius: 1,
                       fontSize: '0.75rem',
                     }}
                   >
                     <div>{day}</div>
                     {statusText && (
-                      <div style={{ fontWeight: 'bold', color: bgColor }}>{statusText}</div>
+                      <div style={{ fontWeight: 'bold', color: textColor }}>{statusText}</div>
                     )}
                   </Box>
                 );
