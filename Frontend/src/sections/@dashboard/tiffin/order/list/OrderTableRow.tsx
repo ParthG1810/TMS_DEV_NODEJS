@@ -53,10 +53,11 @@ export default function OrderTableRow({
   const [openConfirm, setOpenConfirm] = useState(false);
   const [openPopover, setOpenPopover] = useState<HTMLElement | null>(null);
 
-  // Check if order is locked (any non-calculating status)
-  const isLocked = payment_status && ['pending', 'received'].includes(payment_status);
-  const isPaid = payment_status === 'paid';
-  const isDisabled = isLocked || isPaid; // Disable for all locked states
+  // Check if order is locked based on payment status
+  // Status flow: calculating → pending → finalized → paid/partial_paid
+  const isLocked = payment_status && ['finalized', 'paid', 'partial_paid'].includes(payment_status);
+  const isPending = payment_status === 'pending';
+  const isCalculating = !payment_status || payment_status === 'calculating';
 
   // Get status display info
   const getStatusInfo = () => {
@@ -65,23 +66,39 @@ export default function OrderTableRow({
         label: 'Pending Approval',
         color: 'warning' as const,
         icon: 'eva:clock-outline',
-        tooltip: 'Billing is pending approval',
+        tooltip: 'Billing is pending approval - cannot delete',
       };
     }
-    if (payment_status === 'received') {
+    if (payment_status === 'finalized') {
       return {
-        label: 'Approved, Payment Waiting',
+        label: 'Approved (Locked)',
         color: 'info' as const,
-        icon: 'eva:checkmark-outline',
-        tooltip: 'Billing approved, waiting for payment',
+        icon: 'eva:lock-outline',
+        tooltip: 'Billing approved - order is locked',
       };
     }
     if (payment_status === 'paid') {
       return {
-        label: 'Paid',
+        label: 'Paid (Locked)',
         color: 'success' as const,
         icon: 'eva:checkmark-circle-2-outline',
-        tooltip: 'Payment completed - read only',
+        tooltip: 'Payment completed - order is read-only',
+      };
+    }
+    if (payment_status === 'partial_paid') {
+      return {
+        label: 'Partial Paid (Locked)',
+        color: 'secondary' as const,
+        icon: 'eva:checkmark-outline',
+        tooltip: 'Partial payment received - order is read-only',
+      };
+    }
+    if (payment_status === 'calculating') {
+      return {
+        label: 'Calculating',
+        color: 'default' as const,
+        icon: 'eva:refresh-outline',
+        tooltip: 'Billing is being calculated',
       };
     }
     return null;
@@ -109,11 +126,11 @@ export default function OrderTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Tooltip title={statusInfo ? `Cannot select - ${statusInfo.tooltip}` : ''}>
+          <Tooltip title={isLocked ? `Cannot select - ${statusInfo?.tooltip}` : ''}>
             <Checkbox
               checked={selected}
               onClick={onSelectRow}
-              disabled={isDisabled}
+              disabled={isLocked}
             />
           </Tooltip>
         </TableCell>
@@ -170,14 +187,14 @@ export default function OrderTableRow({
         sx={{ width: 160 }}
       >
         <Tooltip
-          title={isDisabled ? `Cannot edit - ${statusInfo?.tooltip}` : ''}
+          title={isLocked ? `Cannot edit - ${statusInfo?.tooltip}` : ''}
           placement="left"
         >
           <MenuItem
             onClick={() => {
-              if (isDisabled) {
+              if (isLocked) {
                 enqueueSnackbar(
-                  `Cannot edit order - ${statusInfo?.tooltip}. ${isPaid ? 'Order is completed.' : 'Please reject or approve the billing first.'}`,
+                  `Cannot edit order - ${statusInfo?.tooltip}`,
                   { variant: 'warning' }
                 );
                 handleClosePopover();
@@ -187,13 +204,13 @@ export default function OrderTableRow({
               handleClosePopover();
             }}
             sx={{
-              color: isDisabled ? 'text.disabled' : 'inherit',
-              cursor: isDisabled ? 'not-allowed' : 'pointer',
-              opacity: isDisabled ? 0.5 : 1,
+              color: isLocked ? 'text.disabled' : 'inherit',
+              cursor: isLocked ? 'not-allowed' : 'pointer',
+              opacity: isLocked ? 0.5 : 1,
             }}
           >
-            <Iconify icon={isDisabled ? 'eva:lock-outline' : 'eva:edit-fill'} />
-            {isDisabled ? 'Locked' : 'Edit'}
+            <Iconify icon={isLocked ? 'eva:lock-outline' : 'eva:edit-fill'} />
+            {isLocked ? 'Locked' : 'Edit'}
           </MenuItem>
         </Tooltip>
 
@@ -211,14 +228,14 @@ export default function OrderTableRow({
         )}
 
         <Tooltip
-          title={isDisabled ? `Cannot delete - ${statusInfo?.tooltip}` : ''}
+          title={(isPending || isLocked) ? `Cannot delete - ${statusInfo?.tooltip}` : ''}
           placement="left"
         >
           <MenuItem
             onClick={() => {
-              if (isDisabled) {
+              if (isPending || isLocked) {
                 enqueueSnackbar(
-                  `Cannot delete order - ${statusInfo?.tooltip}. ${isPaid ? 'Order is completed.' : 'Please reject or approve the billing first.'}`,
+                  `Cannot delete order - ${statusInfo?.tooltip}`,
                   { variant: 'warning' }
                 );
                 handleClosePopover();
@@ -228,13 +245,13 @@ export default function OrderTableRow({
               handleClosePopover();
             }}
             sx={{
-              color: isDisabled ? 'text.disabled' : 'error.main',
-              cursor: isDisabled ? 'not-allowed' : 'pointer',
-              opacity: isDisabled ? 0.5 : 1,
+              color: (isPending || isLocked) ? 'text.disabled' : 'error.main',
+              cursor: (isPending || isLocked) ? 'not-allowed' : 'pointer',
+              opacity: (isPending || isLocked) ? 0.5 : 1,
             }}
           >
-            <Iconify icon={isDisabled ? 'eva:lock-outline' : 'eva:trash-2-outline'} />
-            {isDisabled ? 'Locked' : 'Delete'}
+            <Iconify icon={(isPending || isLocked) ? 'eva:lock-outline' : 'eva:trash-2-outline'} />
+            {(isPending || isLocked) ? 'Locked' : 'Delete'}
           </MenuItem>
         </Tooltip>
       </MenuPopover>
