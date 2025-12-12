@@ -40,7 +40,7 @@ export interface BillingDetailsData {
     end_date: string;
     price: number;
     payment_status: string;
-    order_type: string;
+    days: string;
   }>;
   calendar: Array<{
     delivery_date: string;
@@ -153,7 +153,7 @@ export default async function handler(
             (co.start_date <= ? AND co.end_date >= ?)
             OR (co.start_date >= ? AND co.start_date <= ?)
           )
-        ORDER BY co.order_type DESC, co.start_date ASC
+        ORDER BY co.start_date ASC
       `,
       [customerId, lastDayStr, firstDay, firstDay, lastDayStr]
     );
