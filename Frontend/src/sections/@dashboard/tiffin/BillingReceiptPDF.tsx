@@ -55,7 +55,6 @@ export default function BillingReceiptPDF({
   // Generate calendar grid
   const [year, month] = billing.billing_month.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
-  const firstDayOfMonth = new Date(year, month - 1, 1).getDay(); // 0 = Sunday
 
   // Create calendar grid mapping
   const calendarGrid: { [day: number]: 'delivered' | 'absent' | 'extra' | null } = {};
@@ -143,7 +142,7 @@ export default function BillingReceiptPDF({
         <View style={styles.calendarSection}>
           <Text style={styles.sectionTitle}>Delivery Calendar</Text>
 
-          {/* Calendar Header */}
+          {/* Calendar Grid - Simple layout like My Use tab */}
           <View style={styles.calendarGrid}>
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
               <View key={day} style={styles.calendarHeaderCell}>
@@ -151,12 +150,7 @@ export default function BillingReceiptPDF({
               </View>
             ))}
 
-            {/* Empty cells for days before month starts */}
-            {Array.from({ length: firstDayOfMonth }, (_, i) => (
-              <View key={`empty-${i}`} style={styles.calendarCell} />
-            ))}
-
-            {/* Calendar days */}
+            {/* Calendar days - Simple sequential layout */}
             {Array.from({ length: daysInMonth }, (_, i) => {
               const day = i + 1;
               const status = calendarGrid[day];

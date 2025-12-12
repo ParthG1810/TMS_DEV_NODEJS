@@ -158,20 +158,19 @@ export default function BillingDetailsPage() {
         // Convert logo to data URL for PDF rendering
         if (logoUrl) {
           try {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.width;
-              canvas.height = img.height;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                const dataUrl = canvas.toDataURL('image/png');
-                setLogoDataUrl(dataUrl);
-              }
+            // Fetch the image and convert to base64
+            const response = await fetch(logoUrl);
+            const blob = await response.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64data = reader.result as string;
+              setLogoDataUrl(base64data);
+              console.log('Logo converted to base64 successfully');
             };
-            img.src = logoUrl;
+            reader.onerror = (error) => {
+              console.error('Error reading logo file:', error);
+            };
+            reader.readAsDataURL(blob);
           } catch (error) {
             console.error('Error converting logo to data URL:', error);
           }
