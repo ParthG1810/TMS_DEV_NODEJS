@@ -553,111 +553,100 @@ function MyUseTab({
               Billing Calculation Breakdown
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            <Stack spacing={2}>
+            <Stack spacing={3}>
               {calculations?.breakdown_by_order.map((breakdown, index) => {
                 const totalDays = breakdown.weekdays_only ? calculations.total_weekdays : daysInMonth;
                 const dayType = breakdown.weekdays_only ? 'Mon-Fri' : 'All';
 
+                // Get month name from billing_month (YYYY-MM format)
+                const [year, monthNum] = billing.billing_month.split('-');
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December'];
+                const monthName = monthNames[parseInt(monthNum) - 1];
+
                 return (
-                  <Paper key={breakdown.order_id} sx={{ p: 2, bgcolor: 'background.neutral' }}>
-                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
+                  <Box key={breakdown.order_id}>
+                    <Typography variant="body2" fontWeight="bold" gutterBottom>
                       Base Order: {breakdown.meal_plan_name} ({dayType})
                     </Typography>
-                    <Stack spacing={0.5} sx={{ pl: 1, fontSize: '0.875rem' }}>
-                      {/* Base Order Info */}
-                      <Typography variant="body2" color="text.secondary">
+                    <Stack spacing={0.3} sx={{ pl: 0, fontSize: '0.875rem' }}>
+                      <Typography variant="body2">
                         ├─ Order Price: {fCurrency(breakdown.order_price)}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        ├─ Total {breakdown.weekdays_only ? 'Mon-Fri' : 'All'} days in{' '}
-                        {billing.billing_month}: {totalDays} days
+                      <Typography variant="body2">
+                        ├─ Total {dayType} days in {monthName}: {totalDays} days
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        ├─ Per-Tiffin Price: {fCurrency(breakdown.order_price)} ÷ {totalDays} ={' '}
-                        {fCurrency(breakdown.per_tiffin_price)}/tiffin
+                      <Typography variant="body2">
+                        ├─ Per-Tiffin Price: {fCurrency(breakdown.order_price)} ÷ {totalDays} = {fCurrency(breakdown.per_tiffin_price)}/tiffin
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      <Typography variant="body2" sx={{ mb: 1.5 }}>
                         └─ Order covers: {breakdown.applicable_days} applicable days
                       </Typography>
 
-                      {/* Delivered Tiffins */}
-                      <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 2, mb: 0.5 }}>
+                      <Typography variant="body2" fontWeight="bold">
                         Delivered Tiffins:
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2">
                         ├─ Count: {breakdown.delivered_count} tiffins delivered
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        ├─ Calculation: {breakdown.delivered_count} × {fCurrency(breakdown.per_tiffin_price)} ={' '}
-                        {fCurrency(breakdown.delivered_amount)}
+                      <Typography variant="body2">
+                        ├─ Calculation: {breakdown.delivered_count} × {fCurrency(breakdown.per_tiffin_price)} = {fCurrency(breakdown.delivered_amount)}
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: 'success.main', mb: 1, fontWeight: 'medium' }}
-                      >
+                      <Typography variant="body2" sx={{ mb: 1.5 }}>
                         └─ Subtotal: {fCurrency(breakdown.delivered_amount)}
                       </Typography>
 
-                      {/* Absent Days */}
                       {breakdown.absent_count > 0 && (
                         <>
-                          <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 2, mb: 0.5 }}>
+                          <Typography variant="body2" fontWeight="bold">
                             Absent Days (Deduction):
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2">
                             ├─ Count: {breakdown.absent_count} day{breakdown.absent_count > 1 ? 's' : ''} absent
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            ├─ Calculation: {breakdown.absent_count} × {fCurrency(breakdown.per_tiffin_price)} ={' '}
-                            -{fCurrency(breakdown.absent_deduction)}
+                          <Typography variant="body2">
+                            ├─ Calculation: {breakdown.absent_count} × {fCurrency(breakdown.per_tiffin_price)} = -{fCurrency(breakdown.absent_deduction)}
                           </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ color: 'error.main', mb: 1, fontWeight: 'medium' }}
-                          >
+                          <Typography variant="body2" sx={{ mb: 1.5 }}>
                             └─ Deduction: {fCurrency(-breakdown.absent_deduction)}
                           </Typography>
                         </>
                       )}
 
-                      {/* Extra Tiffins */}
                       {breakdown.extra_count > 0 && (
                         <>
-                          <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 2, mb: 0.5 }}>
+                          <Typography variant="body2" fontWeight="bold">
                             Extra Tiffins:
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2">
                             ├─ Count: {breakdown.extra_count} extra tiffin{breakdown.extra_count > 1 ? 's' : ''}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2">
                             ├─ Price: {fCurrency(breakdown.extra_amount / breakdown.extra_count)}/tiffin
                           </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ color: 'info.main', mb: 1, fontWeight: 'medium' }}
-                          >
+                          <Typography variant="body2" sx={{ mb: 1.5 }}>
                             └─ Addition: +{fCurrency(breakdown.extra_amount)}
                           </Typography>
                         </>
                       )}
 
-                      <Divider sx={{ my: 2 }} />
-
-                      {/* Order Total */}
-                      <Typography variant="body1" fontWeight="bold" sx={{ color: 'primary.main' }}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ mt: 1 }}>
                         Order Total: {fCurrency(breakdown.order_total)}
                       </Typography>
                     </Stack>
-                  </Paper>
+
+                    {index < (calculations?.breakdown_by_order.length || 0) - 1 && (
+                      <Divider sx={{ my: 3 }} />
+                    )}
+                  </Box>
                 );
               })}
 
-              {/* Overall Total */}
-              <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
-                <Typography variant="h6" fontWeight="bold" align="center">
-                  TOTAL AMOUNT DUE: {fCurrency(billing.total_amount)}
-                </Typography>
-              </Paper>
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="h6" fontWeight="bold" align="center">
+                TOTAL AMOUNT DUE: {fCurrency(billing.total_amount)}
+              </Typography>
             </Stack>
           </Paper>
         </Grid>
