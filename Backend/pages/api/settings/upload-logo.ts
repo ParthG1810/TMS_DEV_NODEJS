@@ -42,11 +42,13 @@ async function handlePost(
   res: NextApiResponse<ApiResponse<{ url: string }>>
 ) {
   try {
-    // Parse the multipart form data
-    const { files } = await parseForm(req, 'public/uploads/company');
+    const uploadDir = 'public/uploads/company';
 
-    // Process uploaded files
-    const uploadedFiles = processUploadedFiles(files);
+    // Parse the multipart form data
+    const { files } = await parseForm(req, uploadDir);
+
+    // Process uploaded files with correct upload directory
+    const uploadedFiles = processUploadedFiles(files, uploadDir);
 
     if (uploadedFiles.length === 0) {
       return res.status(400).json({

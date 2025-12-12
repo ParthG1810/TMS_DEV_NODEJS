@@ -104,10 +104,14 @@ export const parseForm = async (
 /**
  * Process uploaded files and validate them
  * @param files - Files from formidable
+ * @param uploadDir - Directory where files were uploaded (e.g., 'public/uploads/company')
  * @returns Array of processed file information
  */
-export const processUploadedFiles = (files: formidable.Files): UploadedFile[] => {
+export const processUploadedFiles = (files: formidable.Files, uploadDir: string = 'public/uploads/recipes'): UploadedFile[] => {
   const processedFiles: UploadedFile[] = [];
+
+  // Convert uploadDir to URL path (e.g., 'public/uploads/company' -> '/uploads/company')
+  const urlPath = uploadDir.replace(/^public/, '');
 
   // Handle both single and multiple file uploads
   for (const [fieldName, fileOrFiles] of Object.entries(files)) {
@@ -129,7 +133,7 @@ export const processUploadedFiles = (files: formidable.Files): UploadedFile[] =>
         filepath: file.filepath,
         mimetype: file.mimetype || 'application/octet-stream',
         size: file.size,
-        url: `${BACKEND_URL}/uploads/recipes/${filename}`,
+        url: `${BACKEND_URL}${urlPath}/${filename}`,
       });
     }
   }
