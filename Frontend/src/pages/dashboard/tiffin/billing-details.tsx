@@ -159,50 +159,26 @@ export default function BillingDetailsPage() {
         const logoUrl = response.data.data.company_logo || '';
         setCompanyLogo(logoUrl);
 
-        // Convert logo to data URL for PDF rendering
+        // Fetch logo as base64 directly from API - bypasses all CORS issues!
         if (logoUrl) {
           try {
-            // Normalize URL to relative path
-            // Handles both full URLs (http://...) and relative paths (/uploads/...)
-            let logoPath = logoUrl;
+            console.log('Fetching company logo via API...');
 
-            // If it's a full URL, extract just the pathname
-            if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
-              try {
-                const url = new URL(logoUrl);
-                logoPath = url.pathname;
-              } catch (e) {
-                console.warn('Failed to parse logo URL, using as-is:', logoUrl);
-              }
+            // Use the new logo API endpoint that returns base64 directly
+            const logoResponse = await axios.get('/api/settings/logo');
+
+            if (logoResponse.data.success) {
+              const dataUrl = logoResponse.data.data.dataUrl;
+              setLogoDataUrl(dataUrl);
+              console.log('✅ Logo loaded successfully via API');
+            } else {
+              console.warn('⚠️ Logo API returned error:', logoResponse.data.error);
+              setLogoDataUrl('');
             }
-
-            console.log('Fetching company logo from:', logoPath);
-
-            // Fetch the image - the proxy will handle /uploads/* requests
-            const imageResponse = await axios.get(logoPath, {
-              responseType: 'blob',
-            });
-
-            // Convert blob to base64 data URL for PDF rendering
-            const blob = imageResponse.data;
-            const reader = new FileReader();
-
-            reader.onloadend = () => {
-              const base64data = reader.result as string;
-              setLogoDataUrl(base64data);
-              console.log('✅ Logo converted to base64 successfully');
-            };
-
-            reader.onerror = (error) => {
-              console.error('❌ Error reading logo file:', error);
-              setLogoDataUrl(''); // Clear on error
-            };
-
-            reader.readAsDataURL(blob);
           } catch (error: any) {
-            console.error('❌ Error fetching/converting logo:', error.message || error);
-            setLogoDataUrl(''); // Clear on error
-            // Continue without logo if conversion fails
+            console.error('❌ Error fetching logo via API:', error.message || error);
+            setLogoDataUrl('');
+            // Continue without logo if fetch fails
           }
         }
       }
