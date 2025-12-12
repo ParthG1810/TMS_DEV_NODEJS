@@ -554,43 +554,110 @@ function MyUseTab({
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <Stack spacing={2}>
-              {calculations?.breakdown_by_order.map((breakdown, index) => (
-                <Paper key={breakdown.order_id} sx={{ p: 2, bgcolor: 'background.neutral' }}>
-                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                    {index + 1}. {breakdown.meal_plan_name} ({breakdown.meal_plan_type})
-                  </Typography>
-                  <Stack spacing={0.5} sx={{ pl: 2, fontSize: '0.875rem' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      ├─ Order Price: {fCurrency(breakdown.order_price)}
+              {calculations?.breakdown_by_order.map((breakdown, index) => {
+                const totalDays = breakdown.weekdays_only ? calculations.total_weekdays : daysInMonth;
+                const dayType = breakdown.weekdays_only ? 'Mon-Fri' : 'All';
+
+                return (
+                  <Paper key={breakdown.order_id} sx={{ p: 2, bgcolor: 'background.neutral' }}>
+                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
+                      Base Order: {breakdown.meal_plan_name} ({dayType})
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      ├─ Total {breakdown.weekdays_only ? 'Weekdays' : 'Days'} in Month:{' '}
-                      {breakdown.weekdays_only ? calculations.total_weekdays : daysInMonth}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      ├─ Per-Tiffin Price: {fCurrency(breakdown.per_tiffin_price)}
-                    </Typography>
-                    <Divider sx={{ my: 1 }} />
-                    <Typography variant="body2" color="text.secondary">
-                      ├─ Delivered: {breakdown.delivered_count} × {fCurrency(breakdown.per_tiffin_price)} ={' '}
-                      {fCurrency(breakdown.delivered_amount)}
-                    </Typography>
-                    <Typography variant="body2" color="error.main">
-                      ├─ Absent: {breakdown.absent_count} × {fCurrency(breakdown.per_tiffin_price)} = -
-                      {fCurrency(breakdown.absent_deduction)}
-                    </Typography>
-                    {breakdown.extra_count > 0 && (
-                      <Typography variant="body2" color="info.main">
-                        ├─ Extra: {breakdown.extra_count} tiffins = +{fCurrency(breakdown.extra_amount)}
+                    <Stack spacing={0.5} sx={{ pl: 1, fontSize: '0.875rem' }}>
+                      {/* Base Order Info */}
+                      <Typography variant="body2" color="text.secondary">
+                        ├─ Order Price: {fCurrency(breakdown.order_price)}
                       </Typography>
-                    )}
-                    <Divider sx={{ my: 1 }} />
-                    <Typography variant="body2" fontWeight="bold">
-                      └─ Order Total: {fCurrency(breakdown.order_total)}
-                    </Typography>
-                  </Stack>
-                </Paper>
-              ))}
+                      <Typography variant="body2" color="text.secondary">
+                        ├─ Total {breakdown.weekdays_only ? 'Mon-Fri' : 'All'} days in{' '}
+                        {billing.billing_month}: {totalDays} days
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        ├─ Per-Tiffin Price: {fCurrency(breakdown.order_price)} ÷ {totalDays} ={' '}
+                        {fCurrency(breakdown.per_tiffin_price)}/tiffin
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        └─ Order covers: {breakdown.applicable_days} applicable days
+                      </Typography>
+
+                      {/* Delivered Tiffins */}
+                      <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 2, mb: 0.5 }}>
+                        Delivered Tiffins:
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        ├─ Count: {breakdown.delivered_count} tiffins delivered
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        ├─ Calculation: {breakdown.delivered_count} × {fCurrency(breakdown.per_tiffin_price)} ={' '}
+                        {fCurrency(breakdown.delivered_amount)}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{ color: 'success.main', mb: 1, fontWeight: 'medium' }}
+                      >
+                        └─ Subtotal: {fCurrency(breakdown.delivered_amount)}
+                      </Typography>
+
+                      {/* Absent Days */}
+                      {breakdown.absent_count > 0 && (
+                        <>
+                          <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 2, mb: 0.5 }}>
+                            Absent Days (Deduction):
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            ├─ Count: {breakdown.absent_count} day{breakdown.absent_count > 1 ? 's' : ''} absent
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            ├─ Calculation: {breakdown.absent_count} × {fCurrency(breakdown.per_tiffin_price)} ={' '}
+                            -{fCurrency(breakdown.absent_deduction)}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: 'error.main', mb: 1, fontWeight: 'medium' }}
+                          >
+                            └─ Deduction: {fCurrency(-breakdown.absent_deduction)}
+                          </Typography>
+                        </>
+                      )}
+
+                      {/* Extra Tiffins */}
+                      {breakdown.extra_count > 0 && (
+                        <>
+                          <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 2, mb: 0.5 }}>
+                            Extra Tiffins:
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            ├─ Count: {breakdown.extra_count} extra tiffin{breakdown.extra_count > 1 ? 's' : ''}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            ├─ Price: {fCurrency(breakdown.extra_amount / breakdown.extra_count)}/tiffin
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: 'info.main', mb: 1, fontWeight: 'medium' }}
+                          >
+                            └─ Addition: +{fCurrency(breakdown.extra_amount)}
+                          </Typography>
+                        </>
+                      )}
+
+                      <Divider sx={{ my: 2 }} />
+
+                      {/* Order Total */}
+                      <Typography variant="body1" fontWeight="bold" sx={{ color: 'primary.main' }}>
+                        Order Total: {fCurrency(breakdown.order_total)}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                );
+              })}
+
+              {/* Overall Total */}
+              <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
+                <Typography variant="h6" fontWeight="bold" align="center">
+                  TOTAL AMOUNT DUE: {fCurrency(billing.total_amount)}
+                </Typography>
+              </Paper>
             </Stack>
           </Paper>
         </Grid>
@@ -795,8 +862,24 @@ function CustomerPreviewTab({
           ))}
           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
             const status = calendarGrid[day];
-            const bgColor = isDark ? '#333' : '#e0e0e0';
-            const activeBg = isDark ? '#555' : '#bdbdbd';
+
+            // Use color-coded backgrounds matching the "My Use" tab
+            let bgColor = 'transparent';
+            let borderColor = isDark ? '#555' : '#e0e0e0';
+
+            if (status === 'delivered') {
+              bgColor = isDark ? 'rgba(76, 175, 80, 0.2)' : 'rgba(76, 175, 80, 0.15)'; // Green
+              borderColor = isDark ? 'rgba(76, 175, 80, 0.4)' : 'rgba(76, 175, 80, 0.3)';
+            } else if (status === 'absent') {
+              bgColor = isDark ? 'rgba(244, 67, 54, 0.2)' : 'rgba(244, 67, 54, 0.15)'; // Red
+              borderColor = isDark ? 'rgba(244, 67, 54, 0.4)' : 'rgba(244, 67, 54, 0.3)';
+            } else if (status === 'extra') {
+              bgColor = isDark ? 'rgba(33, 150, 243, 0.2)' : 'rgba(33, 150, 243, 0.15)'; // Blue
+              borderColor = isDark ? 'rgba(33, 150, 243, 0.4)' : 'rgba(33, 150, 243, 0.3)';
+            }
+
+            const statusText =
+              status === 'delivered' ? 'T' : status === 'absent' ? 'A' : status === 'extra' ? 'E' : '';
 
             return (
               <Box
@@ -804,12 +887,17 @@ function CustomerPreviewTab({
                 sx={{
                   p: 1,
                   textAlign: 'center',
-                  bgcolor: status ? activeBg : bgColor,
+                  bgcolor: bgColor,
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: 1,
                   fontSize: '0.875rem',
                   fontWeight: status ? 'bold' : 'normal',
                 }}
               >
-                {day}
+                <div>{day}</div>
+                {statusText && (
+                  <div style={{ fontSize: '0.75rem', marginTop: 2 }}>{statusText}</div>
+                )}
               </Box>
             );
           })}
