@@ -127,13 +127,15 @@ export const processUploadedFiles = (files: formidable.Files, uploadDir: string 
       // Extract filename from filepath
       const filename = path.basename(file.filepath);
 
+      // Store relative paths instead of full URLs to avoid CORS issues
+      // Frontend will resolve these relative to its own origin
       processedFiles.push({
         filename,
         originalFilename: file.originalFilename || 'unknown',
         filepath: file.filepath,
         mimetype: file.mimetype || 'application/octet-stream',
         size: file.size,
-        url: `${BACKEND_URL}${urlPath}/${filename}`,
+        url: `${urlPath}/${filename}`,
       });
     }
   }
