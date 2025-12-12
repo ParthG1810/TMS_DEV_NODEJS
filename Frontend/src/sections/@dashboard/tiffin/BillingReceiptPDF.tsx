@@ -180,7 +180,8 @@ export default function BillingReceiptPDF({
                 textStyle.push(styles.extraText);
               }
 
-              const statusText = isDelivered ? '✓' : isAbsent ? '✗' : isExtra ? '+' : '';
+              // Use same format as My Use tab: T, A, E
+              const statusText = isDelivered ? 'T' : isAbsent ? 'A' : isExtra ? 'E' : '';
 
               return (
                 <View key={day} style={cellStyle}>

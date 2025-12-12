@@ -111,7 +111,7 @@ export const styles = StyleSheet.create({
 
   calendarHeaderCell: {
     width: '14.28%', // 7 columns (100% / 7)
-    padding: 3,
+    padding: 2,
     backgroundColor: '#f5f5f5',
     borderRight: '1px solid #e0e0e0',
     borderBottom: '1px solid #e0e0e0',
@@ -122,8 +122,8 @@ export const styles = StyleSheet.create({
 
   calendarCell: {
     width: '14.28%', // 7 columns
-    padding: 4,
-    minHeight: 24,
+    padding: 3,
+    minHeight: 22,
     borderRight: '1px solid #e0e0e0',
     borderBottom: '1px solid #e0e0e0',
     textAlign: 'center',
@@ -131,11 +131,12 @@ export const styles = StyleSheet.create({
   },
 
   calendarDayNumber: {
-    marginBottom: 2,
+    marginBottom: 1,
+    fontSize: 7,
   },
 
   calendarDayStatus: {
-    fontSize: 6,
+    fontSize: 7,
     fontFamily: 'Helvetica-Bold',
   },
 
