@@ -139,9 +139,13 @@ export default async function handler(
       `
         SELECT
           co.*,
-          mp.name AS meal_plan_name,
-          mp.type AS meal_plan_type,
-          mp.weekdays_only
+          mp.meal_name AS meal_plan_name,
+          mp.frequency AS meal_plan_type,
+          mp.days,
+          CASE
+            WHEN mp.days = 'Mon-Fri' THEN 1
+            ELSE 0
+          END AS weekdays_only
         FROM customer_orders co
         INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
         WHERE co.customer_id = ?
@@ -163,8 +167,8 @@ export default async function handler(
           ce.order_id,
           ce.quantity,
           ce.price,
-          mp.name AS meal_plan_name
-        FROM tiffin_calendar ce
+          mp.meal_name AS meal_plan_name
+        FROM tiffin_calendar_entries ce
         INNER JOIN customer_orders co ON ce.order_id = co.id
         INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
         WHERE ce.customer_id = ?
