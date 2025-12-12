@@ -140,17 +140,17 @@ export const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
   },
 
-  // Status colors for calendar cells
+  // Status colors for calendar cells - matching My Use tab
   deliveredCell: {
-    backgroundColor: '#e8f5e9', // Light green
+    backgroundColor: '#c8e6c9', // Light green (Material green[100])
   },
 
   absentCell: {
-    backgroundColor: '#ffebee', // Light red
+    backgroundColor: '#ffcdd2', // Light red (Material red[100])
   },
 
   extraCell: {
-    backgroundColor: '#e3f2fd', // Light blue
+    backgroundColor: '#b3e5fc', // Light blue (Material lightBlue[100])
   },
 
   deliveredText: {
