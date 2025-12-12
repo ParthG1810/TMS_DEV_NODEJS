@@ -200,7 +200,8 @@ export default async function handler(
     });
 
     // Get all extra entries for this customer in this month (regardless of order)
-    const allExtraEntries = calendar.filter((e) => e.status === 'extra');
+    // Note: Database stores 'T' for delivered/tiffin, 'A' for absent, 'E' for extra
+    const allExtraEntries = calendar.filter((e) => e.status === 'E' || e.status === 'extra');
 
     const breakdownByOrder = baseOrders.map((order) => {
       const orderEntries = calendar.filter((entry) => entry.order_id === order.id);
@@ -239,8 +240,9 @@ export default async function handler(
       const isFirstOrder = baseOrders[0].id === order.id;
 
       // Get all delivered and absent entries (not just for this order)
-      const allDeliveredEntries = calendar.filter((e) => e.status === 'delivered');
-      const allAbsentEntries = calendar.filter((e) => e.status === 'absent');
+      // Database stores 'T' for tiffin/delivered, 'A' for absent
+      const allDeliveredEntries = calendar.filter((e) => e.status === 'T' || e.status === 'delivered');
+      const allAbsentEntries = calendar.filter((e) => e.status === 'A' || e.status === 'absent');
 
       const deliveredCount = isFirstOrder ? allDeliveredEntries.length : 0;
       const absentCount = isFirstOrder ? allAbsentEntries.length : 0;
