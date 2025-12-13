@@ -178,7 +178,8 @@ export default function InteracTransactionsPage() {
 
     try {
       await axios.put(`/api/interac-transactions/${selectedTransaction.id}`, {
-        confirmed_customer_id: selectedCustomer.id,
+        action: 'confirm_customer',
+        customer_id: selectedCustomer.id,
       });
       enqueueSnackbar('Customer confirmed', { variant: 'success' });
       setOpenCustomerMatch(false);
@@ -192,7 +193,7 @@ export default function InteracTransactionsPage() {
   const handleIgnore = async (transaction: InteracTransaction) => {
     try {
       await axios.put(`/api/interac-transactions/${transaction.id}`, {
-        status: 'ignored',
+        action: 'ignore',
       });
       enqueueSnackbar('Transaction ignored', { variant: 'success' });
       fetchTransactions();
