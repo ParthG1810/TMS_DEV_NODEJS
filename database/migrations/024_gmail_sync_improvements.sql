@@ -2,13 +2,31 @@
 -- Add fields to track last synced email details for robust sync
 -- Created: 2025-12-13
 
--- Add last_sync_email_date to store the date of the last synced email
-ALTER TABLE gmail_oauth_settings
-ADD COLUMN IF NOT EXISTS last_sync_email_date DATETIME DEFAULT NULL AFTER last_sync_email_id;
+-- Check and add last_sync_email_date column
+SET @dbname = DATABASE();
+SET @tablename = 'gmail_oauth_settings';
+SET @columnname = 'last_sync_email_date';
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  'SELECT 1',
+  'ALTER TABLE gmail_oauth_settings ADD COLUMN last_sync_email_date DATETIME DEFAULT NULL AFTER last_sync_email_id'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
 
--- Add last_sync_email_subject to store the subject of the last synced email (for debugging)
-ALTER TABLE gmail_oauth_settings
-ADD COLUMN IF NOT EXISTS last_sync_email_subject VARCHAR(500) DEFAULT NULL AFTER last_sync_email_date;
+-- Check and add last_sync_email_subject column
+SET @columnname = 'last_sync_email_subject';
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  'SELECT 1',
+  'ALTER TABLE gmail_oauth_settings ADD COLUMN last_sync_email_subject VARCHAR(500) DEFAULT NULL AFTER last_sync_email_date'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
 
 -- ROLLBACK:
 -- ALTER TABLE gmail_oauth_settings DROP COLUMN last_sync_email_date;
