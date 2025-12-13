@@ -1,0 +1,403 @@
+/**
+ * Interac Email Scanner Service
+ * Parses Interac e-Transfer notification emails and stores transaction data
+ */
+
+import { gmail_v1 } from 'googleapis';
+import { query } from '../config/database';
+import {
+  GmailOAuthSettings,
+  InteracTransaction,
+} from '../types';
+import {
+  fetchInteracEmails,
+  parseEmailBody,
+  getEmailDate,
+  updateLastSync,
+  getActiveGmailSettings,
+  getAllGmailSettings,
+} from './gmailService';
+import { autoMatchCustomer, learnCustomerAlias } from './customerMatcher';
+
+/**
+ * Interac email parsing patterns
+ */
+const PATTERNS = {
+  // Date: Dec 10, 2025 or December 10, 2025
+  date: /Date:\s*([A-Za-z]+\s+\d{1,2},?\s*\d{4})/i,
+  // Reference Number: C1AwqurRmFYX
+  reference: /Reference\s*Number:\s*([A-Za-z0-9]+)/i,
+  // Sent From: KRINESHKUMAR PATEL
+  sender: /Sent\s*From:\s*([^\n\r]+)/i,
+  // Amount: $35.00 (CAD) or Amount: $35.00
+  amount: /Amount:\s*\$?([\d,]+\.?\d*)\s*\(?(\w{3})?\)?/i,
+  // Deposited: or Money has been deposited (indicates successful transfer)
+  deposited: /deposited|completed|received/i,
+};
+
+/**
+ * Parsed Interac email data
+ */
+export interface ParsedInteracEmail {
+  date: Date;
+  senderName: string;
+  referenceNumber: string;
+  amount: number;
+  currency: string;
+  rawBody: string;
+}
+
+/**
+ * Parse an Interac e-Transfer email
+ */
+export function parseInteracEmail(emailBody: string, emailDate: Date): ParsedInteracEmail | null {
+  // Check if this is a deposit notification (not a pending/request email)
+  if (!PATTERNS.deposited.test(emailBody)) {
+    return null; // Skip non-deposit emails
+  }
+
+  const dateMatch = emailBody.match(PATTERNS.date);
+  const referenceMatch = emailBody.match(PATTERNS.reference);
+  const senderMatch = emailBody.match(PATTERNS.sender);
+  const amountMatch = emailBody.match(PATTERNS.amount);
+
+  // All required fields must be present
+  if (!referenceMatch || !senderMatch || !amountMatch) {
+    console.warn('Could not parse required fields from Interac email');
+    return null;
+  }
+
+  // Parse date (use email date as fallback)
+  let transactionDate = emailDate;
+  if (dateMatch) {
+    const parsedDate = new Date(dateMatch[1]);
+    if (!isNaN(parsedDate.getTime())) {
+      transactionDate = parsedDate;
+    }
+  }
+
+  // Parse amount (remove commas and convert to number)
+  const amountStr = amountMatch[1].replace(/,/g, '');
+  const amount = parseFloat(amountStr);
+
+  if (isNaN(amount) || amount <= 0) {
+    console.warn('Invalid amount in Interac email:', amountMatch[1]);
+    return null;
+  }
+
+  return {
+    date: transactionDate,
+    senderName: senderMatch[1].trim(),
+    referenceNumber: referenceMatch[1].trim(),
+    amount,
+    currency: amountMatch[2]?.toUpperCase() || 'CAD',
+    rawBody: emailBody,
+  };
+}
+
+/**
+ * Check if transaction already exists
+ */
+async function transactionExists(gmailMessageId: string): Promise<boolean> {
+  const result = await query<any[]>(`
+    SELECT id FROM interac_transactions WHERE gmail_message_id = ?
+  `, [gmailMessageId]);
+
+  return result.length > 0;
+}
+
+/**
+ * Save parsed Interac transaction to database
+ */
+async function saveInteracTransaction(
+  gmailSettingsId: number,
+  gmailMessageId: string,
+  parsed: ParsedInteracEmail,
+  matchedCustomerId: number | null,
+  matchConfidence: number
+): Promise<number> {
+  const result = await query<any>(`
+    INSERT INTO interac_transactions (
+      gmail_settings_id, gmail_message_id, email_date,
+      sender_name, reference_number, amount, currency,
+      raw_email_body, auto_matched_customer_id, match_confidence, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+  `, [
+    gmailSettingsId,
+    gmailMessageId,
+    parsed.date,
+    parsed.senderName,
+    parsed.referenceNumber,
+    parsed.amount,
+    parsed.currency,
+    parsed.rawBody,
+    matchedCustomerId,
+    matchConfidence,
+  ]);
+
+  return result.insertId;
+}
+
+/**
+ * Create notification for new Interac transaction
+ */
+async function createInteracNotification(
+  transactionId: number,
+  parsed: ParsedInteracEmail,
+  customerId: number | null
+): Promise<void> {
+  await query(`
+    INSERT INTO payment_notifications (
+      customer_id, notification_type, title, message,
+      priority, action_url, related_interac_id, auto_delete_on_action
+    ) VALUES (?, 'interac_received', ?, ?, 'medium', ?, ?, 1)
+  `, [
+    customerId,
+    `New Interac Payment: $${parsed.amount.toFixed(2)}`,
+    `Payment received from ${parsed.senderName}. Reference: ${parsed.referenceNumber}`,
+    `/dashboard/payments/interac/${transactionId}/allocate`,
+    transactionId,
+  ]);
+}
+
+/**
+ * Process a single Gmail message
+ */
+async function processGmailMessage(
+  settings: GmailOAuthSettings,
+  message: gmail_v1.Schema$Message
+): Promise<{ success: boolean; transactionId?: number }> {
+  const gmailMessageId = message.id!;
+
+  // Skip if already processed
+  if (await transactionExists(gmailMessageId)) {
+    return { success: true };
+  }
+
+  // Parse email body
+  const emailBody = parseEmailBody(message);
+  const emailDate = getEmailDate(message);
+
+  // Parse Interac transaction data
+  const parsed = parseInteracEmail(emailBody, emailDate);
+
+  if (!parsed) {
+    // Not a valid Interac deposit email, skip silently
+    return { success: true };
+  }
+
+  // Try to auto-match customer
+  const match = await autoMatchCustomer(parsed.senderName);
+
+  // Save transaction
+  const transactionId = await saveInteracTransaction(
+    settings.id,
+    gmailMessageId,
+    parsed,
+    match?.customerId || null,
+    match?.confidence || 0
+  );
+
+  // Create notification
+  await createInteracNotification(transactionId, parsed, match?.customerId || null);
+
+  return { success: true, transactionId };
+}
+
+/**
+ * Scan emails for a single Gmail account
+ */
+export async function scanGmailAccount(settings: GmailOAuthSettings): Promise<{
+  processed: number;
+  newTransactions: number;
+  errors: number;
+}> {
+  const results = {
+    processed: 0,
+    newTransactions: 0,
+    errors: 0,
+  };
+
+  try {
+    const isInitialSync = !settings.last_sync_email_id;
+    const messages = await fetchInteracEmails(settings, isInitialSync);
+
+    console.log(`[InteracScanner] Found ${messages.length} messages to process`);
+
+    let latestMessageId: string | null = null;
+
+    for (const message of messages) {
+      try {
+        results.processed++;
+
+        const result = await processGmailMessage(settings, message);
+
+        if (result.transactionId) {
+          results.newTransactions++;
+        }
+
+        // Track latest message ID for next sync
+        if (!latestMessageId && message.id) {
+          latestMessageId = message.id;
+        }
+      } catch (error) {
+        console.error(`[InteracScanner] Error processing message ${message.id}:`, error);
+        results.errors++;
+      }
+    }
+
+    // Update last sync info
+    if (latestMessageId) {
+      await updateLastSync(settings.id, latestMessageId);
+    } else if (messages.length === 0 && !settings.last_sync_email_id) {
+      // No messages found but this is initial sync - mark as synced
+      await updateLastSync(settings.id, 'initial-sync-complete');
+    }
+  } catch (error) {
+    console.error('[InteracScanner] Error scanning Gmail account:', error);
+    results.errors++;
+  }
+
+  return results;
+}
+
+/**
+ * Scan all active Gmail accounts
+ */
+export async function scanAllGmailAccounts(): Promise<{
+  totalProcessed: number;
+  totalNewTransactions: number;
+  totalErrors: number;
+  accountResults: { email: string; results: ReturnType<typeof scanGmailAccount> extends Promise<infer T> ? T : never }[];
+}> {
+  const allSettings = await getAllGmailSettings();
+  const activeSettings = allSettings.filter(s => s.sync_enabled && s.is_active);
+
+  const aggregatedResults = {
+    totalProcessed: 0,
+    totalNewTransactions: 0,
+    totalErrors: 0,
+    accountResults: [] as any[],
+  };
+
+  for (const settings of activeSettings) {
+    console.log(`[InteracScanner] Scanning account: ${settings.email_address}`);
+
+    // Need to fetch full settings with tokens
+    const fullSettings = await query<GmailOAuthSettings[]>(`
+      SELECT * FROM gmail_oauth_settings WHERE id = ?
+    `, [settings.id]);
+
+    if (fullSettings.length === 0 || !fullSettings[0].access_token) {
+      console.warn(`[InteracScanner] Skipping ${settings.email_address} - no valid tokens`);
+      continue;
+    }
+
+    const results = await scanGmailAccount(fullSettings[0]);
+
+    aggregatedResults.totalProcessed += results.processed;
+    aggregatedResults.totalNewTransactions += results.newTransactions;
+    aggregatedResults.totalErrors += results.errors;
+    aggregatedResults.accountResults.push({
+      email: settings.email_address,
+      results,
+    });
+  }
+
+  return aggregatedResults;
+}
+
+/**
+ * Get pending Interac transactions
+ */
+export async function getPendingInteracTransactions(): Promise<InteracTransaction[]> {
+  return await query<InteracTransaction[]>(`
+    SELECT it.*,
+           c1.name as auto_matched_customer_name,
+           c2.name as confirmed_customer_name
+    FROM interac_transactions it
+    LEFT JOIN customers c1 ON it.auto_matched_customer_id = c1.id
+    LEFT JOIN customers c2 ON it.confirmed_customer_id = c2.id
+    WHERE it.status = 'pending' AND it.deleted_flag = 0
+    ORDER BY it.email_date DESC
+  `);
+}
+
+/**
+ * Get Interac transaction by ID
+ */
+export async function getInteracTransactionById(id: number): Promise<InteracTransaction | null> {
+  const results = await query<InteracTransaction[]>(`
+    SELECT it.*,
+           c1.name as auto_matched_customer_name,
+           c2.name as confirmed_customer_name
+    FROM interac_transactions it
+    LEFT JOIN customers c1 ON it.auto_matched_customer_id = c1.id
+    LEFT JOIN customers c2 ON it.confirmed_customer_id = c2.id
+    WHERE it.id = ? AND it.deleted_flag = 0
+  `, [id]);
+
+  return results.length > 0 ? results[0] : null;
+}
+
+/**
+ * Confirm customer match for a transaction
+ */
+export async function confirmCustomerMatch(
+  transactionId: number,
+  customerId: number
+): Promise<boolean> {
+  // Get the transaction to learn the alias
+  const transaction = await getInteracTransactionById(transactionId);
+
+  if (!transaction) {
+    return false;
+  }
+
+  // Update the transaction with confirmed customer
+  await query(`
+    UPDATE interac_transactions SET
+      confirmed_customer_id = ?,
+      updated_at = NOW()
+    WHERE id = ?
+  `, [customerId, transactionId]);
+
+  // Learn this alias for future matching
+  await learnCustomerAlias(customerId, transaction.sender_name);
+
+  return true;
+}
+
+/**
+ * Ignore/delete an Interac transaction
+ */
+export async function ignoreInteracTransaction(
+  transactionId: number,
+  deletedBy: number
+): Promise<boolean> {
+  const result = await query<any>(`
+    UPDATE interac_transactions SET
+      status = 'ignored',
+      deleted_flag = 1,
+      deleted_at = NOW(),
+      deleted_by = ?,
+      updated_at = NOW()
+    WHERE id = ?
+  `, [deletedBy, transactionId]);
+
+  return result.affectedRows > 0;
+}
+
+/**
+ * Mark transaction as allocated
+ */
+export async function markTransactionAllocated(transactionId: number): Promise<boolean> {
+  const result = await query<any>(`
+    UPDATE interac_transactions SET
+      status = 'allocated',
+      updated_at = NOW()
+    WHERE id = ?
+  `, [transactionId]);
+
+  return result.affectedRows > 0;
+}

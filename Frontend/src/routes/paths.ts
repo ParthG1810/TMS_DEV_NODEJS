@@ -126,6 +126,16 @@ export const PATH_DASHBOARD = {
     billingDetails: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/billing-details?id=${id}`),
     settings: path(ROOTS_DASHBOARD, '/tiffin/settings'),
   },
+  payments: {
+    root: path(ROOTS_DASHBOARD, '/payments'),
+    interac: path(ROOTS_DASHBOARD, '/payments/interac'),
+    history: path(ROOTS_DASHBOARD, '/payments/history'),
+    cashPayment: path(ROOTS_DASHBOARD, '/payments/cash'),
+    credit: path(ROOTS_DASHBOARD, '/payments/credit'),
+    refunds: path(ROOTS_DASHBOARD, '/payments/refunds'),
+    settings: path(ROOTS_DASHBOARD, '/payments/settings'),
+    allocate: (id: string) => path(ROOTS_DASHBOARD, `/payments/allocate?id=${id}`),
+  },
 };
 
 export const PATH_DOCS = {

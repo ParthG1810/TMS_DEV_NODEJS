@@ -154,6 +154,22 @@ const navConfig = [
           { title: 'Settings', path: PATH_DASHBOARD.tiffin.settings },
         ],
       },
+
+      // PAYMENTS
+      {
+        title: 'Payments',
+        path: PATH_DASHBOARD.payments.root,
+        icon: ICONS.banking,
+        children: [
+          { title: 'Dashboard', path: PATH_DASHBOARD.payments.root },
+          { title: 'Interac Transactions', path: PATH_DASHBOARD.payments.interac },
+          { title: 'Record Cash Payment', path: PATH_DASHBOARD.payments.cashPayment },
+          { title: 'Payment History', path: PATH_DASHBOARD.payments.history },
+          { title: 'Customer Credit', path: PATH_DASHBOARD.payments.credit },
+          { title: 'Refunds', path: PATH_DASHBOARD.payments.refunds },
+          { title: 'Gmail Settings', path: PATH_DASHBOARD.payments.settings },
+        ],
+      },
     ],
   },
 
