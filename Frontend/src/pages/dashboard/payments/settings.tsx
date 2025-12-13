@@ -105,9 +105,9 @@ export default function PaymentSettingsPage() {
       setSyncing(true);
       const response = await axios.post('/api/gmail/sync');
       if (response.data.success) {
-        const { emails_processed, transactions_created } = response.data.data;
+        const { totalProcessed, totalNewTransactions } = response.data.data;
         enqueueSnackbar(
-          `Sync complete: ${emails_processed} emails processed, ${transactions_created} transactions created`,
+          `Sync complete: ${totalProcessed} emails processed, ${totalNewTransactions} transactions created`,
           { variant: 'success' }
         );
         fetchGmailStatus();
