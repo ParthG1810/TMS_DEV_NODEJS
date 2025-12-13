@@ -679,3 +679,354 @@ export interface BillingCalculation {
   extra_amount: number;
   total_amount: number;
 }
+
+// ----------------------------------------------------------------------
+// PAYMENT WORKFLOW TYPES (Gmail Integration, Interac, Payments)
+// ----------------------------------------------------------------------
+
+/**
+ * Gmail OAuth Settings entity
+ */
+export interface GmailOAuthSettings {
+  id: number;
+  account_name: string;
+  email_address: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_expires_at?: Date;
+  last_sync_email_id?: string;
+  last_sync_at?: Date;
+  sync_enabled: boolean;
+  is_active: boolean;
+  created_at: Date;
+  created_by?: number;
+  updated_at: Date;
+}
+
+/**
+ * Interac Transaction status enum
+ */
+export type InteracTransactionStatus = 'pending' | 'allocated' | 'ignored' | 'deleted';
+
+/**
+ * Interac Transaction entity
+ */
+export interface InteracTransaction {
+  id: number;
+  gmail_settings_id: number;
+  gmail_message_id: string;
+  email_date: Date;
+  sender_name: string;
+  reference_number: string;
+  amount: number;
+  currency: string;
+  raw_email_body?: string;
+  auto_matched_customer_id?: number;
+  confirmed_customer_id?: number;
+  match_confidence: number;
+  status: InteracTransactionStatus;
+  created_at: Date;
+  updated_at: Date;
+  deleted_flag: boolean;
+  deleted_at?: Date;
+  deleted_by?: number;
+}
+
+/**
+ * Interac Transaction with customer details
+ */
+export interface InteracTransactionWithDetails extends InteracTransaction {
+  auto_matched_customer_name?: string;
+  confirmed_customer_name?: string;
+}
+
+/**
+ * Customer Name Alias entity
+ */
+export interface CustomerNameAlias {
+  id: number;
+  customer_id: number;
+  alias_name: string;
+  source: 'manual' | 'learned';
+  created_at: Date;
+  created_by?: number;
+}
+
+/**
+ * Payment type enum
+ */
+export type PaymentType = 'online' | 'cash';
+
+/**
+ * Allocation status enum
+ */
+export type AllocationStatus = 'unallocated' | 'partial' | 'fully_allocated' | 'has_excess';
+
+/**
+ * Payment Record entity
+ */
+export interface PaymentRecord {
+  id: number;
+  payment_type: PaymentType;
+  payment_source?: string;
+  interac_transaction_id?: number;
+  customer_id?: number;
+  payer_name?: string;
+  payment_date: string;
+  amount: number;
+  reference_number?: string;
+  notes?: string;
+  total_allocated: number;
+  excess_amount: number;
+  allocation_status: AllocationStatus;
+  created_at: Date;
+  created_by?: number;
+  updated_at: Date;
+  updated_by?: number;
+  deleted_flag: boolean;
+  deleted_at?: Date;
+  deleted_by?: number;
+  delete_reason?: string;
+}
+
+/**
+ * Payment Record with details
+ */
+export interface PaymentRecordWithDetails extends PaymentRecord {
+  customer_name?: string;
+  allocations?: PaymentAllocation[];
+}
+
+/**
+ * Payment Allocation entity
+ */
+export interface PaymentAllocation {
+  id: number;
+  payment_record_id: number;
+  billing_id: number;
+  customer_id: number;
+  allocation_order: number;
+  allocated_amount: number;
+  invoice_balance_before: number;
+  invoice_balance_after: number;
+  resulting_status: 'partial_paid' | 'paid';
+  created_at: Date;
+  created_by?: number;
+  deleted_flag: boolean;
+  deleted_at?: Date;
+  deleted_by?: number;
+}
+
+/**
+ * Payment Allocation with details
+ */
+export interface PaymentAllocationWithDetails extends PaymentAllocation {
+  billing_month?: string;
+  customer_name?: string;
+}
+
+/**
+ * Customer Credit status enum
+ */
+export type CustomerCreditStatus = 'available' | 'used' | 'refunded' | 'expired';
+
+/**
+ * Customer Credit entity
+ */
+export interface CustomerCredit {
+  id: number;
+  customer_id: number;
+  payment_record_id: number;
+  original_amount: number;
+  current_balance: number;
+  status: CustomerCreditStatus;
+  created_at: Date;
+  updated_at: Date;
+  notes?: string;
+}
+
+/**
+ * Customer Credit with details
+ */
+export interface CustomerCreditWithDetails extends CustomerCredit {
+  customer_name?: string;
+  payment_date?: string;
+}
+
+/**
+ * Customer Credit Usage entity
+ */
+export interface CustomerCreditUsage {
+  id: number;
+  credit_id: number;
+  billing_id: number;
+  amount_used: number;
+  used_at: Date;
+  used_by?: number;
+}
+
+/**
+ * Refund source type enum
+ */
+export type RefundSourceType = 'credit' | 'payment';
+
+/**
+ * Refund method enum
+ */
+export type RefundMethod = 'interac' | 'cash' | 'cheque' | 'other';
+
+/**
+ * Refund status enum
+ */
+export type RefundStatus = 'pending' | 'completed' | 'cancelled';
+
+/**
+ * Refund Record entity
+ */
+export interface RefundRecord {
+  id: number;
+  source_type: RefundSourceType;
+  credit_id?: number;
+  payment_record_id?: number;
+  customer_id: number;
+  refund_amount: number;
+  refund_method: RefundMethod;
+  refund_date: string;
+  reference_number?: string;
+  reason: string;
+  status: RefundStatus;
+  requested_by: number;
+  approved_by?: number;
+  approved_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+  deleted_flag: boolean;
+  deleted_at?: Date;
+  deleted_by?: number;
+}
+
+/**
+ * Refund Record with details
+ */
+export interface RefundRecordWithDetails extends RefundRecord {
+  customer_name?: string;
+  requested_by_name?: string;
+  approved_by_name?: string;
+}
+
+/**
+ * User Role enum
+ */
+export type UserRole = 'admin' | 'manager' | 'staff' | 'viewer';
+
+/**
+ * User Role entity
+ */
+export interface UserRoleRecord {
+  id: number;
+  user_id: string;
+  email?: string;
+  role: UserRole;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Delete Authorization Log entity
+ */
+export interface DeleteAuthorizationLog {
+  id: number;
+  user_id: string;
+  user_email?: string;
+  table_name: string;
+  record_id: number;
+  action_type: 'soft_delete' | 'restore';
+  password_verified: boolean;
+  reason?: string;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: Date;
+}
+
+/**
+ * Extended Payment Notification types
+ */
+export type ExtendedNotificationType =
+  | 'month_end_calculation'
+  | 'payment_received'
+  | 'payment_overdue'
+  | 'billing_pending_approval'
+  | 'interac_received'
+  | 'payment_allocated'
+  | 'invoice_paid'
+  | 'excess_payment'
+  | 'refund_request'
+  | 'refund_completed'
+  | 'refund_cancelled';
+
+// ----------------------------------------------------------------------
+// PAYMENT WORKFLOW REQUEST TYPES
+// ----------------------------------------------------------------------
+
+/**
+ * Request body for creating a cash payment
+ */
+export interface CreateCashPaymentRequest {
+  customer_id: number;
+  payer_name?: string;
+  amount: number;
+  payment_date: string;
+  notes?: string;
+}
+
+/**
+ * Request body for allocating a payment to invoices
+ */
+export interface AllocatePaymentRequest {
+  payment_record_id: number;
+  billing_ids: number[];  // Array of billing IDs in order
+}
+
+/**
+ * Request body for confirming a customer match
+ */
+export interface ConfirmCustomerMatchRequest {
+  interac_transaction_id: number;
+  customer_id: number;
+}
+
+/**
+ * Request body for creating a refund
+ */
+export interface CreateRefundRequest {
+  source_type: RefundSourceType;
+  credit_id?: number;
+  payment_record_id?: number;
+  customer_id: number;
+  refund_amount: number;
+  refund_method: RefundMethod;
+  refund_date: string;
+  reference_number?: string;
+  reason: string;
+}
+
+/**
+ * Request body for soft delete with password confirmation
+ */
+export interface SoftDeleteRequest {
+  password: string;
+  reason?: string;
+}
+
+/**
+ * Monthly billing with balance (for allocation UI)
+ */
+export interface MonthlyBillingWithBalance extends MonthlyBilling {
+  amount_paid: number;
+  credit_applied: number;
+  balance_due: number;
+  last_payment_date?: string;
+  payment_count: number;
+  customer_name?: string;
+  customer_phone?: string;
+}
