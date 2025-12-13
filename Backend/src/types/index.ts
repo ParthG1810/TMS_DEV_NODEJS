@@ -248,3 +248,785 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
+
+// ----------------------------------------------------------------------
+// TIFFIN MANAGEMENT SYSTEM TYPES
+// ----------------------------------------------------------------------
+
+/**
+ * Meal plan frequency enum
+ */
+export type MealFrequency = 'Daily' | 'Weekly' | 'Monthly';
+
+/**
+ * Days enum
+ */
+export type MealDays = 'Mon-Fri' | 'Mon-Sat' | 'Single';
+
+/**
+ * Day names for order selection
+ */
+export type DayName = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+
+/**
+ * Meal Plan entity from database
+ */
+export interface MealPlan {
+  id: number;
+  meal_name: string;
+  description?: string;
+  frequency: MealFrequency;
+  days: MealDays;
+  price: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Customer entity from database
+ */
+export interface Customer {
+  id: number;
+  name: string;
+  phone?: string;
+  address: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Customer Order entity from database
+ */
+export interface CustomerOrder {
+  id: number;
+  customer_id: number;
+  meal_plan_id: number;
+  quantity: number;
+  selected_days: DayName[];
+  price: number;
+  payment_id?: number;
+  payment_status: PaymentStatus;
+  start_date: string; // YYYY-MM-DD format
+  end_date: string; // YYYY-MM-DD format
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Request body for creating a meal plan
+ */
+export interface CreateMealPlanRequest {
+  meal_name: string;
+  description?: string;
+  frequency: MealFrequency;
+  days?: MealDays;
+  price: number;
+}
+
+/**
+ * Request body for updating a meal plan
+ */
+export interface UpdateMealPlanRequest {
+  meal_name?: string;
+  description?: string;
+  frequency?: MealFrequency;
+  days?: MealDays;
+  price?: number;
+}
+
+/**
+ * Request body for creating a customer
+ */
+export interface CreateCustomerRequest {
+  name: string;
+  phone?: string;
+  address: string;
+}
+
+/**
+ * Request body for updating a customer
+ */
+export interface UpdateCustomerRequest {
+  name?: string;
+  phone?: string;
+  address?: string;
+}
+
+/**
+ * Request body for creating a customer order
+ */
+export interface CreateCustomerOrderRequest {
+  customer_id: number;
+  meal_plan_id: number;
+  quantity: number;
+  selected_days: DayName[];
+  price: number;
+  start_date: string; // YYYY-MM-DD format
+  end_date: string; // YYYY-MM-DD format
+}
+
+/**
+ * Request body for updating a customer order
+ */
+export interface UpdateCustomerOrderRequest {
+  customer_id?: number;
+  meal_plan_id?: number;
+  quantity?: number;
+  selected_days?: DayName[];
+  price?: number;
+  start_date?: string;
+  end_date?: string;
+}
+
+/**
+ * Customer order with customer and meal plan details (joined data)
+ */
+export interface CustomerOrderWithDetails extends CustomerOrder {
+  customer_name: string;
+  customer_phone?: string;
+  customer_address: string;
+  meal_plan_name: string;
+  meal_plan_description?: string;
+  meal_plan_frequency: MealFrequency;
+  meal_plan_days: MealDays;
+}
+
+/**
+ * Daily tiffin count item
+ */
+export interface DailyTiffinCount {
+  customer_name: string;
+  quantity: number;
+  meal_plan_name: string;
+}
+
+/**
+ * Daily tiffin summary
+ */
+export interface DailyTiffinSummary {
+  date: string; // YYYY-MM-DD format
+  orders: DailyTiffinCount[];
+  total_count: number;
+}
+
+// ----------------------------------------------------------------------
+// PAYMENT MANAGEMENT TYPES
+// ----------------------------------------------------------------------
+
+/**
+ * Payment status enum
+ * Flow: calculating → pending → finalized → paid/partial_paid
+ */
+export type PaymentStatus = 'calculating' | 'pending' | 'finalized' | 'paid' | 'partial_paid';
+
+/**
+ * Calendar entry status enum
+ * T = Tiffin Delivered
+ * A = Absent/Cancelled
+ * E = Extra Tiffin
+ */
+export type CalendarEntryStatus = 'T' | 'A' | 'E';
+
+/**
+ * Billing status enum
+ * Flow: calculating → pending → finalized → paid/partial_paid
+ */
+export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid' | 'partial_paid';
+
+/**
+ * Notification type enum
+ */
+export type NotificationType = 'month_end_calculation' | 'payment_received' | 'payment_overdue';
+
+/**
+ * Notification priority enum
+ */
+export type NotificationPriority = 'low' | 'medium' | 'high';
+
+/**
+ * Tiffin Calendar Entry entity from database
+ */
+export interface TiffinCalendarEntry {
+  id: number;
+  customer_id: number;
+  order_id: number;
+  delivery_date: string; // YYYY-MM-DD format
+  status: CalendarEntryStatus;
+  quantity: number;
+  price: number;
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Monthly Billing entity from database
+ */
+export interface MonthlyBilling {
+  id: number;
+  customer_id: number;
+  billing_month: string; // YYYY-MM format
+  total_delivered: number;
+  total_absent: number;
+  total_extra: number;
+  total_days: number;
+  base_amount: number;
+  extra_amount: number;
+  total_amount: number;
+  status: BillingStatus;
+  calculated_at?: Date;
+  finalized_at?: Date;
+  finalized_by?: string;
+  paid_at?: Date;
+  payment_method?: string;
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Payment Notification entity from database
+ */
+export interface PaymentNotification {
+  id: number;
+  notification_type: NotificationType;
+  billing_id?: number;
+  customer_id?: number;
+  billing_month?: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  is_dismissed: boolean;
+  priority: NotificationPriority;
+  action_url?: string;
+  created_at: Date;
+  read_at?: Date;
+  dismissed_at?: Date;
+}
+
+/**
+ * Payment History entity from database
+ */
+export interface PaymentHistory {
+  id: number;
+  billing_id: number;
+  customer_id: number;
+  amount: number;
+  payment_method: string;
+  payment_date: string; // YYYY-MM-DD format
+  transaction_id?: string;
+  reference_number?: string;
+  notes?: string;
+  created_by?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Pricing Rule entity from database
+ */
+export interface PricingRule {
+  id: number;
+  meal_plan_id?: number;
+  rule_name: string;
+  delivered_price: number;
+  extra_price: number;
+  is_default: boolean;
+  effective_from: string; // YYYY-MM-DD format
+  effective_to?: string; // YYYY-MM-DD format
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Request body for creating a calendar entry
+ */
+export interface CreateCalendarEntryRequest {
+  customer_id: number;
+  order_id: number;
+  delivery_date: string; // YYYY-MM-DD format
+  status: CalendarEntryStatus;
+  quantity?: number;
+  price?: number;
+  notes?: string;
+}
+
+/**
+ * Request body for updating a calendar entry
+ */
+export interface UpdateCalendarEntryRequest {
+  status?: CalendarEntryStatus;
+  quantity?: number;
+  price?: number;
+  notes?: string;
+}
+
+/**
+ * Request body for batch updating calendar entries
+ */
+export interface BatchUpdateCalendarEntriesRequest {
+  entries: {
+    delivery_date: string;
+    status: CalendarEntryStatus;
+    quantity?: number;
+    price?: number;
+  }[];
+  customer_id: number;
+  order_id: number;
+}
+
+/**
+ * Request body for finalizing monthly billing
+ */
+export interface FinalizeBillingRequest {
+  billing_id: number;
+  finalized_by: string;
+  notes?: string;
+}
+
+/**
+ * Request body for recording payment
+ */
+export interface RecordPaymentRequest {
+  billing_id: number;
+  amount: number;
+  payment_method: string;
+  payment_date: string; // YYYY-MM-DD format
+  transaction_id?: string;
+  reference_number?: string;
+  notes?: string;
+  created_by?: string;
+}
+
+/**
+ * Calendar entry with customer and order details (joined data)
+ */
+export interface CalendarEntryWithDetails extends TiffinCalendarEntry {
+  customer_name: string;
+  customer_phone?: string;
+  meal_plan_id: number;
+  meal_plan_name: string;
+}
+
+/**
+ * Monthly billing with customer details (joined data)
+ */
+export interface MonthlyBillingWithDetails extends MonthlyBilling {
+  customer_name: string;
+  customer_phone?: string;
+  customer_address: string;
+}
+
+/**
+ * Payment notification with customer details (joined data)
+ */
+export interface PaymentNotificationWithDetails extends PaymentNotification {
+  customer_name?: string;
+}
+
+/**
+ * Monthly calendar data for a customer
+ */
+export interface MonthlyCalendarData {
+  customer_id: number;
+  customer_name: string;
+  billing_month: string; // YYYY-MM format
+  entries: TiffinCalendarEntry[];
+  billing?: MonthlyBilling;
+  active_orders: CustomerOrder[];
+}
+
+/**
+ * Calendar grid data for the frontend
+ */
+export interface CalendarGridData {
+  year: number;
+  month: number;
+  customers: {
+    customer_id: number;
+    customer_name: string;
+    customer_phone?: string;
+    entries: {
+      [date: string]: CalendarEntryStatus | null; // date in format 'YYYY-MM-DD'
+    };
+    total_delivered: number;
+    total_absent: number;
+    total_extra: number;
+    total_amount: number;
+    billing_status: BillingStatus;
+    billing_id?: number;
+    orders?: Array<{
+      id: number;
+      start_date: string;
+      end_date: string;
+    }>;
+  }[];
+}
+
+/**
+ * Billing calculation result
+ */
+export interface BillingCalculation {
+  customer_id: number;
+  billing_month: string;
+  total_delivered: number;
+  total_absent: number;
+  total_extra: number;
+  total_days: number;
+  delivered_price: number;
+  extra_price: number;
+  base_amount: number;
+  extra_amount: number;
+  total_amount: number;
+}
+
+// ----------------------------------------------------------------------
+// PAYMENT WORKFLOW TYPES (Gmail Integration, Interac, Payments)
+// ----------------------------------------------------------------------
+
+/**
+ * Gmail OAuth Settings entity
+ */
+export interface GmailOAuthSettings {
+  id: number;
+  account_name: string;
+  email_address: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_expires_at?: Date;
+  last_sync_email_id?: string;
+  last_sync_at?: Date;
+  sync_enabled: boolean;
+  is_active: boolean;
+  created_at: Date;
+  created_by?: number;
+  updated_at: Date;
+}
+
+/**
+ * Interac Transaction status enum
+ */
+export type InteracTransactionStatus = 'pending' | 'allocated' | 'ignored' | 'deleted';
+
+/**
+ * Interac Transaction entity
+ */
+export interface InteracTransaction {
+  id: number;
+  gmail_settings_id: number;
+  gmail_message_id: string;
+  email_date: Date;
+  sender_name: string;
+  reference_number: string;
+  amount: number;
+  currency: string;
+  raw_email_body?: string;
+  auto_matched_customer_id?: number;
+  confirmed_customer_id?: number;
+  match_confidence: number;
+  status: InteracTransactionStatus;
+  created_at: Date;
+  updated_at: Date;
+  deleted_flag: boolean;
+  deleted_at?: Date;
+  deleted_by?: number;
+}
+
+/**
+ * Interac Transaction with customer details
+ */
+export interface InteracTransactionWithDetails extends InteracTransaction {
+  auto_matched_customer_name?: string;
+  confirmed_customer_name?: string;
+}
+
+/**
+ * Customer Name Alias entity
+ */
+export interface CustomerNameAlias {
+  id: number;
+  customer_id: number;
+  alias_name: string;
+  source: 'manual' | 'learned';
+  created_at: Date;
+  created_by?: number;
+}
+
+/**
+ * Payment type enum
+ */
+export type PaymentType = 'online' | 'cash';
+
+/**
+ * Allocation status enum
+ */
+export type AllocationStatus = 'unallocated' | 'partial' | 'fully_allocated' | 'has_excess';
+
+/**
+ * Payment Record entity
+ */
+export interface PaymentRecord {
+  id: number;
+  payment_type: PaymentType;
+  payment_source?: string;
+  interac_transaction_id?: number;
+  customer_id?: number;
+  payer_name?: string;
+  payment_date: string;
+  amount: number;
+  reference_number?: string;
+  notes?: string;
+  total_allocated: number;
+  excess_amount: number;
+  allocation_status: AllocationStatus;
+  created_at: Date;
+  created_by?: number;
+  updated_at: Date;
+  updated_by?: number;
+  deleted_flag: boolean;
+  deleted_at?: Date;
+  deleted_by?: number;
+  delete_reason?: string;
+}
+
+/**
+ * Payment Record with details
+ */
+export interface PaymentRecordWithDetails extends PaymentRecord {
+  customer_name?: string;
+  allocations?: PaymentAllocation[];
+}
+
+/**
+ * Payment Allocation entity
+ */
+export interface PaymentAllocation {
+  id: number;
+  payment_record_id: number;
+  billing_id: number;
+  customer_id: number;
+  allocation_order: number;
+  allocated_amount: number;
+  invoice_balance_before: number;
+  invoice_balance_after: number;
+  resulting_status: 'partial_paid' | 'paid';
+  created_at: Date;
+  created_by?: number;
+  deleted_flag: boolean;
+  deleted_at?: Date;
+  deleted_by?: number;
+}
+
+/**
+ * Payment Allocation with details
+ */
+export interface PaymentAllocationWithDetails extends PaymentAllocation {
+  billing_month?: string;
+  customer_name?: string;
+}
+
+/**
+ * Customer Credit status enum
+ */
+export type CustomerCreditStatus = 'available' | 'used' | 'refunded' | 'expired';
+
+/**
+ * Customer Credit entity
+ */
+export interface CustomerCredit {
+  id: number;
+  customer_id: number;
+  payment_record_id: number;
+  original_amount: number;
+  current_balance: number;
+  status: CustomerCreditStatus;
+  created_at: Date;
+  updated_at: Date;
+  notes?: string;
+}
+
+/**
+ * Customer Credit with details
+ */
+export interface CustomerCreditWithDetails extends CustomerCredit {
+  customer_name?: string;
+  payment_date?: string;
+}
+
+/**
+ * Customer Credit Usage entity
+ */
+export interface CustomerCreditUsage {
+  id: number;
+  credit_id: number;
+  billing_id: number;
+  amount_used: number;
+  used_at: Date;
+  used_by?: number;
+}
+
+/**
+ * Refund source type enum
+ */
+export type RefundSourceType = 'credit' | 'payment';
+
+/**
+ * Refund method enum
+ */
+export type RefundMethod = 'interac' | 'cash' | 'cheque' | 'other';
+
+/**
+ * Refund status enum
+ */
+export type RefundStatus = 'pending' | 'completed' | 'cancelled';
+
+/**
+ * Refund Record entity
+ */
+export interface RefundRecord {
+  id: number;
+  source_type: RefundSourceType;
+  credit_id?: number;
+  payment_record_id?: number;
+  customer_id: number;
+  refund_amount: number;
+  refund_method: RefundMethod;
+  refund_date: string;
+  reference_number?: string;
+  reason: string;
+  status: RefundStatus;
+  requested_by: number;
+  approved_by?: number;
+  approved_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+  deleted_flag: boolean;
+  deleted_at?: Date;
+  deleted_by?: number;
+}
+
+/**
+ * Refund Record with details
+ */
+export interface RefundRecordWithDetails extends RefundRecord {
+  customer_name?: string;
+  requested_by_name?: string;
+  approved_by_name?: string;
+}
+
+/**
+ * User Role enum
+ */
+export type UserRole = 'admin' | 'manager' | 'staff' | 'viewer';
+
+/**
+ * User Role entity
+ */
+export interface UserRoleRecord {
+  id: number;
+  user_id: string;
+  email?: string;
+  role: UserRole;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Delete Authorization Log entity
+ */
+export interface DeleteAuthorizationLog {
+  id: number;
+  user_id: string;
+  user_email?: string;
+  table_name: string;
+  record_id: number;
+  action_type: 'soft_delete' | 'restore';
+  password_verified: boolean;
+  reason?: string;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: Date;
+}
+
+/**
+ * Extended Payment Notification types
+ */
+export type ExtendedNotificationType =
+  | 'month_end_calculation'
+  | 'payment_received'
+  | 'payment_overdue'
+  | 'billing_pending_approval'
+  | 'interac_received'
+  | 'payment_allocated'
+  | 'invoice_paid'
+  | 'excess_payment'
+  | 'refund_request'
+  | 'refund_completed'
+  | 'refund_cancelled';
+
+// ----------------------------------------------------------------------
+// PAYMENT WORKFLOW REQUEST TYPES
+// ----------------------------------------------------------------------
+
+/**
+ * Request body for creating a cash payment
+ */
+export interface CreateCashPaymentRequest {
+  customer_id: number;
+  payer_name?: string;
+  amount: number;
+  payment_date: string;
+  notes?: string;
+}
+
+/**
+ * Request body for allocating a payment to invoices
+ */
+export interface AllocatePaymentRequest {
+  payment_record_id: number;
+  billing_ids: number[];  // Array of billing IDs in order
+}
+
+/**
+ * Request body for confirming a customer match
+ */
+export interface ConfirmCustomerMatchRequest {
+  interac_transaction_id: number;
+  customer_id: number;
+}
+
+/**
+ * Request body for creating a refund
+ */
+export interface CreateRefundRequest {
+  source_type: RefundSourceType;
+  credit_id?: number;
+  payment_record_id?: number;
+  customer_id: number;
+  refund_amount: number;
+  refund_method: RefundMethod;
+  refund_date: string;
+  reference_number?: string;
+  reason: string;
+}
+
+/**
+ * Request body for soft delete with password confirmation
+ */
+export interface SoftDeleteRequest {
+  password: string;
+  reason?: string;
+}
+
+/**
+ * Monthly billing with balance (for allocation UI)
+ */
+export interface MonthlyBillingWithBalance extends MonthlyBilling {
+  amount_paid: number;
+  credit_applied: number;
+  balance_due: number;
+  last_payment_date?: string;
+  payment_count: number;
+  customer_name?: string;
+  customer_phone?: string;
+}

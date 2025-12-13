@@ -9,6 +9,10 @@ import calendarReducer from './slices/calendar';
 import kanbanReducer from './slices/kanban';
 import tmsIngredientReducer from './slices/tmsIngredient';
 import tmsRecipeReducer from './slices/tmsRecipe';
+import mealPlanReducer from './slices/mealPlan';
+import customerReducer from './slices/customer';
+import customerOrderReducer from './slices/customerOrder';
+import paymentReducer from './slices/payment';
 
 // ----------------------------------------------------------------------
 
@@ -49,6 +53,10 @@ const rootReducer = combineReducers({
   product: persistReducer(productPersistConfig, productReducer),
   tmsIngredient: tmsIngredientReducer,
   tmsRecipe: tmsRecipeReducer,
+  mealPlan: mealPlanReducer,
+  customer: customerReducer,
+  customerOrder: customerOrderReducer,
+  payment: paymentReducer,
 });
 
 export default rootReducer;

@@ -1,5 +1,6 @@
 import { noCase } from 'change-case';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 // @mui
 import {
   Box,
@@ -19,22 +20,83 @@ import {
 } from '@mui/material';
 // utils
 import { fToNow } from '../../../utils/formatTime';
-// _mock_
-import { _notifications } from '../../../_mock/arrays';
+import axios from '../../../utils/axios';
 // components
 import Iconify from '../../../components/iconify';
 import Scrollbar from '../../../components/scrollbar';
 import MenuPopover from '../../../components/menu-popover';
 import { IconButtonAnimate } from '../../../components/animate';
+import { useSnackbar } from '../../../components/snackbar';
 
 // ----------------------------------------------------------------------
 
+interface PaymentNotification {
+  id: number;
+  notification_type: string;
+  billing_id: number;
+  customer_id: number;
+  billing_month: string;
+  title: string;
+  message: string;
+  priority: string;
+  is_read: boolean;
+  is_dismissed: boolean;
+  action_url: string;
+  created_at: string;
+}
+
 export default function NotificationsPopover() {
-  const [notifications, setNotifications] = useState(_notifications);
-
+  const router = useRouter();
+  const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
   const [openPopover, setOpenPopover] = useState<HTMLElement | null>(null);
+  const { enqueueSnackbar } = useSnackbar();
+  const [hasShownStartupAlert, setHasShownStartupAlert] = useState(false);
 
-  const totalUnRead = notifications.filter((item) => item.isUnRead === true).length;
+  // Fetch notifications from API
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  // Show startup alert for pending approvals
+  useEffect(() => {
+    if (!hasShownStartupAlert && notifications.length > 0) {
+      const pendingApprovals = notifications.filter(
+        (n) => !n.is_read && n.notification_type === 'billing_pending_approval'
+      );
+
+      if (pendingApprovals.length > 0) {
+        enqueueSnackbar(
+          `You have ${pendingApprovals.length} billing${
+            pendingApprovals.length > 1 ? 's' : ''
+          } pending approval. Check notifications!`,
+          {
+            variant: 'warning',
+            autoHideDuration: 8000,
+            anchorOrigin: {
+              vertical: 'top',
+              horizontal: 'right',
+            },
+          }
+        );
+        setHasShownStartupAlert(true);
+      }
+    }
+  }, [notifications, hasShownStartupAlert, enqueueSnackbar]);
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await axios.get('/api/payment-notifications', {
+        params: { unread_only: false },
+      });
+      if (response.data.success) {
+        setNotifications(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  const totalUnRead = notifications.filter((item) => !item.is_read).length;
 
   const handleOpenPopover = (event: React.MouseEvent<HTMLElement>) => {
     setOpenPopover(event.currentTarget);
@@ -44,13 +106,40 @@ export default function NotificationsPopover() {
     setOpenPopover(null);
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(
-      notifications.map((notification) => ({
-        ...notification,
-        isUnRead: false,
-      }))
-    );
+  const handleMarkAllAsRead = async () => {
+    try {
+      // Mark all unread notifications as read
+      const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+
+      for (const id of unreadIds) {
+        await axios.put(`/api/payment-notifications/${id}`, { is_read: true });
+      }
+
+      // Refresh notifications
+      await fetchNotifications();
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  };
+
+  const handleNotificationClick = async (notification: PaymentNotification) => {
+    try {
+      // Mark as read
+      if (!notification.is_read) {
+        await axios.put(`/api/payment-notifications/${notification.id}`, { is_read: true });
+        await fetchNotifications();
+      }
+
+      // Close popover
+      handleClosePopover();
+
+      // Navigate to action URL using Next.js router
+      if (notification.action_url) {
+        router.push(notification.action_url);
+      }
+    } catch (error) {
+      console.error('Error handling notification click:', error);
+    }
   };
 
   return (
@@ -87,31 +176,57 @@ export default function NotificationsPopover() {
         <Divider sx={{ borderStyle: 'dashed' }} />
 
         <Scrollbar sx={{ height: { xs: 340, sm: 'auto' } }}>
-          <List
-            disablePadding
-            subheader={
-              <ListSubheader disableSticky sx={{ py: 1, px: 2.5, typography: 'overline' }}>
-                New
-              </ListSubheader>
-            }
-          >
-            {notifications.slice(0, 2).map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} />
-            ))}
-          </List>
+          {notifications.length === 0 ? (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                No notifications
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <List
+                disablePadding
+                subheader={
+                  <ListSubheader disableSticky sx={{ py: 1, px: 2.5, typography: 'overline' }}>
+                    Unread
+                  </ListSubheader>
+                }
+              >
+                {notifications
+                  .filter((n) => !n.is_read)
+                  .slice(0, 5)
+                  .map((notification) => (
+                    <NotificationItem
+                      key={notification.id}
+                      notification={notification}
+                      onClick={() => handleNotificationClick(notification)}
+                    />
+                  ))}
+              </List>
 
-          <List
-            disablePadding
-            subheader={
-              <ListSubheader disableSticky sx={{ py: 1, px: 2.5, typography: 'overline' }}>
-                Before that
-              </ListSubheader>
-            }
-          >
-            {notifications.slice(2, 5).map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} />
-            ))}
-          </List>
+              {notifications.filter((n) => n.is_read).length > 0 && (
+                <List
+                  disablePadding
+                  subheader={
+                    <ListSubheader disableSticky sx={{ py: 1, px: 2.5, typography: 'overline' }}>
+                      Read
+                    </ListSubheader>
+                  }
+                >
+                  {notifications
+                    .filter((n) => n.is_read)
+                    .slice(0, 5)
+                    .map((notification) => (
+                      <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        onClick={() => handleNotificationClick(notification)}
+                      />
+                    ))}
+                </List>
+              )}
+            </>
+          )}
         </Scrollbar>
 
         <Divider sx={{ borderStyle: 'dashed' }} />
@@ -128,26 +243,23 @@ export default function NotificationsPopover() {
 
 // ----------------------------------------------------------------------
 
-type NotificationItemProps = {
-  id: string;
-  title: string;
-  description: string;
-  avatar: string | null;
-  type: string;
-  createdAt: Date;
-  isUnRead: boolean;
-};
-
-function NotificationItem({ notification }: { notification: NotificationItemProps }) {
+function NotificationItem({
+  notification,
+  onClick,
+}: {
+  notification: PaymentNotification;
+  onClick: () => void;
+}) {
   const { avatar, title } = renderContent(notification);
 
   return (
     <ListItemButton
+      onClick={onClick}
       sx={{
         py: 1.5,
         px: 2.5,
         mt: '1px',
-        ...(notification.isUnRead && {
+        ...(!notification.is_read && {
           bgcolor: 'action.selected',
         }),
       }}
@@ -162,7 +274,7 @@ function NotificationItem({ notification }: { notification: NotificationItemProp
         secondary={
           <Stack direction="row" sx={{ mt: 0.5, typography: 'caption', color: 'text.disabled' }}>
             <Iconify icon="eva:clock-fill" width={16} sx={{ mr: 0.5 }} />
-            <Typography variant="caption">{fToNow(notification.createdAt)}</Typography>
+            <Typography variant="caption">{fToNow(new Date(notification.created_at))}</Typography>
           </Stack>
         }
       />
@@ -172,42 +284,36 @@ function NotificationItem({ notification }: { notification: NotificationItemProp
 
 // ----------------------------------------------------------------------
 
-function renderContent(notification: NotificationItemProps) {
+function renderContent(notification: PaymentNotification) {
   const title = (
     <Typography variant="subtitle2">
       {notification.title}
       <Typography component="span" variant="body2" sx={{ color: 'text.secondary' }}>
-        &nbsp; {noCase(notification.description)}
+        &nbsp; {notification.message}
       </Typography>
     </Typography>
   );
 
-  if (notification.type === 'order_placed') {
+  if (notification.notification_type === 'billing_pending_approval') {
     return {
-      avatar: <img alt={notification.title} src="/assets/icons/notification/ic_package.svg" />,
+      avatar: <Iconify icon="eva:credit-card-fill" width={24} />,
       title,
     };
   }
-  if (notification.type === 'order_shipped') {
+  if (notification.notification_type === 'month_end_calculation') {
     return {
-      avatar: <img alt={notification.title} src="/assets/icons/notification/ic_shipping.svg" />,
+      avatar: <Iconify icon="eva:calendar-fill" width={24} />,
       title,
     };
   }
-  if (notification.type === 'mail') {
+  if (notification.notification_type === 'payment_received') {
     return {
-      avatar: <img alt={notification.title} src="/assets/icons/notification/ic_mail.svg" />,
-      title,
-    };
-  }
-  if (notification.type === 'chat_message') {
-    return {
-      avatar: <img alt={notification.title} src="/assets/icons/notification/ic_chat.svg" />,
+      avatar: <Iconify icon="eva:checkmark-circle-fill" width={24} />,
       title,
     };
   }
   return {
-    avatar: notification.avatar ? <img alt={notification.title} src={notification.avatar} /> : null,
+    avatar: <Iconify icon="eva:bell-fill" width={24} />,
     title,
   };
 }
