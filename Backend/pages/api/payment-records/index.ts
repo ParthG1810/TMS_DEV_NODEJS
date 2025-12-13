@@ -147,6 +147,10 @@ async function handlePost(
       });
     }
 
+    // Format payment_date to YYYY-MM-DD for MySQL DATE column
+    const paymentDate = new Date(body.payment_date);
+    const formattedDate = paymentDate.toISOString().split('T')[0];
+
     // Create payment record
     const result = await query<any>(`
       INSERT INTO payment_records (
@@ -156,7 +160,7 @@ async function handlePost(
     `, [
       body.customer_id,
       body.payer_name || customers[0].name,
-      body.payment_date,
+      formattedDate,
       body.amount,
       body.notes || null,
       body.created_by || null,
