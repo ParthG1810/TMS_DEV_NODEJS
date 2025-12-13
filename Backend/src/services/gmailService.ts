@@ -195,22 +195,41 @@ export async function disconnectGmail(id: number): Promise<boolean> {
 }
 
 /**
- * Update last sync info
+ * Update last sync info with detailed tracking
  */
-export async function updateLastSync(id: number, lastEmailId: string): Promise<void> {
+export async function updateLastSync(
+  id: number,
+  lastEmailId: string,
+  lastEmailDate: Date,
+  lastEmailSubject: string
+): Promise<void> {
   await query(`
     UPDATE gmail_oauth_settings SET
       last_sync_email_id = ?,
+      last_sync_email_date = ?,
+      last_sync_email_subject = ?,
       last_sync_at = NOW(),
       updated_at = NOW()
     WHERE id = ?
-  `, [lastEmailId, id]);
+  `, [lastEmailId, lastEmailDate, lastEmailSubject.substring(0, 500), id]);
+
+  console.log(`[Gmail] Updated sync marker: ID=${lastEmailId}, Date=${lastEmailDate.toISOString()}, Subject="${lastEmailSubject.substring(0, 50)}..."`);
+}
+
+/**
+ * Get email subject from headers
+ */
+export function getEmailSubject(message: gmail_v1.Schema$Message): string {
+  const headers = message.payload?.headers || [];
+  const subjectHeader = headers.find(h => h.name?.toLowerCase() === 'subject');
+  return subjectHeader?.value || '(No Subject)';
 }
 
 /**
  * Fetch Interac emails from Gmail
+ * Uses date-based filtering for robust incremental sync
  * @param settings Gmail OAuth settings
- * @param initialSync If true, fetch last 30 days; otherwise incremental
+ * @param initialSync If true, fetch last 60 days; otherwise use last sync date
  */
 export async function fetchInteracEmails(
   settings: GmailOAuthSettings,
@@ -218,13 +237,23 @@ export async function fetchInteracEmails(
 ): Promise<gmail_v1.Schema$Message[]> {
   const gmail = await getGmailClient(settings);
 
-  // Build search query - use broad search to catch all Interac emails
-  // Try multiple approaches: domain-based and subject-based
-  let searchQuery = 'from:payments.interac.ca OR subject:INTERAC OR subject:"e-Transfer"';
+  // Base search query - search for Interac e-Transfer emails
+  const baseQuery = 'from:payments.interac.ca';
 
-  if (initialSync || !settings.last_sync_email_id) {
+  let searchQuery: string;
+
+  if (initialSync || !settings.last_sync_email_date) {
     // Initial sync: last 60 days
-    searchQuery = `(${searchQuery}) newer_than:60d`;
+    searchQuery = `${baseQuery} newer_than:60d`;
+    console.log(`[Gmail] Performing INITIAL sync (last 60 days)`);
+  } else {
+    // Incremental sync: use the last sync date
+    // Format date as YYYY/MM/DD for Gmail search
+    const lastDate = new Date(settings.last_sync_email_date);
+    const dateStr = `${lastDate.getFullYear()}/${String(lastDate.getMonth() + 1).padStart(2, '0')}/${String(lastDate.getDate()).padStart(2, '0')}`;
+    searchQuery = `${baseQuery} after:${dateStr}`;
+    console.log(`[Gmail] Performing INCREMENTAL sync (after ${dateStr})`);
+    console.log(`[Gmail] Last synced email: "${settings.last_sync_email_subject?.substring(0, 50)}..." at ${lastDate.toISOString()}`);
   }
 
   console.log(`[Gmail] Search query: ${searchQuery}`);
@@ -232,6 +261,10 @@ export async function fetchInteracEmails(
 
   const messages: gmail_v1.Schema$Message[] = [];
   let pageToken: string | undefined;
+  const processedIds = new Set<string>();
+
+  // Also track last_sync_email_id to skip already processed emails
+  const lastSyncId = settings.last_sync_email_id;
 
   do {
     const response = await gmail.users.messages.list({
@@ -245,13 +278,19 @@ export async function fetchInteracEmails(
     console.log(`[Gmail] API returned ${response.data.messages?.length || 0} messages, estimate: ${response.data.resultSizeEstimate}`);
 
     if (response.data.messages) {
-      // For incremental sync, stop when we reach the last synced message
       for (const msg of response.data.messages) {
-        if (!initialSync && settings.last_sync_email_id && msg.id === settings.last_sync_email_id) {
-          // We've reached the last synced message, stop here
-          console.log(`[Gmail] Reached last synced message: ${msg.id}`);
-          return messages;
+        // Skip if we've already processed this message ID (from previous sync)
+        if (lastSyncId && msg.id === lastSyncId) {
+          console.log(`[Gmail] Reached last synced message ID: ${msg.id}, stopping`);
+          // Still return what we have collected so far (newer messages)
+          break;
         }
+
+        // Skip duplicates within this batch
+        if (processedIds.has(msg.id!)) {
+          continue;
+        }
+        processedIds.add(msg.id!);
 
         // Fetch full message
         try {
