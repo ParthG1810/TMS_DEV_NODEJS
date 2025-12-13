@@ -57,11 +57,19 @@ export default async function handler(
     const customerId = parseInt(customer_id as string);
     const amount = parseFloat(payment_amount as string);
     const maxInvoices = parseInt(max_invoices as string);
+    const fetchLimit = Math.max(1, Math.min(maxInvoices + 5, 20)); // Limit to max 20
 
     if (isNaN(amount) || amount <= 0) {
       return res.status(400).json({
         success: false,
         error: 'payment_amount must be a positive number',
+      });
+    }
+
+    if (isNaN(customerId) || customerId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'customer_id must be a positive number',
       });
     }
 
@@ -87,8 +95,8 @@ export default async function handler(
           ELSE 2
         END,
         mb.billing_month ASC
-      LIMIT ?
-    `, [customerId, maxInvoices + 5]); // Fetch a few extra in case we need more
+      LIMIT ${fetchLimit}
+    `, [customerId]); // Fetch a few extra in case we need more
 
     // Calculate allocations
     let remainingAmount = amount;
