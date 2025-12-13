@@ -13,6 +13,7 @@ import {
   fetchInteracEmails,
   parseEmailBody,
   getEmailDate,
+  getEmailSubject,
   updateLastSync,
   getActiveGmailSettings,
   getAllGmailSettings,
@@ -270,30 +271,49 @@ export async function scanGmailAccount(settings: GmailOAuthSettings): Promise<{
   };
 
   try {
-    // Treat as initial sync if no last_sync_email_id or if it's the marker value
-    const isInitialSync = !settings.last_sync_email_id || settings.last_sync_email_id === 'initial-sync-complete';
+    // Treat as initial sync if no last_sync_email_date
+    const isInitialSync = !settings.last_sync_email_date;
     console.log(`[InteracScanner] Starting scan for ${settings.email_address}`);
-    console.log(`[InteracScanner] Initial sync: ${isInitialSync}, last_sync_email_id: ${settings.last_sync_email_id || 'none'}`);
+    console.log(`[InteracScanner] Initial sync: ${isInitialSync}`);
+    if (settings.last_sync_email_date) {
+      console.log(`[InteracScanner] Last sync: ${new Date(settings.last_sync_email_date).toISOString()}`);
+      console.log(`[InteracScanner] Last email: "${settings.last_sync_email_subject?.substring(0, 50)}..."`);
+    }
 
     const messages = await fetchInteracEmails(settings, isInitialSync);
 
     console.log(`[InteracScanner] Found ${messages.length} messages to process`);
 
-    let latestMessageId: string | null = null;
+    // Track the newest message info for sync marker
+    let newestMessage: {
+      id: string;
+      date: Date;
+      subject: string;
+    } | null = null;
 
+    // Process messages (they come in reverse chronological order from Gmail)
     for (const message of messages) {
       try {
         results.processed++;
+
+        const messageDate = getEmailDate(message);
+        const messageSubject = getEmailSubject(message);
+
+        // Track the newest message (first one we see, since Gmail returns newest first)
+        if (!newestMessage && message.id) {
+          newestMessage = {
+            id: message.id,
+            date: messageDate,
+            subject: messageSubject,
+          };
+          console.log(`[InteracScanner] Newest message: "${messageSubject.substring(0, 50)}..." from ${messageDate.toISOString()}`);
+        }
 
         const result = await processGmailMessage(settings, message);
 
         if (result.transactionId) {
           results.newTransactions++;
-        }
-
-        // Track latest message ID for next sync
-        if (!latestMessageId && message.id) {
-          latestMessageId = message.id;
+          console.log(`[InteracScanner] Created transaction #${result.transactionId} from email: "${messageSubject.substring(0, 50)}..."`);
         }
       } catch (error) {
         console.error(`[InteracScanner] Error processing message ${message.id}:`, error);
@@ -301,12 +321,18 @@ export async function scanGmailAccount(settings: GmailOAuthSettings): Promise<{
       }
     }
 
-    // Update last sync info
-    if (latestMessageId) {
-      await updateLastSync(settings.id, latestMessageId);
-    } else if (messages.length === 0 && !settings.last_sync_email_id) {
-      // No messages found but this is initial sync - mark as synced
-      await updateLastSync(settings.id, 'initial-sync-complete');
+    // Update last sync info with the newest message's details
+    if (newestMessage) {
+      await updateLastSync(
+        settings.id,
+        newestMessage.id,
+        newestMessage.date,
+        newestMessage.subject
+      );
+      console.log(`[InteracScanner] Sync complete. Marker set to: ${newestMessage.date.toISOString()}`);
+    } else if (messages.length === 0) {
+      // No messages found - update last_sync_at to show we tried
+      console.log(`[InteracScanner] No new messages found`);
     }
   } catch (error) {
     console.error('[InteracScanner] Error scanning Gmail account:', error);

@@ -27,7 +27,11 @@ export default async function handler(
       // Reset specific account
       await query(`
         UPDATE gmail_oauth_settings
-        SET last_sync_email_id = NULL, last_sync_at = NULL, updated_at = NOW()
+        SET last_sync_email_id = NULL,
+            last_sync_email_date = NULL,
+            last_sync_email_subject = NULL,
+            last_sync_at = NULL,
+            updated_at = NOW()
         WHERE id = ?
       `, [id]);
 
@@ -36,7 +40,11 @@ export default async function handler(
       // Reset all accounts
       await query(`
         UPDATE gmail_oauth_settings
-        SET last_sync_email_id = NULL, last_sync_at = NULL, updated_at = NOW()
+        SET last_sync_email_id = NULL,
+            last_sync_email_date = NULL,
+            last_sync_email_subject = NULL,
+            last_sync_at = NULL,
+            updated_at = NOW()
       `);
 
       console.log('[Gmail] Reset sync state for all accounts');
