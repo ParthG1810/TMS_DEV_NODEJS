@@ -51,8 +51,18 @@ export interface ParsedInteracEmail {
  * Parse an Interac e-Transfer email
  */
 export function parseInteracEmail(emailBody: string, emailDate: Date): ParsedInteracEmail | null {
+  // Check if this looks like an Interac email
+  const hasInteracKeyword = /interac|e-?transfer/i.test(emailBody);
+  console.log(`[InteracParser] Has Interac keyword: ${hasInteracKeyword}`);
+
+  if (!hasInteracKeyword) {
+    console.log('[InteracParser] Not an Interac email - skipping');
+    return null;
+  }
+
   // Check if this is a deposit notification (not a pending/request email)
   if (!PATTERNS.deposited.test(emailBody)) {
+    console.log('[InteracParser] Not a deposit notification - skipping');
     return null; // Skip non-deposit emails
   }
 
@@ -61,9 +71,17 @@ export function parseInteracEmail(emailBody: string, emailDate: Date): ParsedInt
   const senderMatch = emailBody.match(PATTERNS.sender);
   const amountMatch = emailBody.match(PATTERNS.amount);
 
+  console.log('[InteracParser] Parsed fields:', {
+    hasDate: !!dateMatch,
+    hasReference: !!referenceMatch,
+    hasSender: !!senderMatch,
+    hasAmount: !!amountMatch,
+  });
+
   // All required fields must be present
   if (!referenceMatch || !senderMatch || !amountMatch) {
-    console.warn('Could not parse required fields from Interac email');
+    console.warn('[InteracParser] Could not parse required fields');
+    console.warn('[InteracParser] Email body preview:', emailBody.substring(0, 500));
     return null;
   }
 
@@ -219,7 +237,11 @@ export async function scanGmailAccount(settings: GmailOAuthSettings): Promise<{
   };
 
   try {
-    const isInitialSync = !settings.last_sync_email_id;
+    // Treat as initial sync if no last_sync_email_id or if it's the marker value
+    const isInitialSync = !settings.last_sync_email_id || settings.last_sync_email_id === 'initial-sync-complete';
+    console.log(`[InteracScanner] Starting scan for ${settings.email_address}`);
+    console.log(`[InteracScanner] Initial sync: ${isInitialSync}, last_sync_email_id: ${settings.last_sync_email_id || 'none'}`);
+
     const messages = await fetchInteracEmails(settings, isInitialSync);
 
     console.log(`[InteracScanner] Found ${messages.length} messages to process`);
