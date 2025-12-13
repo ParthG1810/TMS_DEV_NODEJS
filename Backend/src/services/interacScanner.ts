@@ -20,19 +20,30 @@ import {
 import { autoMatchCustomer, learnCustomerAlias } from './customerMatcher';
 
 /**
- * Interac email parsing patterns
+ * Interac email parsing patterns - supports multiple email formats
  */
 const PATTERNS = {
-  // Date: Dec 10, 2025 or December 10, 2025
+  // Date patterns
   date: /Date:\s*([A-Za-z]+\s+\d{1,2},?\s*\d{4})/i,
-  // Reference Number: C1AwqurRmFYX
-  reference: /Reference\s*Number:\s*([A-Za-z0-9]+)/i,
-  // Sent From: KRINESHKUMAR PATEL
-  sender: /Sent\s*From:\s*([^\n\r]+)/i,
-  // Amount: $35.00 (CAD) or Amount: $35.00
-  amount: /Amount:\s*\$?([\d,]+\.?\d*)\s*\(?(\w{3})?\)?/i,
-  // Deposited: or Money has been deposited (indicates successful transfer)
-  deposited: /deposited|completed|received/i,
+
+  // Reference Number (if present in email)
+  reference: /Reference\s*(?:Number)?:?\s*([A-Za-z0-9]+)/i,
+
+  // Sender name patterns:
+  // Pattern 1: "from NAME and it has been" (common in subject/body)
+  // Pattern 2: "Sent From: NAME"
+  // Pattern 3: "received $XX.XX from NAME"
+  senderPatterns: [
+    /from\s+([A-Z][A-Za-z\s]+?)\s+and\s+it\s+has\s+been/i,
+    /Sent\s*From:\s*([^\n\r<]+)/i,
+    /received\s+\$[\d,.]+\s+from\s+([A-Z][A-Za-z\s]+?)(?:\s+and|\.|$)/i,
+  ],
+
+  // Amount: Just look for $XX.XX format anywhere
+  amount: /\$\s*([\d,]+\.\d{2})/,
+
+  // Deposited confirmation keywords
+  deposited: /deposited|Funds Deposited|completed|received|successfully/i,
 };
 
 /**
@@ -51,21 +62,59 @@ export interface ParsedInteracEmail {
  * Parse an Interac e-Transfer email
  */
 export function parseInteracEmail(emailBody: string, emailDate: Date): ParsedInteracEmail | null {
-  // Check if this is a deposit notification (not a pending/request email)
-  if (!PATTERNS.deposited.test(emailBody)) {
-    return null; // Skip non-deposit emails
-  }
+  // Check if this looks like an Interac email
+  const hasInteracKeyword = /interac|e-?transfer/i.test(emailBody);
+  console.log(`[InteracParser] Has Interac keyword: ${hasInteracKeyword}`);
 
-  const dateMatch = emailBody.match(PATTERNS.date);
-  const referenceMatch = emailBody.match(PATTERNS.reference);
-  const senderMatch = emailBody.match(PATTERNS.sender);
-  const amountMatch = emailBody.match(PATTERNS.amount);
-
-  // All required fields must be present
-  if (!referenceMatch || !senderMatch || !amountMatch) {
-    console.warn('Could not parse required fields from Interac email');
+  if (!hasInteracKeyword) {
+    console.log('[InteracParser] Not an Interac email - skipping');
     return null;
   }
+
+  // Check if this is a deposit notification (not a pending/request email)
+  if (!PATTERNS.deposited.test(emailBody)) {
+    console.log('[InteracParser] Not a deposit notification - skipping');
+    return null;
+  }
+
+  // Try to find amount
+  const amountMatch = emailBody.match(PATTERNS.amount);
+  if (!amountMatch) {
+    console.warn('[InteracParser] Could not find amount in email');
+    return null;
+  }
+
+  // Try multiple sender patterns
+  let senderName: string | null = null;
+  for (const pattern of PATTERNS.senderPatterns) {
+    const match = emailBody.match(pattern);
+    if (match) {
+      senderName = match[1].trim();
+      console.log(`[InteracParser] Found sender using pattern: ${pattern}`);
+      break;
+    }
+  }
+
+  if (!senderName) {
+    console.warn('[InteracParser] Could not find sender name');
+    console.warn('[InteracParser] Email preview:', emailBody.substring(0, 500));
+    return null;
+  }
+
+  // Try to find reference number (optional - generate one if not found)
+  const referenceMatch = emailBody.match(PATTERNS.reference);
+  const referenceNumber = referenceMatch
+    ? referenceMatch[1].trim()
+    : `AUTO-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+  const dateMatch = emailBody.match(PATTERNS.date);
+
+  console.log('[InteracParser] Parsed fields:', {
+    sender: senderName,
+    amount: amountMatch[1],
+    reference: referenceNumber,
+    hasDate: !!dateMatch,
+  });
 
   // Parse date (use email date as fallback)
   let transactionDate = emailDate;
@@ -85,12 +134,14 @@ export function parseInteracEmail(emailBody: string, emailDate: Date): ParsedInt
     return null;
   }
 
+  console.log('[InteracParser] Successfully parsed:', { sender: senderName, amount, reference: referenceNumber });
+
   return {
     date: transactionDate,
-    senderName: senderMatch[1].trim(),
-    referenceNumber: referenceMatch[1].trim(),
+    senderName: senderName,
+    referenceNumber: referenceNumber,
     amount,
-    currency: amountMatch[2]?.toUpperCase() || 'CAD',
+    currency: 'CAD',
     rawBody: emailBody,
   };
 }
@@ -219,7 +270,11 @@ export async function scanGmailAccount(settings: GmailOAuthSettings): Promise<{
   };
 
   try {
-    const isInitialSync = !settings.last_sync_email_id;
+    // Treat as initial sync if no last_sync_email_id or if it's the marker value
+    const isInitialSync = !settings.last_sync_email_id || settings.last_sync_email_id === 'initial-sync-complete';
+    console.log(`[InteracScanner] Starting scan for ${settings.email_address}`);
+    console.log(`[InteracScanner] Initial sync: ${isInitialSync}, last_sync_email_id: ${settings.last_sync_email_id || 'none'}`);
+
     const messages = await fetchInteracEmails(settings, isInitialSync);
 
     console.log(`[InteracScanner] Found ${messages.length} messages to process`);
