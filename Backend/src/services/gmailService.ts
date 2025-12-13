@@ -218,14 +218,17 @@ export async function fetchInteracEmails(
 ): Promise<gmail_v1.Schema$Message[]> {
   const gmail = await getGmailClient(settings);
 
-  // Build search query
-  let searchQuery = `from:${INTERAC_SENDER}`;
+  // Build search query - use broad search to catch all Interac emails
+  // Try multiple approaches: domain-based and subject-based
+  let searchQuery = 'from:payments.interac.ca OR subject:INTERAC OR subject:"e-Transfer"';
 
   if (initialSync || !settings.last_sync_email_id) {
-    // Initial sync: last 30 days
-    searchQuery += ' newer_than:30d';
+    // Initial sync: last 60 days
+    searchQuery = `(${searchQuery}) newer_than:60d`;
   }
-  // For incremental sync, we'll filter by message ID after fetching
+
+  console.log(`[Gmail] Search query: ${searchQuery}`);
+  console.log(`[Gmail] Account: ${settings.email_address}`);
 
   const messages: gmail_v1.Schema$Message[] = [];
   let pageToken: string | undefined;
@@ -236,30 +239,38 @@ export async function fetchInteracEmails(
       q: searchQuery,
       maxResults: 100,
       pageToken,
+      includeSpamTrash: true,
     });
+
+    console.log(`[Gmail] API returned ${response.data.messages?.length || 0} messages, estimate: ${response.data.resultSizeEstimate}`);
 
     if (response.data.messages) {
       // For incremental sync, stop when we reach the last synced message
       for (const msg of response.data.messages) {
         if (!initialSync && settings.last_sync_email_id && msg.id === settings.last_sync_email_id) {
           // We've reached the last synced message, stop here
+          console.log(`[Gmail] Reached last synced message: ${msg.id}`);
           return messages;
         }
 
         // Fetch full message
-        const fullMessage = await gmail.users.messages.get({
-          userId: 'me',
-          id: msg.id!,
-          format: 'full',
-        });
-
-        messages.push(fullMessage.data);
+        try {
+          const fullMessage = await gmail.users.messages.get({
+            userId: 'me',
+            id: msg.id!,
+            format: 'full',
+          });
+          messages.push(fullMessage.data);
+        } catch (err) {
+          console.error(`[Gmail] Error fetching message ${msg.id}:`, err);
+        }
       }
     }
 
     pageToken = response.data.nextPageToken || undefined;
   } while (pageToken);
 
+  console.log(`[Gmail] Total messages fetched: ${messages.length}`);
   return messages;
 }
 
