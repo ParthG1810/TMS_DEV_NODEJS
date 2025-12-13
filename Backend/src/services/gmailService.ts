@@ -10,12 +10,8 @@ import { GmailOAuthSettings } from '../types';
 // Gmail API scopes (read-only)
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
-// Interac sender email - multiple possible formats
-const INTERAC_SENDERS = [
-  'notify@payments.interac.ca',
-  'interac@payments.interac.ca',
-  'no-reply@payments.interac.ca',
-];
+// Interac sender email
+const INTERAC_SENDER = 'notify@payments.interac.ca';
 
 /**
  * Create OAuth2 client with credentials from environment
@@ -222,75 +218,48 @@ export async function fetchInteracEmails(
 ): Promise<gmail_v1.Schema$Message[]> {
   const gmail = await getGmailClient(settings);
 
-  // Build search query - search for Interac e-Transfer emails
-  // Use multiple search strategies to catch all Interac emails:
-  // 1. from:payments.interac.ca - emails from Interac domain
-  // 2. from:notify@payments.interac.ca - specific sender
-  // 3. subject contains "INTERAC" - any Interac-related email
-  // 4. subject contains "e-Transfer" - e-Transfer notifications
-  let searchQuery = 'from:payments.interac.ca OR subject:INTERAC OR subject:e-Transfer OR subject:"e-Transfer"';
+  // Build search query
+  let searchQuery = `from:${INTERAC_SENDER}`;
 
-  // Add date filter for initial sync
-  if (initialSync || !settings.last_sync_email_id || settings.last_sync_email_id === 'initial-sync-complete') {
-    // Initial sync: last 60 days (increased from 30)
-    searchQuery = `(${searchQuery}) newer_than:60d`;
+  if (initialSync || !settings.last_sync_email_id) {
+    // Initial sync: last 30 days
+    searchQuery += ' newer_than:30d';
   }
-
-  // Log detailed info for debugging
-  console.log(`[Gmail] Fetching emails for: ${settings.email_address}`);
-  console.log(`[Gmail] Initial sync: ${initialSync}`);
-  console.log(`[Gmail] Last sync ID: ${settings.last_sync_email_id || 'none'}`);
-  console.log(`[Gmail] Search query: ${searchQuery}`);
+  // For incremental sync, we'll filter by message ID after fetching
 
   const messages: gmail_v1.Schema$Message[] = [];
   let pageToken: string | undefined;
 
   do {
-    console.log(`[Gmail] Making API request with pageToken: ${pageToken || 'none'}`);
-
     const response = await gmail.users.messages.list({
       userId: 'me',
       q: searchQuery,
       maxResults: 100,
       pageToken,
-      includeSpamTrash: true, // Include spam and trash folders
     });
-
-    console.log(`[Gmail] API Response - resultSizeEstimate: ${response.data.resultSizeEstimate}`);
-    console.log(`[Gmail] Found ${response.data.messages?.length || 0} messages in this page`);
-    console.log(`[Gmail] Next page token: ${response.data.nextPageToken || 'none'}`);
 
     if (response.data.messages) {
       // For incremental sync, stop when we reach the last synced message
       for (const msg of response.data.messages) {
-        // Skip if this is the last synced message (for incremental sync)
-        if (!initialSync &&
-            settings.last_sync_email_id &&
-            settings.last_sync_email_id !== 'initial-sync-complete' &&
-            msg.id === settings.last_sync_email_id) {
-          console.log(`[Gmail] Reached last synced message: ${msg.id}`);
+        if (!initialSync && settings.last_sync_email_id && msg.id === settings.last_sync_email_id) {
+          // We've reached the last synced message, stop here
           return messages;
         }
 
         // Fetch full message
-        try {
-          const fullMessage = await gmail.users.messages.get({
-            userId: 'me',
-            id: msg.id!,
-            format: 'full',
-          });
+        const fullMessage = await gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id!,
+          format: 'full',
+        });
 
-          messages.push(fullMessage.data);
-        } catch (err) {
-          console.error(`[Gmail] Error fetching message ${msg.id}:`, err);
-        }
+        messages.push(fullMessage.data);
       }
     }
 
     pageToken = response.data.nextPageToken || undefined;
   } while (pageToken);
 
-  console.log(`[Gmail] Total messages fetched: ${messages.length}`);
   return messages;
 }
 
