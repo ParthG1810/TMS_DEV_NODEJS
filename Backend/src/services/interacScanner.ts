@@ -199,18 +199,22 @@ async function createInteracNotification(
   parsed: ParsedInteracEmail,
   customerId: number | null
 ): Promise<void> {
-  await query(`
-    INSERT INTO payment_notifications (
-      customer_id, notification_type, title, message,
-      priority, action_url, related_interac_id, auto_delete_on_action
-    ) VALUES (?, 'interac_received', ?, ?, 'medium', ?, ?, 1)
-  `, [
-    customerId,
-    `New Interac Payment: $${parsed.amount.toFixed(2)}`,
-    `Payment received from ${parsed.senderName}. Reference: ${parsed.referenceNumber}`,
-    `/dashboard/payments/interac/${transactionId}/allocate`,
-    transactionId,
-  ]);
+  try {
+    await query(`
+      INSERT INTO payment_notifications (
+        customer_id, notification_type, title, message,
+        priority, action_url
+      ) VALUES (?, 'interac_received', ?, ?, 'medium', ?)
+    `, [
+      customerId,
+      `New Interac Payment: $${parsed.amount.toFixed(2)}`,
+      `Payment received from ${parsed.senderName}. Reference: ${parsed.referenceNumber}`,
+      `/dashboard/payments/allocate?id=${transactionId}`,
+    ]);
+  } catch (error) {
+    // Notification creation is optional - don't fail the transaction
+    console.warn(`[InteracScanner] Could not create notification: ${error}`);
+  }
 }
 
 /**
