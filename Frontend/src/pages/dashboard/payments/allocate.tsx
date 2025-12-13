@@ -223,22 +223,20 @@ export default function PaymentAllocationPage() {
 
       const paymentId = paymentResponse.data.data.id;
 
-      // Allocate to invoices
-      const allocations: AllocationItem[] = [];
-      let order = 1;
+      // Allocate to invoices - API expects billing_ids array in allocation order
+      const billing_ids: number[] = [];
       selectedInvoices.forEach((amount, invoiceId) => {
-        allocations.push({ invoiceId, amount, order });
-        order++;
+        billing_ids.push(invoiceId);
       });
 
       const allocateResponse = await axios.post(`/api/payment-records/${paymentId}/allocate`, {
-        allocations,
+        billing_ids,
       });
 
       if (allocateResponse.data.success) {
-        const { has_excess, excess_amount } = allocateResponse.data.data;
+        const { allocation_status, excess_amount } = allocateResponse.data.data;
 
-        if (has_excess) {
+        if (allocation_status === 'has_excess' && excess_amount > 0) {
           enqueueSnackbar(
             `Payment allocated. ${fCurrency(excess_amount)} added to customer credit.`,
             { variant: 'success' }
