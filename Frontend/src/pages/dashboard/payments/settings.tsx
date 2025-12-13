@@ -48,10 +48,8 @@ export default function PaymentSettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [gmailStatus, setGmailStatus] = useState<GmailStatus>({ connected: false });
   const [openDisconnect, setOpenDisconnect] = useState(false);
-  const [openResetSync, setOpenResetSync] = useState(false);
 
   const fetchGmailStatus = useCallback(async () => {
     try {
@@ -121,25 +119,6 @@ export default function PaymentSettingsPage() {
       enqueueSnackbar(error.message || 'Sync failed', { variant: 'error' });
     } finally {
       setSyncing(false);
-    }
-  };
-
-  const handleResetSync = async () => {
-    try {
-      setResetting(true);
-      const response = await axios.post('/api/gmail/reset-sync');
-      if (response.data.success) {
-        enqueueSnackbar('Sync state reset. Click "Sync Now" to re-scan all emails.', { variant: 'success' });
-        setOpenResetSync(false);
-        fetchGmailStatus();
-      } else {
-        enqueueSnackbar(response.data.error || 'Reset failed', { variant: 'error' });
-      }
-    } catch (error: any) {
-      console.error('Error resetting sync:', error);
-      enqueueSnackbar(error.message || 'Reset failed', { variant: 'error' });
-    } finally {
-      setResetting(false);
     }
   };
 
@@ -245,21 +224,10 @@ export default function PaymentSettingsPage() {
                       variant="contained"
                       startIcon={syncing ? <CircularProgress size={20} /> : <Iconify icon="eva:sync-outline" />}
                       onClick={handleManualSync}
-                      disabled={syncing || resetting}
+                      disabled={syncing}
                     >
                       {syncing ? 'Syncing...' : 'Sync Now'}
                     </Button>
-                    <Tooltip title="Reset the sync marker to re-scan all emails from the last 60 days">
-                      <Button
-                        variant="outlined"
-                        color="warning"
-                        startIcon={resetting ? <CircularProgress size={20} /> : <Iconify icon="eva:refresh-outline" />}
-                        onClick={() => setOpenResetSync(true)}
-                        disabled={syncing || resetting}
-                      >
-                        {resetting ? 'Resetting...' : 'Reset & Re-scan'}
-                      </Button>
-                    </Tooltip>
                     <Button
                       variant="outlined"
                       color="error"
@@ -395,7 +363,7 @@ export default function PaymentSettingsPage() {
               </Typography>
               <Divider sx={{ mb: 3 }} />
               <Alert severity="info">
-                When you first connect your Gmail, the system will import Interac e-Transfer emails from the last 60 days.
+                When you first connect your Gmail, the system will import Interac e-Transfer emails from the last 30 days.
                 Subsequent syncs will only fetch new emails.
               </Alert>
             </Card>
@@ -411,18 +379,6 @@ export default function PaymentSettingsPage() {
         action={
           <Button variant="contained" color="error" onClick={handleDisconnectGmail}>
             Disconnect
-          </Button>
-        }
-      />
-
-      <ConfirmDialog
-        open={openResetSync}
-        onClose={() => setOpenResetSync(false)}
-        title="Reset Email Sync"
-        content="This will reset the sync marker and re-scan all Interac emails from the last 60 days on the next sync. Use this if emails weren't imported correctly. After clicking Reset, use 'Sync Now' to scan."
-        action={
-          <Button variant="contained" color="warning" onClick={handleResetSync} disabled={resetting}>
-            {resetting ? 'Resetting...' : 'Reset Sync'}
           </Button>
         }
       />
