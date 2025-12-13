@@ -66,41 +66,74 @@ export interface ParsedInteracEmail {
 export function parseInteracEmail(emailBody: string, emailDate: Date): ParsedInteracEmail | null {
   // Check if this looks like an Interac email
   const hasInteracKeyword = /interac|e-?transfer/i.test(emailBody);
-  console.log(`[InteracParser] Has Interac keyword: ${hasInteracKeyword}`);
 
   if (!hasInteracKeyword) {
-    console.log('[InteracParser] Not an Interac email - skipping');
     return null;
   }
 
-  // Check if this is a deposit notification (not a pending/request email)
+  // Skip OUTGOING transfers (emails that say "Your transfer to X" or "you sent")
+  // We only want INCOMING money (emails that say "received from X")
+  if (/Your\s+transfer\s+to|you\s+sent\s+to/i.test(emailBody)) {
+    return null; // This is money sent OUT, not received
+  }
+
+  // Check if this is a deposit notification (money received)
   if (!PATTERNS.deposited.test(emailBody)) {
-    console.log('[InteracParser] Not a deposit notification - skipping');
     return null;
   }
 
   // Try to find amount
   const amountMatch = emailBody.match(PATTERNS.amount);
   if (!amountMatch) {
-    console.warn('[InteracParser] Could not find amount in email');
     return null;
   }
 
-  // Try multiple sender patterns
+  // Try multiple sender patterns - order matters!
   let senderName: string | null = null;
-  for (const pattern of PATTERNS.senderPatterns) {
-    const match = emailBody.match(pattern);
+
+  // Pattern 1: "from NAME and it has been" (most reliable)
+  const fromAndPattern = /from\s+([A-Z][A-Za-z\s]+?)\s+and\s+it\s+has\s+been/i;
+  let match = emailBody.match(fromAndPattern);
+  if (match) {
+    senderName = match[1].trim();
+  }
+
+  // Pattern 2: "received $XX.XX from NAME"
+  if (!senderName) {
+    const receivedFromPattern = /received\s+\$[\d,.]+\s+from\s+([A-Z][A-Za-z\s]+?)(?:\s+and|\s+at|\.|$)/i;
+    match = emailBody.match(receivedFromPattern);
     if (match) {
       senderName = match[1].trim();
-      console.log(`[InteracParser] Found sender using pattern: ${pattern}`);
-      break;
+    }
+  }
+
+  // Pattern 3: "Sent From: NAME" (but limit to first line)
+  if (!senderName) {
+    const sentFromPattern = /Sent\s+From:\s*([A-Za-z0-9][A-Za-z0-9\s]{1,50}?)(?:\s+Amount|\s*$)/i;
+    match = emailBody.match(sentFromPattern);
+    if (match) {
+      senderName = match[1].trim();
+    }
+  }
+
+  // Pattern 4: "sent from NAME have been"
+  if (!senderName) {
+    const sentFromAltPattern = /sent\s+from\s+([A-Za-z0-9][A-Za-z0-9\s]{1,50}?)\s+have\s+been/i;
+    match = emailBody.match(sentFromAltPattern);
+    if (match) {
+      senderName = match[1].trim();
     }
   }
 
   if (!senderName) {
     console.warn('[InteracParser] Could not find sender name');
-    console.warn('[InteracParser] Email preview:', emailBody.substring(0, 500));
+    console.warn('[InteracParser] Email preview:', emailBody.substring(0, 300));
     return null;
+  }
+
+  // Truncate sender name to max 100 chars for safety
+  if (senderName.length > 100) {
+    senderName = senderName.substring(0, 100);
   }
 
   // Try to find reference number (optional - generate one if not found)
