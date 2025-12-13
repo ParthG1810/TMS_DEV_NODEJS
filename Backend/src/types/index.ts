@@ -695,6 +695,8 @@ export interface GmailOAuthSettings {
   refresh_token?: string;
   token_expires_at?: Date;
   last_sync_email_id?: string;
+  last_sync_email_date?: Date;
+  last_sync_email_subject?: string;
   last_sync_at?: Date;
   sync_enabled: boolean;
   is_active: boolean;
