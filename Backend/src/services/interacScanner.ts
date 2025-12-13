@@ -12,6 +12,7 @@ import {
 import {
   fetchInteracEmails,
   parseEmailBody,
+  getEmailContent,
   getEmailDate,
   getEmailSubject,
   updateLastSync,
@@ -226,12 +227,12 @@ async function processGmailMessage(
     return { success: true };
   }
 
-  // Parse email body
-  const emailBody = parseEmailBody(message);
+  // Get full email content (subject + body) for parsing
+  const emailContent = getEmailContent(message);
   const emailDate = getEmailDate(message);
 
   // Parse Interac transaction data
-  const parsed = parseInteracEmail(emailBody, emailDate);
+  const parsed = parseInteracEmail(emailContent, emailDate);
 
   if (!parsed) {
     // Not a valid Interac deposit email, skip silently
@@ -292,12 +293,21 @@ export async function scanGmailAccount(settings: GmailOAuthSettings): Promise<{
     } | null = null;
 
     // Process messages (they come in reverse chronological order from Gmail)
+    let debugLoggedFirst = false;
     for (const message of messages) {
       try {
         results.processed++;
 
         const messageDate = getEmailDate(message);
         const messageSubject = getEmailSubject(message);
+        const emailContent = getEmailContent(message);
+
+        // Log first email content for debugging
+        if (!debugLoggedFirst) {
+          console.log(`[InteracScanner] First email content sample (first 300 chars):`);
+          console.log(emailContent.substring(0, 300));
+          debugLoggedFirst = true;
+        }
 
         // Track the newest message (first one we see, since Gmail returns newest first)
         if (!newestMessage && message.id) {

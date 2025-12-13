@@ -315,32 +315,59 @@ export async function fetchInteracEmails(
 
 /**
  * Parse email body from Gmail message
+ * Handles multipart emails and extracts text content
  */
 export function parseEmailBody(message: gmail_v1.Schema$Message): string {
-  let body = '';
+  const bodies: string[] = [];
 
-  const getBody = (payload: gmail_v1.Schema$MessagePart): string => {
+  const extractBodies = (payload: gmail_v1.Schema$MessagePart | undefined): void => {
+    if (!payload) return;
+
+    // If this part has data, decode it
     if (payload.body?.data) {
-      return Buffer.from(payload.body.data, 'base64').toString('utf-8');
+      const decoded = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+      bodies.push(decoded);
     }
 
+    // Recursively check all parts (multipart emails)
     if (payload.parts) {
       for (const part of payload.parts) {
-        if (part.mimeType === 'text/plain' || part.mimeType === 'text/html') {
-          const partBody = getBody(part);
-          if (partBody) return partBody;
-        }
+        extractBodies(part);
       }
     }
-
-    return '';
   };
 
-  if (message.payload) {
-    body = getBody(message.payload);
-  }
+  extractBodies(message.payload);
 
-  return body;
+  // Combine all bodies
+  let combinedBody = bodies.join('\n');
+
+  // Strip HTML tags to get plain text
+  combinedBody = combinedBody
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tags
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags
+    .replace(/<[^>]+>/g, ' ') // Remove HTML tags
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+
+  return combinedBody;
+}
+
+/**
+ * Get full email content including subject for parsing
+ */
+export function getEmailContent(message: gmail_v1.Schema$Message): string {
+  const subject = getEmailSubject(message);
+  const body = parseEmailBody(message);
+
+  // Combine subject and body for parsing - this ensures we catch keywords in subject
+  return `Subject: ${subject}\n\n${body}`;
 }
 
 /**
