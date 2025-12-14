@@ -758,6 +758,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               // Use order ID + customer ID + index for unique key (same customer can have multiple orders)
               const rowKey = order ? `${customer.customer_id}-${order.id}` : `${customer.customer_id}-${index}`;
 
+              // Check if this is the first row for this customer (for showing Finalize button only once)
+              const isFirstRowForCustomer = customers.findIndex((c) => c.customer_id === customer.customer_id) === index;
+
               return (
               <TableRow key={rowKey} hover>
                 <StyledTableCell>
@@ -877,7 +880,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                       CAD ${customer.total_amount.toFixed(2)}
                     </Typography>
 
-                    {customer.billing_status === 'calculating' && (
+                    {customer.billing_status === 'calculating' && isFirstRowForCustomer && (
                       <Button
                         size="small"
                         variant="outlined"
@@ -897,7 +900,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                       </Button>
                     )}
 
-                    {customer.billing_status !== 'calculating' && (
+                    {customer.billing_status !== 'calculating' && isFirstRowForCustomer && (
                       <Typography
                         variant="caption"
                         sx={{
