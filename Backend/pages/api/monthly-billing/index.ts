@@ -204,13 +204,10 @@ async function handleGetCalendarGrid(
         const customerId = Number(order.customer_id);
         const orderId = Number(order.order_id);
 
-        // Get entries for this specific order (or fallback to customer-level if order_id not set)
+        // Get entries for this specific order only (strict matching by order_id)
+        // No fallback to customer_id - each order has its own isolated entries
         const orderEntries = entries.filter((e) => {
-          if (e.order_id) {
-            return Number(e.order_id) === orderId;
-          }
-          // Fallback: match by customer_id for entries without order_id
-          return Number(e.customer_id) === customerId;
+          return Number(e.order_id) === orderId;
         });
 
         const entriesMap: { [date: string]: any } = {};
