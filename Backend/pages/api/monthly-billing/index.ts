@@ -135,14 +135,6 @@ async function handleGetCalendarGrid(
     const customerIds = customers.map(c => c.id);
     let orders: any[] = [];
 
-    console.log('[CalendarGrid] Query params:', {
-      month,
-      firstDayOfMonth,
-      lastDayOfMonthStr,
-      customerIds,
-      customersCount: customers.length,
-    });
-
     if (customerIds.length > 0) {
       const placeholders = customerIds.map(() => '?').join(',');
       orders = await query<any[]>(
@@ -155,14 +147,6 @@ async function handleGetCalendarGrid(
         `,
         [...customerIds, lastDayOfMonthStr, firstDayOfMonth]
       );
-
-      console.log('[CalendarGrid] Orders fetched:', orders.length, orders.map(o => ({
-        id: o.id,
-        customer_id: o.customer_id,
-        start_date: o.start_date,
-        end_date: o.end_date,
-        selected_days: o.selected_days,
-      })));
     }
 
     // Get calendar entries for the month
@@ -196,13 +180,13 @@ async function handleGetCalendarGrid(
       [month]
     );
 
-    // Create billing lookup (use Number to ensure consistent key types)
+    // Create billing lookup (ensure consistent number keys)
     const billingMap = new Map<number, any>();
     billings.forEach((b) => {
       billingMap.set(Number(b.customer_id), b);
     });
 
-    // Create orders lookup by customer (use Number to ensure consistent key types)
+    // Create orders lookup by customer (ensure consistent number keys)
     const ordersMap = new Map<number, any[]>();
     orders.forEach((order) => {
       const customerId = Number(order.customer_id);
@@ -222,27 +206,23 @@ async function handleGetCalendarGrid(
         }
       }
 
-      // Format dates to YYYY-MM-DD string format for consistent frontend handling
-      const formatDateToString = (date: any): string => {
+      // Format dates to YYYY-MM-DD string for consistent frontend handling
+      const formatDate = (date: any): string => {
         if (!date) return '';
-        if (typeof date === 'string') {
-          // Already a string, extract YYYY-MM-DD part
-          return date.split('T')[0];
-        }
+        if (typeof date === 'string') return date.split('T')[0];
         if (date instanceof Date) {
-          // Convert Date object to YYYY-MM-DD string using local timezone
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          return `${year}-${month}-${day}`;
+          const y = date.getFullYear();
+          const m = String(date.getMonth() + 1).padStart(2, '0');
+          const d = String(date.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
         }
         return String(date);
       };
 
       ordersMap.get(customerId)!.push({
         id: order.id,
-        start_date: formatDateToString(order.start_date),
-        end_date: formatDateToString(order.end_date),
+        start_date: formatDate(order.start_date),
+        end_date: formatDate(order.end_date),
         selected_days: selectedDays,
       });
     });
@@ -263,15 +243,8 @@ async function handleGetCalendarGrid(
         const billing = billingMap.get(customerId);
         const customerOrders = ordersMap.get(customerId) || [];
 
-        // Debug: Log customer orders mapping
-        console.log(`[CalendarGrid] Customer ${customerId} (${customer.name}):`, {
-          orderMapKeys: Array.from(ordersMap.keys()),
-          ordersFound: customerOrders.length,
-          orders: customerOrders,
-        });
-
         return {
-          customer_id: customer.id,
+          customer_id: customerId,
           customer_name: customer.name,
           customer_phone: customer.phone,
           entries: entriesMap,
