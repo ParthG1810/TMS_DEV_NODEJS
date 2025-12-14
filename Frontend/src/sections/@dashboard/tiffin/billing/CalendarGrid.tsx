@@ -233,6 +233,15 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayName = dayNames[dayOfWeek];
 
+    // Debug log for first customer, first few days
+    if (day <= 3 && customer.customer_name.toLowerCase().includes('rajesh')) {
+      console.log(`[CalendarGrid Debug] ${customer.customer_name} day ${day} (${dayName}):`, {
+        dateStr,
+        orders: customer.orders,
+        ordersCount: customer.orders.length,
+      });
+    }
+
     return customer.orders.some((order) => {
       // Ensure order dates are properly formatted for comparison
       const orderStartDate = order.start_date?.split('T')[0] || order.start_date; // Handle datetime format
@@ -247,7 +256,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       }
 
       // Check if the current day of week is in the selected_days array
-      return isInDateRange && order.selected_days.includes(dayName);
+      const isSelectedDay = order.selected_days.includes(dayName);
+
+      // Debug log for Rajesh Kumar
+      if (day <= 10 && customer.customer_name.toLowerCase().includes('rajesh')) {
+        console.log(`[CalendarGrid Debug] ${customer.customer_name} day ${day}: inRange=${isInDateRange}, dayName=${dayName}, selected_days=${JSON.stringify(order.selected_days)}, isSelectedDay=${isSelectedDay}`);
+      }
+
+      return isInDateRange && isSelectedDay;
     });
   };
 
