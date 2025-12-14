@@ -33,6 +33,8 @@ import { useDispatch } from '../../../../redux/store';
 import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/payment';
 // types
 import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/tms';
+// local components
+import CombinedInvoiceDialog from './CombinedInvoiceDialog';
 
 // ----------------------------------------------------------------------
 
@@ -167,6 +169,13 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const [selectedCustomer, setSelectedCustomer] = useState<ICalendarCustomerData | null>(null);
   const [openFinalizeDialog, setOpenFinalizeDialog] = useState(false);
   const [finalizingCustomerId, setFinalizingCustomerId] = useState<number | null>(null);
+
+  // Combined invoice dialog state
+  const [openInvoiceDialog, setOpenInvoiceDialog] = useState(false);
+  const [invoiceCustomer, setInvoiceCustomer] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   // Extra tiffin order dialog state
   const [openExtraDialog, setOpenExtraDialog] = useState(false);
@@ -624,6 +633,18 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     }
   };
 
+  const handleViewInvoice = (customer: ICalendarCustomerData) => {
+    setInvoiceCustomer({
+      id: customer.customer_id,
+      name: customer.customer_name,
+    });
+    setOpenInvoiceDialog(true);
+  };
+
+  const handleInvoiceApproved = () => {
+    onUpdate(); // Refresh the calendar after invoice approval
+  };
+
   const handleCreateExtraOrder = async () => {
     if (!extraOrderData || !selectedMealPlan || !extraPrice) {
       enqueueSnackbar('Please fill in all fields', { variant: 'warning' });
@@ -915,20 +936,31 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                     )}
 
                     {customer.billing_status !== 'calculating' && (
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          px: 0.75,
-                          py: 0.25,
-                          borderRadius: 0.5,
-                          fontSize: 9,
-                          bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
-                          color: `${getBillingStatusColor(customer.billing_status)}.darker`,
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {customer.billing_status}
-                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            px: 0.75,
+                            py: 0.25,
+                            borderRadius: 0.5,
+                            fontSize: 9,
+                            bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
+                            color: `${getBillingStatusColor(customer.billing_status)}.darker`,
+                            textTransform: 'capitalize',
+                          }}
+                        >
+                          {customer.billing_status}
+                        </Typography>
+                        <Tooltip title="View Combined Invoice">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleViewInvoice(customer)}
+                            sx={{ p: 0.25 }}
+                          >
+                            <Iconify icon="eva:file-text-outline" width={14} />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
                     )}
                   </Stack>
                 </StyledTableCell>
@@ -1060,6 +1092,21 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Combined Invoice Dialog */}
+      {invoiceCustomer && (
+        <CombinedInvoiceDialog
+          open={openInvoiceDialog}
+          onClose={() => {
+            setOpenInvoiceDialog(false);
+            setInvoiceCustomer(null);
+          }}
+          customerId={invoiceCustomer.id}
+          customerName={invoiceCustomer.name}
+          billingMonth={`${year}-${String(month).padStart(2, '0')}`}
+          onApproved={handleInvoiceApproved}
+        />
+      )}
     </Card>
   );
 }
