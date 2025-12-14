@@ -137,12 +137,15 @@ async function handleGetCalendarGrid(
 
     if (customerIds.length > 0) {
       const placeholders = customerIds.map(() => '?').join(',');
+      // Only fetch parent orders (parent_order_id IS NULL)
+      // Extra tiffin orders (children) are excluded from plan day calculation
       orders = await query<any[]>(
         `
           SELECT id, customer_id, start_date, end_date, selected_days
           FROM customer_orders
           WHERE customer_id IN (${placeholders})
           AND start_date <= ? AND end_date >= ?
+          AND (parent_order_id IS NULL OR parent_order_id = 0)
           ORDER BY customer_id, start_date
         `,
         [...customerIds, lastDayOfMonthStr, firstDayOfMonth]
