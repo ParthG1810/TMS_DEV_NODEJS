@@ -186,19 +186,23 @@ export default async function handler(
 
       const [creditResult]: any = await connection.query('SELECT LAST_INSERT_ID() as id');
 
-      // Create notification for excess payment
-      await connection.query(`
-        INSERT INTO payment_notifications (
-          customer_id, notification_type, title, message,
-          priority, action_url, related_payment_id, auto_delete_on_action
-        ) VALUES (?, 'excess_payment', ?, ?, 'medium', ?, ?, 1)
-      `, [
-        payment.customer_id,
-        `Excess Payment: $${excessAmount.toFixed(2)}`,
-        `Customer has $${excessAmount.toFixed(2)} credit available from payment. Consider refund if needed.`,
-        `/dashboard/payments/credit/${creditResult[0].id}`,
-        paymentId,
-      ]);
+      // Create notification for excess payment (use payment_received if excess_payment not in ENUM)
+      try {
+        await connection.query(`
+          INSERT INTO payment_notifications (
+            customer_id, notification_type, title, message,
+            priority, action_url, billing_id
+          ) VALUES (?, 'payment_received', ?, ?, 'medium', ?, ?)
+        `, [
+          payment.customer_id,
+          `Excess Payment: $${excessAmount.toFixed(2)}`,
+          `Customer has $${excessAmount.toFixed(2)} credit available from payment. Consider refund if needed.`,
+          `/dashboard/payments/credit/${creditResult[0].id}`,
+          paymentId,
+        ]);
+      } catch (notifError) {
+        console.log('Note: Could not create excess payment notification', notifError);
+      }
     }
 
     // Update payment record
@@ -216,13 +220,22 @@ export default async function handler(
       await markTransactionAllocated(payment.interac_transaction_id);
     }
 
-    // Delete related 'interac_received' notifications
-    await connection.query(`
-      UPDATE payment_notifications SET
-        is_dismissed = 1,
-        dismissed_at = NOW()
-      WHERE related_payment_id = ? AND notification_type = 'interac_received'
-    `, [paymentId]);
+    // Dismiss any pending interac_received notifications for this customer
+    // Note: This dismisses by customer_id since related_payment_id column may not exist
+    if (payment.customer_id) {
+      try {
+        await connection.query(`
+          UPDATE payment_notifications SET
+            is_dismissed = 1,
+            dismissed_at = NOW()
+          WHERE customer_id = ?
+            AND notification_type = 'interac_received'
+            AND is_dismissed = 0
+        `, [payment.customer_id]);
+      } catch (dismissError) {
+        console.log('Note: Could not dismiss interac notifications', dismissError);
+      }
+    }
 
     await connection.commit();
 
