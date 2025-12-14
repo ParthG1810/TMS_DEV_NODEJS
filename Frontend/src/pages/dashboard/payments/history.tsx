@@ -13,6 +13,7 @@ import {
   TableContainer,
   TableRow,
   TableCell,
+  TableHead,
   IconButton,
   Typography,
   Tabs,
@@ -68,6 +69,14 @@ interface PaymentRecord {
   deleted_flag: number;
 }
 
+interface PaymentAllocation {
+  id: number;
+  billing_id: number;
+  billing_month: string;
+  allocated_amount: number;
+  resulting_status: string;
+}
+
 const TABLE_HEAD = [
   { id: 'payment_date', label: 'Date', align: 'left' },
   { id: 'payment_type', label: 'Type', align: 'left' },
@@ -118,7 +127,10 @@ export default function PaymentHistoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openDelete, setOpenDelete] = useState(false);
   const [openDeleteReason, setOpenDeleteReason] = useState(false);
+  const [openDetails, setOpenDetails] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
+  const [paymentAllocations, setPaymentAllocations] = useState<PaymentAllocation[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleting, setDeleting] = useState(false);
 
@@ -154,6 +166,24 @@ export default function PaymentHistoryPage() {
   const handleFilterType = (_event: React.SyntheticEvent, newValue: string) => {
     setPage(0);
     setFilterType(newValue);
+  };
+
+  const handleViewDetails = async (payment: PaymentRecord) => {
+    setSelectedPayment(payment);
+    setOpenDetails(true);
+    setLoadingDetails(true);
+
+    try {
+      const response = await axios.get(`/api/payment-records/${payment.id}/allocations`);
+      if (response.data.success) {
+        setPaymentAllocations(response.data.data || []);
+      }
+    } catch (error: any) {
+      console.error('Error fetching allocations:', error);
+      setPaymentAllocations([]);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -385,7 +415,7 @@ export default function PaymentHistoryPage() {
                           <TableCell align="right">
                             <Stack direction="row" spacing={1} justifyContent="flex-end">
                               <Tooltip title="View details">
-                                <IconButton size="small">
+                                <IconButton size="small" onClick={() => handleViewDetails(row)}>
                                   <Iconify icon="eva:eye-outline" />
                                 </IconButton>
                               </Tooltip>
@@ -492,6 +522,132 @@ export default function PaymentHistoryPage() {
           >
             {deleting ? 'Deleting...' : 'Delete Payment'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Details Dialog */}
+      <Dialog open={openDetails} onClose={() => setOpenDetails(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Iconify icon="eva:file-text-outline" width={24} />
+            <span>Payment Details</span>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          {selectedPayment && (
+            <Box sx={{ pt: 2 }}>
+              {/* Payment Summary */}
+              <Card variant="outlined" sx={{ p: 2, mb: 3 }}>
+                <Stack spacing={2}>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Customer</Typography>
+                    <Typography variant="subtitle2">{selectedPayment.customer_name}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Payment Type</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {getTypeIcon(selectedPayment.payment_type)}
+                      <Typography variant="subtitle2" sx={{ textTransform: 'capitalize' }}>
+                        {selectedPayment.payment_type === 'online' ? 'Interac e-Transfer' : 'Cash'}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Payment Date</Typography>
+                    <Typography variant="subtitle2">{fDate(selectedPayment.payment_date)}</Typography>
+                  </Stack>
+                  {selectedPayment.reference_number && (
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2" color="text.secondary">Reference</Typography>
+                      <Typography variant="subtitle2" sx={{ fontFamily: 'monospace' }}>
+                        {selectedPayment.reference_number}
+                      </Typography>
+                    </Stack>
+                  )}
+                  <Divider />
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Total Amount</Typography>
+                    <Typography variant="h6" color="success.main">{fCurrency(selectedPayment.amount)}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Allocated</Typography>
+                    <Typography variant="subtitle2">{fCurrency(selectedPayment.total_allocated)}</Typography>
+                  </Stack>
+                  {selectedPayment.excess_amount > 0 && (
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2" color="text.secondary">Customer Credit</Typography>
+                      <Chip size="small" label={fCurrency(selectedPayment.excess_amount)} color="primary" />
+                    </Stack>
+                  )}
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Status</Typography>
+                    {getStatusLabel(selectedPayment.allocation_status)}
+                  </Stack>
+                  {selectedPayment.notes && (
+                    <>
+                      <Divider />
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>Notes</Typography>
+                        <Typography variant="body2">{selectedPayment.notes}</Typography>
+                      </Box>
+                    </>
+                  )}
+                </Stack>
+              </Card>
+
+              {/* Allocations */}
+              <Typography variant="subtitle1" gutterBottom>
+                Allocations
+              </Typography>
+              {loadingDetails ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : paymentAllocations.length > 0 ? (
+                <TableContainer component={Card} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Invoice Period</TableCell>
+                        <TableCell align="right">Amount Allocated</TableCell>
+                        <TableCell align="center">Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {paymentAllocations.map((alloc) => (
+                        <TableRow key={alloc.id}>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {fDate(alloc.billing_month, 'MMMM yyyy')}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="subtitle2" color="success.main">
+                              {fCurrency(alloc.allocated_amount)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Label color={alloc.resulting_status === 'paid' ? 'success' : 'warning'}>
+                              {alloc.resulting_status === 'paid' ? 'Paid' : 'Partial'}
+                            </Label>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Card variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    No allocations yet
+                  </Typography>
+                </Card>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDetails(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </>
