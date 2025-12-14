@@ -365,6 +365,7 @@ export type ICalendarCustomerData = {
     start_date: string;
     end_date: string;
     selected_days?: string[]; // Array of day names: ['Monday', 'Tuesday', etc.]
+    meal_plan_name?: string; // Name of the meal plan for this order
   }>;
 };
 
