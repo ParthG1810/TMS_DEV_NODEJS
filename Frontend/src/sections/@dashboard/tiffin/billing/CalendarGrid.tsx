@@ -176,6 +176,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     customer_name: string;
     delivery_date: string;
     order_id: number;
+    parent_order_id?: number; // Links extra tiffin to parent meal plan order
   } | null>(null);
   const [mealPlans, setMealPlans] = useState<any[]>([]);
   const [selectedMealPlan, setSelectedMealPlan] = useState<number | null>(null);
@@ -508,12 +509,27 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
+    // Find a parent order that covers this date (by date range, not by selected_days)
+    // This links the extra tiffin to the parent meal plan for grouping
+    let parentOrderId: number | undefined;
+    if (customer.orders && customer.orders.length > 0) {
+      const parentOrder = customer.orders.find((order) => {
+        const orderStartDate = order.start_date?.split('T')[0] || order.start_date;
+        const orderEndDate = order.end_date?.split('T')[0] || order.end_date;
+        return date >= orderStartDate && date <= orderEndDate;
+      });
+      if (parentOrder) {
+        parentOrderId = parentOrder.id;
+      }
+    }
+
     // Set data and show confirmation dialog
     setExtraOrderData({
       customer_id: customer.customer_id,
       customer_name: customer.customer_name,
       delivery_date: date,
       order_id: 0, // Will be created
+      parent_order_id: parentOrderId,
     });
     setOpenConfirmDialog(true);
   };
@@ -630,6 +646,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       }
 
       // Create a new order for the extra tiffin
+      // Link to parent order if one exists for proper grouping
       const orderResult = await axios.post('/api/customer-orders', {
         customer_id: extraOrderData.customer_id,
         meal_plan_id: selectedMealPlan,
@@ -638,6 +655,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         quantity: 1,
         price: priceValue,
         selected_days: [dayOfWeek], // Single day for extra tiffin
+        parent_order_id: extraOrderData.parent_order_id || null, // Link to parent meal plan
       });
 
       if (orderResult.data.success) {
