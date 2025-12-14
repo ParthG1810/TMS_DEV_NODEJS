@@ -91,6 +91,7 @@ async function handleGet(
 
 /**
  * GET calendar grid format
+ * Returns one row per ORDER (not per customer) for detailed billing tracking
  */
 async function handleGetCalendarGrid(
   req: NextApiRequest,
@@ -113,56 +114,42 @@ async function handleGetCalendarGrid(
     const lastDayOfMonth = new Date(year, monthNum, 0).getDate();
     const lastDayOfMonthStr = `${month}-${String(lastDayOfMonth).padStart(2, '0')}`;
 
-    // Get customers who have orders that overlap with the selected month
-    let customerSql = `
-      SELECT DISTINCT c.id, c.name, c.phone
-      FROM customers c
-      INNER JOIN customer_orders co ON c.id = co.customer_id
+    // Get all parent orders that overlap with the selected month (with customer and meal plan details)
+    let ordersSql = `
+      SELECT
+        co.id as order_id,
+        co.customer_id,
+        co.start_date,
+        co.end_date,
+        co.selected_days,
+        co.price as order_price,
+        co.payment_status,
+        c.name as customer_name,
+        c.phone as customer_phone,
+        mp.meal_name as meal_plan_name
+      FROM customer_orders co
+      INNER JOIN customers c ON co.customer_id = c.id
+      LEFT JOIN meal_plans mp ON co.meal_plan_id = mp.id
       WHERE co.start_date <= ? AND co.end_date >= ?
+      AND (co.parent_order_id IS NULL OR co.parent_order_id = 0)
     `;
-    const customerParams: any[] = [lastDayOfMonthStr, firstDayOfMonth];
+    const orderParams: any[] = [lastDayOfMonthStr, firstDayOfMonth];
 
     if (customer_id) {
-      customerSql += ' AND c.id = ?';
-      customerParams.push(customer_id);
+      ordersSql += ' AND co.customer_id = ?';
+      orderParams.push(customer_id);
     }
 
-    customerSql += ' ORDER BY c.name ASC';
+    ordersSql += ' ORDER BY c.name ASC, co.start_date ASC';
 
-    const customers = await query<any[]>(customerSql, customerParams);
+    const orders = await query<any[]>(ordersSql, orderParams);
 
-    // Get orders for these customers that overlap with the selected month
-    const customerIds = customers.map(c => c.id);
-    let orders: any[] = [];
-
-    if (customerIds.length > 0) {
-      const placeholders = customerIds.map(() => '?').join(',');
-      // Only fetch parent orders (parent_order_id IS NULL)
-      // Extra tiffin orders (children) are excluded from plan day calculation
-      orders = await query<any[]>(
-        `
-          SELECT id, customer_id, start_date, end_date, selected_days, parent_order_id
-          FROM customer_orders
-          WHERE customer_id IN (${placeholders})
-          AND start_date <= ? AND end_date >= ?
-          AND (parent_order_id IS NULL OR parent_order_id = 0)
-          ORDER BY customer_id, start_date
-        `,
-        [...customerIds, lastDayOfMonthStr, firstDayOfMonth]
-      );
-
-      // Debug: Log orders found for each customer
-      console.log('[CalendarGrid] Orders found:', orders.length);
-      orders.forEach(o => {
-        console.log(`[CalendarGrid] Order ${o.id}: customer=${o.customer_id}, dates=${o.start_date}-${o.end_date}, parent_order_id=${o.parent_order_id}, selected_days=${o.selected_days}`);
-      });
-    }
-
-    // Get calendar entries for the month
+    // Get calendar entries for the month (with order_id to match entries to specific orders)
     const entries = await query<any[]>(
       `
         SELECT
           customer_id,
+          order_id,
           DATE_FORMAT(delivery_date, '%Y-%m-%d') as delivery_date,
           status
         FROM tiffin_calendar_entries
@@ -172,7 +159,7 @@ async function handleGetCalendarGrid(
       [month]
     );
 
-    // Get billing data for the month
+    // Get billing data for the month (per customer - shared across orders)
     const billings = await query<any[]>(
       `
         SELECT
@@ -189,81 +176,90 @@ async function handleGetCalendarGrid(
       [month]
     );
 
-    // Create billing lookup (ensure consistent number keys)
+    // Create billing lookup by customer_id
     const billingMap = new Map<number, any>();
     billings.forEach((b) => {
       billingMap.set(Number(b.customer_id), b);
     });
 
-    // Create orders lookup by customer (ensure consistent number keys)
-    const ordersMap = new Map<number, any[]>();
-    orders.forEach((order) => {
-      const customerId = Number(order.customer_id);
-      if (!ordersMap.has(customerId)) {
-        ordersMap.set(customerId, []);
+    // Format date helper
+    const formatDate = (date: any): string => {
+      if (!date) return '';
+      if (typeof date === 'string') return date.split('T')[0];
+      if (date instanceof Date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
       }
+      return String(date);
+    };
 
-      // Parse selected_days from JSON string if it exists
-      let selectedDays = null;
-      if (order.selected_days) {
-        try {
-          selectedDays = typeof order.selected_days === 'string'
-            ? JSON.parse(order.selected_days)
-            : order.selected_days;
-        } catch (e) {
-          console.error('Error parsing selected_days:', e);
-        }
-      }
-
-      // Format dates to YYYY-MM-DD string for consistent frontend handling
-      const formatDate = (date: any): string => {
-        if (!date) return '';
-        if (typeof date === 'string') return date.split('T')[0];
-        if (date instanceof Date) {
-          const y = date.getFullYear();
-          const m = String(date.getMonth() + 1).padStart(2, '0');
-          const d = String(date.getDate()).padStart(2, '0');
-          return `${y}-${m}-${d}`;
-        }
-        return String(date);
-      };
-
-      ordersMap.get(customerId)!.push({
-        id: order.id,
-        start_date: formatDate(order.start_date),
-        end_date: formatDate(order.end_date),
-        selected_days: selectedDays,
-      });
-    });
-
-    // Build grid data
+    // Build grid data - ONE ROW PER ORDER
     const gridData: CalendarGridData = {
       year,
       month: monthNum,
-      customers: customers.map((customer) => {
-        const customerId = Number(customer.id);
-        const customerEntries = entries.filter((e) => Number(e.customer_id) === customerId);
-        const entriesMap: { [date: string]: any } = {};
+      customers: orders.map((order) => {
+        const customerId = Number(order.customer_id);
+        const orderId = Number(order.order_id);
 
-        customerEntries.forEach((entry) => {
+        // Get entries for this specific order (or fallback to customer-level if order_id not set)
+        const orderEntries = entries.filter((e) => {
+          if (e.order_id) {
+            return Number(e.order_id) === orderId;
+          }
+          // Fallback: match by customer_id for entries without order_id
+          return Number(e.customer_id) === customerId;
+        });
+
+        const entriesMap: { [date: string]: any } = {};
+        orderEntries.forEach((entry) => {
           entriesMap[entry.delivery_date] = entry.status;
         });
 
+        // Parse selected_days
+        let selectedDays = null;
+        if (order.selected_days) {
+          try {
+            selectedDays = typeof order.selected_days === 'string'
+              ? JSON.parse(order.selected_days)
+              : order.selected_days;
+          } catch (e) {
+            console.error('Error parsing selected_days:', e);
+          }
+        }
+
         const billing = billingMap.get(customerId);
-        const customerOrders = ordersMap.get(customerId) || [];
+
+        // Calculate order-specific totals from entries
+        let orderDelivered = 0;
+        let orderAbsent = 0;
+        let orderExtra = 0;
+        orderEntries.forEach((entry) => {
+          if (entry.status === 'T') orderDelivered++;
+          else if (entry.status === 'A') orderAbsent++;
+          else if (entry.status === 'E') orderExtra++;
+        });
 
         return {
           customer_id: customerId,
-          customer_name: customer.name,
-          customer_phone: customer.phone,
+          customer_name: order.customer_name,
+          customer_phone: order.customer_phone,
           entries: entriesMap,
-          total_delivered: billing?.total_delivered || 0,
-          total_absent: billing?.total_absent || 0,
-          total_extra: billing?.total_extra || 0,
-          total_amount: billing?.total_amount || 0,
-          billing_status: billing?.status || 'calculating',
+          total_delivered: orderDelivered,
+          total_absent: orderAbsent,
+          total_extra: orderExtra,
+          total_amount: Number(order.order_price) || 0,
+          billing_status: order.payment_status || 'calculating',
           billing_id: billing?.id,
-          orders: customerOrders,
+          // Include single order for this row (for plan day calculation)
+          orders: [{
+            id: orderId,
+            start_date: formatDate(order.start_date),
+            end_date: formatDate(order.end_date),
+            selected_days: selectedDays,
+            meal_plan_name: order.meal_plan_name,
+          }],
         };
       }),
     };

@@ -659,6 +659,8 @@ export interface CalendarGridData {
       id: number;
       start_date: string;
       end_date: string;
+      selected_days?: string[];
+      meal_plan_name?: string;
     }>;
   }[];
 }
