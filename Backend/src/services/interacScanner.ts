@@ -16,6 +16,7 @@ import {
   getEmailDate,
   getEmailSubject,
   updateLastSync,
+  updateLastSyncTime,
   getActiveGmailSettings,
   getAllGmailSettings,
 } from './gmailService';
@@ -377,9 +378,10 @@ export async function scanGmailAccount(settings: GmailOAuthSettings): Promise<{
         newestMessage.subject
       );
       console.log(`[InteracScanner] Sync complete. Marker set to: ${newestMessage.date.toISOString()}`);
-    } else if (messages.length === 0) {
-      // No messages found - update last_sync_at to show we tried
-      console.log(`[InteracScanner] No new messages found`);
+    } else {
+      // No messages found - still update last_sync_at to show we tried
+      await updateLastSyncTime(settings.id);
+      console.log(`[InteracScanner] No new messages found, updated sync timestamp`);
     }
   } catch (error) {
     console.error('[InteracScanner] Error scanning Gmail account:', error);

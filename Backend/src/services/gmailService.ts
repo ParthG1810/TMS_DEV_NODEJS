@@ -217,6 +217,20 @@ export async function updateLastSync(
 }
 
 /**
+ * Update only the last_sync_at timestamp (used when no new messages found)
+ */
+export async function updateLastSyncTime(id: number): Promise<void> {
+  await query(`
+    UPDATE gmail_oauth_settings SET
+      last_sync_at = NOW(),
+      updated_at = NOW()
+    WHERE id = ?
+  `, [id]);
+
+  console.log(`[Gmail] Updated last_sync_at timestamp for account ${id}`);
+}
+
+/**
  * Get email subject from headers
  */
 export function getEmailSubject(message: gmail_v1.Schema$Message): string {

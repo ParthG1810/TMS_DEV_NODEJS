@@ -2,12 +2,17 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { ApiResponse, GmailOAuthSettings } from '../../../src/types';
 import cors from '../../../src/utils/cors';
 import { getAllGmailSettings, getActiveGmailSettings } from '../../../src/services/gmailService';
+import { getJobStatus, startEmailSyncJob } from '../../../src/jobs/emailSyncJob';
 
 /**
  * Gmail connection status response
  */
 interface GmailStatusResponse {
   connected: boolean;
+  email?: string;
+  lastSyncAt?: string | null;
+  syncEnabled?: boolean;
+  accountName?: string;
   accounts: {
     id: number;
     account_name: string;
@@ -21,6 +26,11 @@ interface GmailStatusResponse {
     email_address: string;
     last_sync_at: Date | null;
   } | null;
+  autoSyncStatus?: {
+    running: boolean;
+    lastRunAt: Date | null;
+    nextRunIn: number | null;
+  };
 }
 
 /**
@@ -44,8 +54,22 @@ export default async function handler(
     const allSettings = await getAllGmailSettings();
     const activeSettings = await getActiveGmailSettings();
 
+    // Start the email sync job if there's an active account (lazy start)
+    if (activeSettings && activeSettings.sync_enabled) {
+      startEmailSyncJob();
+    }
+
+    // Get auto-sync job status
+    const jobStatus = getJobStatus();
+
     const response: GmailStatusResponse = {
       connected: allSettings.some(s => s.sync_enabled && s.is_active),
+      // Frontend-compatible flat fields
+      email: activeSettings?.email_address,
+      lastSyncAt: activeSettings?.last_sync_at?.toISOString() || null,
+      syncEnabled: activeSettings?.sync_enabled || false,
+      accountName: activeSettings?.account_name,
+      // Detailed nested fields
       accounts: allSettings.map(s => ({
         id: s.id,
         account_name: s.account_name,
@@ -59,6 +83,11 @@ export default async function handler(
         email_address: activeSettings.email_address,
         last_sync_at: activeSettings.last_sync_at || null,
       } : null,
+      autoSyncStatus: {
+        running: jobStatus.running,
+        lastRunAt: jobStatus.lastRunAt,
+        nextRunIn: jobStatus.nextRunIn,
+      },
     };
 
     return res.status(200).json({
