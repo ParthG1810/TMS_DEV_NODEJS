@@ -131,6 +131,9 @@ async function handleGetCalendarGrid(
 
     const customers = await query<any[]>(customerSql, customerParams);
 
+    // Debug: Log customer IDs and names
+    console.log('[CalendarGrid] Customers found:', customers.map(c => ({ id: c.id, name: c.name })));
+
     // Get orders for these customers that overlap with the selected month
     const customerIds = customers.map(c => c.id);
     let orders: any[] = [];
