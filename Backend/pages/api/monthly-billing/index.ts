@@ -151,7 +151,8 @@ async function handleGetCalendarGrid(
           customer_id,
           order_id,
           DATE_FORMAT(delivery_date, '%Y-%m-%d') as delivery_date,
-          status
+          status,
+          price
         FROM tiffin_calendar_entries
         WHERE DATE_FORMAT(delivery_date, '%Y-%m') = ?
         ORDER BY delivery_date ASC
@@ -235,11 +236,50 @@ async function handleGetCalendarGrid(
         let orderDelivered = 0;
         let orderAbsent = 0;
         let orderExtra = 0;
+        let extraAmount = 0;
         orderEntries.forEach((entry) => {
           if (entry.status === 'T') orderDelivered++;
           else if (entry.status === 'A') orderAbsent++;
-          else if (entry.status === 'E') orderExtra++;
+          else if (entry.status === 'E') {
+            orderExtra++;
+            // Extra entries have their price stored
+            extraAmount += Number(entry.price) || 0;
+          }
         });
+
+        // Calculate the actual billing amount based on deliveries
+        // Formula: (order_price / total_plan_days_in_month) * delivered_count + extra_amount
+        let calculatedAmount = 0;
+        const orderPrice = Number(order.order_price) || 0;
+
+        if (selectedDays && selectedDays.length > 0 && orderDelivered > 0) {
+          // Count how many times selected days appear in the billing month
+          const dayNameMap: { [key: string]: number } = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+          };
+
+          let totalPlanDaysInMonth = 0;
+          const firstDay = new Date(year, monthNum - 1, 1);
+          const lastDay = new Date(year, monthNum, 0).getDate();
+
+          for (let d = 1; d <= lastDay; d++) {
+            const currentDate = new Date(year, monthNum - 1, d);
+            const dayOfWeek = currentDate.getDay();
+            const dayName = Object.keys(dayNameMap).find(key => dayNameMap[key] === dayOfWeek);
+            if (dayName && selectedDays.includes(dayName)) {
+              totalPlanDaysInMonth++;
+            }
+          }
+
+          if (totalPlanDaysInMonth > 0) {
+            const perTiffinPrice = orderPrice / totalPlanDaysInMonth;
+            calculatedAmount = (perTiffinPrice * orderDelivered) + extraAmount;
+          }
+        } else if (orderDelivered > 0) {
+          // Fallback: if no selected_days, use full order price proportionally
+          calculatedAmount = orderPrice + extraAmount;
+        }
 
         return {
           customer_id: customerId,
@@ -249,7 +289,7 @@ async function handleGetCalendarGrid(
           total_delivered: orderDelivered,
           total_absent: orderAbsent,
           total_extra: orderExtra,
-          total_amount: Number(order.order_price) || 0,
+          total_amount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimal places
           billing_status: order.payment_status || 'calculating',
           billing_id: billing?.id,
           // Include single order for this row (for plan day calculation)
