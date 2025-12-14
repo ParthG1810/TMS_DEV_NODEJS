@@ -392,23 +392,40 @@ async function handleDelete(
   res: NextApiResponse<ApiResponse<any>>
 ) {
   try {
-    const { customer_id, delivery_date } = req.query;
+    const { customer_id, order_id, delivery_date } = req.query;
 
-    if (!customer_id || !delivery_date) {
+    if (!delivery_date) {
       return res.status(400).json({
         success: false,
-        error: 'customer_id and delivery_date are required',
+        error: 'delivery_date is required',
       });
     }
 
-    // Delete the calendar entry
-    await query(
-      `
-        DELETE FROM tiffin_calendar_entries
-        WHERE customer_id = ? AND delivery_date = ?
-      `,
-      [customer_id, delivery_date]
-    );
+    // Prefer order_id for deletion (more specific), fallback to customer_id
+    if (order_id) {
+      // Delete entry for specific order
+      await query(
+        `
+          DELETE FROM tiffin_calendar_entries
+          WHERE order_id = ? AND delivery_date = ?
+        `,
+        [order_id, delivery_date]
+      );
+    } else if (customer_id) {
+      // Fallback: delete by customer_id (legacy behavior, less specific)
+      await query(
+        `
+          DELETE FROM tiffin_calendar_entries
+          WHERE customer_id = ? AND delivery_date = ?
+        `,
+        [customer_id, delivery_date]
+      );
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'order_id or customer_id is required',
+      });
+    }
 
     return res.status(200).json({
       success: true,
