@@ -512,19 +512,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-    // Find a parent order that covers this date (by date range, not by selected_days)
-    // This links the extra tiffin to the parent meal plan for grouping
-    let parentOrderId: number | undefined;
-    if (customer.orders && customer.orders.length > 0) {
-      const parentOrder = customer.orders.find((order) => {
-        const orderStartDate = order.start_date?.split('T')[0] || order.start_date;
-        const orderEndDate = order.end_date?.split('T')[0] || order.end_date;
-        return date >= orderStartDate && date <= orderEndDate;
-      });
-      if (parentOrder) {
-        parentOrderId = parentOrder.id;
-      }
-    }
+    // Each row now represents ONE order, so use that order as the parent
+    // The extra tiffin will appear in this order's row in the billing calendar
+    const parentOrder = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+    const parentOrderId = parentOrder?.id;
 
     // Set data and show confirmation dialog
     setExtraOrderData({
