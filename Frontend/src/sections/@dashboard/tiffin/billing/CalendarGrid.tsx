@@ -558,8 +558,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   };
 
   const handleFinalize = async (customer: ICalendarCustomerData) => {
-    if (!customer.billing_id) {
-      enqueueSnackbar('No billing record found for this customer', { variant: 'warning' });
+    // Get the order for this row
+    const order = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+    if (!order) {
+      enqueueSnackbar('No order found for this row', { variant: 'warning' });
       return;
     }
 
@@ -585,24 +587,39 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     setFinalizingCustomerId(customer.customer_id);
 
     try {
-      const result = await dispatch(
-        finalizeBilling(customer.billing_id, 'admin', `Finalized for ${customer.customer_name}`)
-      );
+      // Call the order-billing finalize API (per-order finalization)
+      const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+      const response = await axios.post('/api/order-billing/finalize', {
+        order_id: order.id,
+        billing_month: billingMonth,
+        finalized_by: 'admin',
+      });
 
-      if (result.success) {
-        enqueueSnackbar('Billing finalized successfully', { variant: 'success' });
+      if (response.data.success) {
+        const { all_orders_finalized, total_orders, finalized_orders } = response.data.data;
 
-        // Wait for UI to refresh before clearing loading state
+        if (all_orders_finalized) {
+          enqueueSnackbar(
+            `Order finalized! All ${total_orders} orders for ${customer.customer_name} are now finalized.`,
+            { variant: 'success' }
+          );
+        } else {
+          enqueueSnackbar(
+            `Order finalized! ${finalized_orders}/${total_orders} orders finalized for ${customer.customer_name}.`,
+            { variant: 'success' }
+          );
+        }
+
+        // Refresh the UI
         await onUpdate();
-
-        // Clear finalizing state after refresh completes
         setFinalizingCustomerId(null);
       } else {
-        enqueueSnackbar(result.error || 'Failed to finalize billing', { variant: 'error' });
+        enqueueSnackbar(response.data.error || 'Failed to finalize order', { variant: 'error' });
         setFinalizingCustomerId(null);
       }
-    } catch (error) {
-      enqueueSnackbar('Failed to finalize billing', { variant: 'error' });
+    } catch (error: any) {
+      console.error('Error finalizing order:', error);
+      enqueueSnackbar(error.response?.data?.error || 'Failed to finalize order', { variant: 'error' });
       setFinalizingCustomerId(null);
     }
   };
