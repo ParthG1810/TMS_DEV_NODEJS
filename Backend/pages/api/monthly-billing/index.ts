@@ -135,6 +135,14 @@ async function handleGetCalendarGrid(
     const customerIds = customers.map(c => c.id);
     let orders: any[] = [];
 
+    console.log('[CalendarGrid] Query params:', {
+      month,
+      firstDayOfMonth,
+      lastDayOfMonthStr,
+      customerIds,
+      customersCount: customers.length,
+    });
+
     if (customerIds.length > 0) {
       const placeholders = customerIds.map(() => '?').join(',');
       orders = await query<any[]>(
@@ -147,6 +155,14 @@ async function handleGetCalendarGrid(
         `,
         [...customerIds, lastDayOfMonthStr, firstDayOfMonth]
       );
+
+      console.log('[CalendarGrid] Orders fetched:', orders.length, orders.map(o => ({
+        id: o.id,
+        customer_id: o.customer_id,
+        start_date: o.start_date,
+        end_date: o.end_date,
+        selected_days: o.selected_days,
+      })));
     }
 
     // Get calendar entries for the month
@@ -180,17 +196,18 @@ async function handleGetCalendarGrid(
       [month]
     );
 
-    // Create billing lookup
-    const billingMap = new Map();
+    // Create billing lookup (use Number to ensure consistent key types)
+    const billingMap = new Map<number, any>();
     billings.forEach((b) => {
-      billingMap.set(b.customer_id, b);
+      billingMap.set(Number(b.customer_id), b);
     });
 
-    // Create orders lookup by customer
-    const ordersMap = new Map();
+    // Create orders lookup by customer (use Number to ensure consistent key types)
+    const ordersMap = new Map<number, any[]>();
     orders.forEach((order) => {
-      if (!ordersMap.has(order.customer_id)) {
-        ordersMap.set(order.customer_id, []);
+      const customerId = Number(order.customer_id);
+      if (!ordersMap.has(customerId)) {
+        ordersMap.set(customerId, []);
       }
 
       // Parse selected_days from JSON string if it exists
@@ -205,10 +222,27 @@ async function handleGetCalendarGrid(
         }
       }
 
-      ordersMap.get(order.customer_id).push({
+      // Format dates to YYYY-MM-DD string format for consistent frontend handling
+      const formatDateToString = (date: any): string => {
+        if (!date) return '';
+        if (typeof date === 'string') {
+          // Already a string, extract YYYY-MM-DD part
+          return date.split('T')[0];
+        }
+        if (date instanceof Date) {
+          // Convert Date object to YYYY-MM-DD string using local timezone
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        }
+        return String(date);
+      };
+
+      ordersMap.get(customerId)!.push({
         id: order.id,
-        start_date: order.start_date,
-        end_date: order.end_date,
+        start_date: formatDateToString(order.start_date),
+        end_date: formatDateToString(order.end_date),
         selected_days: selectedDays,
       });
     });
@@ -218,15 +252,23 @@ async function handleGetCalendarGrid(
       year,
       month: monthNum,
       customers: customers.map((customer) => {
-        const customerEntries = entries.filter((e) => e.customer_id === customer.id);
+        const customerId = Number(customer.id);
+        const customerEntries = entries.filter((e) => Number(e.customer_id) === customerId);
         const entriesMap: { [date: string]: any } = {};
 
         customerEntries.forEach((entry) => {
           entriesMap[entry.delivery_date] = entry.status;
         });
 
-        const billing = billingMap.get(customer.id);
-        const customerOrders = ordersMap.get(customer.id) || [];
+        const billing = billingMap.get(customerId);
+        const customerOrders = ordersMap.get(customerId) || [];
+
+        // Debug: Log customer orders mapping
+        console.log(`[CalendarGrid] Customer ${customerId} (${customer.name}):`, {
+          orderMapKeys: Array.from(ordersMap.keys()),
+          ordersFound: customerOrders.length,
+          orders: customerOrders,
+        });
 
         return {
           customer_id: customer.id,
