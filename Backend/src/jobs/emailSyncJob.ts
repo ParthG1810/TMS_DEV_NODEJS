@@ -49,6 +49,7 @@ async function runSync(): Promise<void> {
 
 /**
  * Start the email sync job (runs every 30 minutes)
+ * Note: Does NOT run immediately on start - users should trigger first sync manually
  */
 export function startEmailSyncJob(): void {
   if (intervalId) {
@@ -56,15 +57,16 @@ export function startEmailSyncJob(): void {
     return;
   }
 
-  // Run immediately on start
-  runSync();
+  // DON'T run immediately - let users manually trigger first sync
+  // This ensures the "Sync Now" button shows the actual results
+  // runSync(); // Removed - was causing confusing "0 emails" on first manual sync
 
   // Schedule to run every 30 minutes (30 * 60 * 1000 = 1800000 ms)
   const SYNC_INTERVAL = 30 * 60 * 1000;
 
   intervalId = setInterval(runSync, SYNC_INTERVAL);
 
-  console.log('[EmailSync] Background job started - runs every 30 minutes');
+  console.log('[EmailSync] Background job started - first auto-sync in 30 minutes');
 }
 
 /**
