@@ -180,13 +180,17 @@ async function handleDelete(
       WHERE id = ?
     `, [deleted_by || null, delete_reason || null, id]);
 
-    // Delete related notifications
-    await connection.query(`
-      UPDATE payment_notifications SET
-        is_dismissed = 1,
-        dismissed_at = NOW()
-      WHERE related_payment_id = ?
-    `, [id]);
+    // Delete related notifications (use customer_id since related_payment_id may not exist)
+    try {
+      await connection.query(`
+        UPDATE payment_notifications SET
+          is_dismissed = 1,
+          dismissed_at = NOW()
+        WHERE customer_id = ? AND is_dismissed = 0
+      `, [payments[0].customer_id]);
+    } catch (notifError) {
+      console.log('Note: Could not dismiss notifications', notifError);
+    }
 
     await connection.commit();
 
