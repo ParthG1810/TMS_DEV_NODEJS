@@ -665,18 +665,23 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
       if (orderResult.data.success) {
         const newOrderId = orderResult.data.data.id;
+        // Use parent_order_id for the calendar entry so it appears in the parent order's row
+        const entryOrderId = extraOrderData.parent_order_id || newOrderId;
 
         console.log('Created extra tiffin order:', {
           order_id: newOrderId,
+          parent_order_id: extraOrderData.parent_order_id,
+          entry_order_id: entryOrderId,
           order_data: orderResult.data.data,
           delivery_date: extraOrderData.delivery_date,
         });
 
         // Create the calendar entry with 'E' status
+        // Use parent_order_id so the entry appears in the parent order's row in the billing calendar
         const result = await dispatch(
           createCalendarEntry({
             customer_id: extraOrderData.customer_id,
-            order_id: newOrderId,
+            order_id: entryOrderId,
             delivery_date: extraOrderData.delivery_date,
             status: 'E',
             quantity: 1,
@@ -687,24 +692,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         console.log('Calendar entry creation result:', result);
 
         if (result.success) {
-          // Verify the calendar entry was created with correct order_id
-          const verifyResponse = await axios.get('/api/calendar-entries', {
-            params: {
-              customer_id: extraOrderData.customer_id,
-              delivery_date: extraOrderData.delivery_date,
-            },
-          });
-
-          const verifyEntries = verifyResponse.data?.data;
-          const verifyEntry = verifyEntries && verifyEntries.length > 0 ? verifyEntries[0] : null;
-
-          console.log('Verification - Calendar entry after creation:', {
-            expected_order_id: newOrderId,
-            actual_order_id: verifyEntry?.order_id,
-            full_entry: verifyEntry,
-            matches: verifyEntry?.order_id === newOrderId,
-          });
-
           enqueueSnackbar('Extra tiffin order created successfully', { variant: 'success' });
 
           // Find the customer and revert billing if finalized
