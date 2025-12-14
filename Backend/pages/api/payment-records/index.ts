@@ -151,17 +151,25 @@ async function handlePost(
     const paymentDate = new Date(body.payment_date);
     const formattedDate = paymentDate.toISOString().split('T')[0];
 
+    // Determine payment type and source (default to cash)
+    const paymentType = body.payment_type || 'cash';
+    const paymentSource = body.payment_source || 'cash';
+
     // Create payment record
     const result = await query<any>(`
       INSERT INTO payment_records (
-        payment_type, payment_source, customer_id, payer_name,
-        payment_date, amount, notes, allocation_status, created_by
-      ) VALUES ('cash', 'cash', ?, ?, ?, ?, ?, 'unallocated', ?)
+        payment_type, payment_source, interac_transaction_id, customer_id, payer_name,
+        payment_date, amount, reference_number, notes, allocation_status, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unallocated', ?)
     `, [
+      paymentType,
+      paymentSource,
+      body.interac_transaction_id || null,
       body.customer_id,
       body.payer_name || customers[0].name,
       formattedDate,
       body.amount,
+      body.reference_number || null,
       body.notes || null,
       body.created_by || null,
     ]);

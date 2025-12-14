@@ -13,6 +13,8 @@ import {
   TableContainer,
   TableRow,
   TableCell,
+  TableHead,
+  TableSortLabel,
   IconButton,
   Typography,
   Tabs,
@@ -26,6 +28,7 @@ import {
   DialogActions,
   TextField,
   Autocomplete,
+  InputAdornment,
 } from '@mui/material';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
@@ -42,7 +45,6 @@ import {
   emptyRows,
   TableNoData,
   TableEmptyRows,
-  TableHeadCustom,
   TablePaginationCustom,
 } from '../../../components/table';
 import { fCurrency } from '../../../utils/formatNumber';
@@ -71,16 +73,6 @@ interface Customer {
   name: string;
   phone?: string;
 }
-
-const TABLE_HEAD = [
-  { id: 'email_date', label: 'Date', align: 'left' },
-  { id: 'reference_number', label: 'Reference', align: 'left' },
-  { id: 'sender_name', label: 'Sender', align: 'left' },
-  { id: 'amount', label: 'Amount', align: 'right' },
-  { id: 'customer', label: 'Customer', align: 'left' },
-  { id: 'status', label: 'Status', align: 'center' },
-  { id: 'actions', label: '', align: 'right' },
-];
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -118,6 +110,9 @@ export default function InteracTransactionsPage() {
   const [transactions, setTransactions] = useState<InteracTransaction[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filterStatus, setFilterStatus] = useState('pending');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<string>('email_date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [openDelete, setOpenDelete] = useState(false);
   const [openCustomerMatch, setOpenCustomerMatch] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<InteracTransaction | null>(null);
@@ -244,8 +239,55 @@ export default function InteracTransactionsPage() {
     return 'error';
   };
 
-  const dataInPage = transactions.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  const isNotFound = !loading && transactions.length === 0;
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+    setPage(0);
+  };
+
+  // Filter and sort transactions
+  const filteredTransactions = transactions
+    .filter((tx) => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        tx.sender_name.toLowerCase().includes(query) ||
+        tx.reference_number.toLowerCase().includes(query) ||
+        tx.amount.toString().includes(query) ||
+        (tx.confirmed_customer_name && tx.confirmed_customer_name.toLowerCase().includes(query)) ||
+        (tx.auto_matched_customer_name && tx.auto_matched_customer_name.toLowerCase().includes(query))
+      );
+    })
+    .sort((a, b) => {
+      let aVal: any = a[sortBy as keyof InteracTransaction];
+      let bVal: any = b[sortBy as keyof InteracTransaction];
+
+      // Handle customer column specially
+      if (sortBy === 'customer') {
+        aVal = a.confirmed_customer_name || a.auto_matched_customer_name || '';
+        bVal = b.confirmed_customer_name || b.auto_matched_customer_name || '';
+      }
+
+      // Handle null/undefined values
+      if (aVal == null) aVal = '';
+      if (bVal == null) bVal = '';
+
+      // Numeric comparison for amount
+      if (sortBy === 'amount') {
+        return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      // String comparison
+      const comparison = String(aVal).localeCompare(String(bVal));
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+  const dataInPage = filteredTransactions.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const isNotFound = !loading && filteredTransactions.length === 0;
 
   return (
     <>
@@ -288,6 +330,42 @@ export default function InteracTransactionsPage() {
 
           <Divider />
 
+          {/* Search */}
+          <Stack direction="row" spacing={2} sx={{ p: 2.5 }} alignItems="center">
+            <TextField
+              size="small"
+              placeholder="Search by sender, reference, amount, or customer..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(0);
+              }}
+              sx={{ minWidth: 350 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Iconify icon="eva:search-outline" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            {searchQuery && (
+              <Button
+                variant="soft"
+                size="small"
+                onClick={() => setSearchQuery('')}
+              >
+                Clear
+              </Button>
+            )}
+            <Box sx={{ flexGrow: 1 }} />
+            <Typography variant="body2" color="text.secondary">
+              {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
+            </Typography>
+          </Stack>
+
+          <Divider />
+
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
               <CircularProgress />
@@ -297,7 +375,65 @@ export default function InteracTransactionsPage() {
               <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
                 <Scrollbar>
                   <Table size={dense ? 'small' : 'medium'} sx={{ minWidth: 800 }}>
-                    <TableHeadCustom headLabel={TABLE_HEAD} />
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>
+                          <TableSortLabel
+                            active={sortBy === 'email_date'}
+                            direction={sortBy === 'email_date' ? sortOrder : 'asc'}
+                            onClick={() => handleSort('email_date')}
+                          >
+                            Date
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={sortBy === 'reference_number'}
+                            direction={sortBy === 'reference_number' ? sortOrder : 'asc'}
+                            onClick={() => handleSort('reference_number')}
+                          >
+                            Reference
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={sortBy === 'sender_name'}
+                            direction={sortBy === 'sender_name' ? sortOrder : 'asc'}
+                            onClick={() => handleSort('sender_name')}
+                          >
+                            Sender
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell align="right">
+                          <TableSortLabel
+                            active={sortBy === 'amount'}
+                            direction={sortBy === 'amount' ? sortOrder : 'asc'}
+                            onClick={() => handleSort('amount')}
+                          >
+                            Amount
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={sortBy === 'customer'}
+                            direction={sortBy === 'customer' ? sortOrder : 'asc'}
+                            onClick={() => handleSort('customer')}
+                          >
+                            Customer
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell align="center">
+                          <TableSortLabel
+                            active={sortBy === 'status'}
+                            direction={sortBy === 'status' ? sortOrder : 'asc'}
+                            onClick={() => handleSort('status')}
+                          >
+                            Status
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell align="right">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
 
                     <TableBody>
                       {dataInPage.map((row) => (
@@ -398,7 +534,7 @@ export default function InteracTransactionsPage() {
 
                       <TableEmptyRows
                         height={dense ? 52 : 72}
-                        emptyRows={emptyRows(page, rowsPerPage, transactions.length)}
+                        emptyRows={emptyRows(page, rowsPerPage, filteredTransactions.length)}
                       />
 
                       <TableNoData isNotFound={isNotFound} />
@@ -408,7 +544,7 @@ export default function InteracTransactionsPage() {
               </TableContainer>
 
               <TablePaginationCustom
-                count={transactions.length}
+                count={filteredTransactions.length}
                 page={page}
                 rowsPerPage={rowsPerPage}
                 onPageChange={onChangePage}
