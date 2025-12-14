@@ -769,8 +769,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           </TableHead>
 
           <TableBody>
-            {customers.map((customer) => (
-              <TableRow key={customer.customer_id} hover>
+            {customers.map((customer, index) => {
+              // Get the order for this row (now each row represents one order)
+              const order = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+              // Use order ID + customer ID + index for unique key (same customer can have multiple orders)
+              const rowKey = order ? `${customer.customer_id}-${order.id}` : `${customer.customer_id}-${index}`;
+
+              return (
+              <TableRow key={rowKey} hover>
                 <StyledTableCell>
                   <Stack spacing={0.2} alignItems="flex-start">
                     <Typography
@@ -781,13 +787,27 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                         lineHeight: 1.3,
                         wordBreak: 'break-word',
                         display: '-webkit-box',
-                        WebkitLineClamp: 3,
+                        WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
                       }}
                     >
                       {customer.customer_name}
                     </Typography>
+                    {order?.meal_plan_name && (
+                      <Typography
+                        variant="caption"
+                        color="primary.main"
+                        sx={{
+                          fontSize: 8,
+                          lineHeight: 1.2,
+                          wordBreak: 'break-word',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {order.meal_plan_name}
+                      </Typography>
+                    )}
                     {customer.customer_phone && (
                       <Typography
                         variant="caption"
@@ -913,7 +933,8 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                   </Stack>
                 </StyledTableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
