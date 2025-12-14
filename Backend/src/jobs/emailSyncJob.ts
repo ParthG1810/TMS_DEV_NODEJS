@@ -110,10 +110,12 @@ export async function triggerManualSync(): Promise<void> {
   await runSync();
 }
 
-// Auto-start in production
-if (process.env.NODE_ENV === 'production') {
-  // Delay start to allow database connection
+// Auto-start in both development and production
+// Delay start to allow database connection to establish
+// Only start if we're in a server environment (not during build)
+if (typeof window === 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
   setTimeout(() => {
+    console.log('[EmailSync] Auto-starting background job...');
     startEmailSyncJob();
-  }, 5000);
+  }, 10000); // 10 second delay to ensure DB is ready
 }
