@@ -166,6 +166,7 @@ async function handleCreateCustomerOrder(
       price,
       start_date,
       end_date,
+      parent_order_id, // Optional: links extra tiffin orders to parent meal plan
     } = req.body as any; // Use any to allow flexible type handling
 
     // Robust handling of selected_days - ensure it's always an array
@@ -236,9 +237,11 @@ async function handleCreateCustomerOrder(
     console.log('[v2] Storing in database as JSON:', selectedDaysJson);
 
     // Insert customer order with payment_status='calculating' (initial state)
+    // parent_order_id is used to link extra tiffin orders to their parent meal plan
+    const parentOrderIdValue = parent_order_id ? Number(parent_order_id) : null;
     const result = (await query(
-      'INSERT INTO customer_orders (customer_id, meal_plan_id, quantity, selected_days, price, start_date, end_date, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [customer_id, meal_plan_id, quantity, selectedDaysJson, price, formattedStartDate, formattedEndDate, 'calculating']
+      'INSERT INTO customer_orders (customer_id, meal_plan_id, quantity, selected_days, price, start_date, end_date, payment_status, parent_order_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [customer_id, meal_plan_id, quantity, selectedDaysJson, price, formattedStartDate, formattedEndDate, 'calculating', parentOrderIdValue]
     )) as any;
 
     const orderId = result.insertId;
