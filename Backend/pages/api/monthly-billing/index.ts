@@ -131,9 +131,6 @@ async function handleGetCalendarGrid(
 
     const customers = await query<any[]>(customerSql, customerParams);
 
-    // Debug: Log customer IDs and names
-    console.log('[CalendarGrid] Customers found:', customers.map(c => ({ id: c.id, name: c.name })));
-
     // Get orders for these customers that overlap with the selected month
     const customerIds = customers.map(c => c.id);
     let orders: any[] = [];
@@ -144,7 +141,7 @@ async function handleGetCalendarGrid(
       // Extra tiffin orders (children) are excluded from plan day calculation
       orders = await query<any[]>(
         `
-          SELECT id, customer_id, start_date, end_date, selected_days, parent_order_id
+          SELECT id, customer_id, start_date, end_date, selected_days
           FROM customer_orders
           WHERE customer_id IN (${placeholders})
           AND start_date <= ? AND end_date >= ?
@@ -153,12 +150,6 @@ async function handleGetCalendarGrid(
         `,
         [...customerIds, lastDayOfMonthStr, firstDayOfMonth]
       );
-
-      // Debug: Log orders found for each customer
-      console.log('[CalendarGrid] Orders found:', orders.length);
-      orders.forEach(o => {
-        console.log(`[CalendarGrid] Order ${o.id}: customer=${o.customer_id}, dates=${o.start_date}-${o.end_date}, parent_order_id=${o.parent_order_id}, selected_days=${o.selected_days}`);
-      });
     }
 
     // Get calendar entries for the month
