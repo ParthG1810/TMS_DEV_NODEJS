@@ -295,17 +295,13 @@ export default function PaymentHistoryPage() {
               label="Start Date"
               value={filterStartDate}
               onChange={(newValue) => setFilterStartDate(newValue)}
-              slotProps={{
-                textField: { size: 'small', sx: { minWidth: 150 } },
-              }}
+              renderInput={(params) => <TextField {...params} size="small" sx={{ minWidth: 150 }} />}
             />
             <DatePicker
               label="End Date"
               value={filterEndDate}
               onChange={(newValue) => setFilterEndDate(newValue)}
-              slotProps={{
-                textField: { size: 'small', sx: { minWidth: 150 } },
-              }}
+              renderInput={(params) => <TextField {...params} size="small" sx={{ minWidth: 150 }} />}
             />
             {(filterStartDate || filterEndDate || searchQuery) && (
               <Button
