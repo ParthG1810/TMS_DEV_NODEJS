@@ -297,10 +297,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
       try {
         if (shouldDelete) {
-          // Delete the entry to clear it
+          // Delete the entry to clear it - use order_id for specific order isolation
           await axios.delete('/api/calendar-entries', {
             params: {
-              customer_id: customer.customer_id,
+              order_id: activeOrder.id,
               delivery_date: date,
             },
           });
@@ -433,8 +433,11 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         } else {
           console.log('No extra tiffin order found - just deleting calendar entry');
           // Fallback: just delete the calendar entry if no matching order found
+          // Use order_id from current row for isolation
+          const currentOrder = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
           const deleteResult = await axios.delete('/api/calendar-entries', {
             params: {
+              order_id: currentOrder?.id,
               customer_id: customer.customer_id,
               delivery_date: date,
             },
@@ -633,9 +636,11 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
       // IMPORTANT: Delete any existing calendar entry for this date first
       // This ensures we start with a clean state and the new order_id is correctly set
+      // Use parent_order_id to only delete entries for this specific parent order
       try {
         await axios.delete('/api/calendar-entries', {
           params: {
+            order_id: extraOrderData.parent_order_id,
             customer_id: extraOrderData.customer_id,
             delivery_date: extraOrderData.delivery_date,
           },
@@ -1029,10 +1034,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           <Button
             onClick={async () => {
               // Make the cell blank by deleting any existing entry
+              // Use parent_order_id to only delete entries for this specific order
               if (extraOrderData) {
                 try {
                   await axios.delete('/api/calendar-entries', {
                     params: {
+                      order_id: extraOrderData.parent_order_id,
                       customer_id: extraOrderData.customer_id,
                       delivery_date: extraOrderData.delivery_date,
                     },
