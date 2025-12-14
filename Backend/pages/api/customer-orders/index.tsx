@@ -246,6 +246,46 @@ async function handleCreateCustomerOrder(
 
     const orderId = result.insertId;
 
+    // Auto-create calendar entries for all plan days with status 'T' (delivered)
+    // This pre-populates the billing calendar so customers only need to mark absences
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const startDateObj = new Date(formattedStartDate);
+    const endDateObj = new Date(formattedEndDate);
+
+    // Get the order price per day (for single-day pricing)
+    const pricePerDay = Number(price) / (daysArray.length > 0 ? daysArray.length : 1);
+
+    let currentDate = new Date(startDateObj);
+    const calendarEntries: { delivery_date: string; status: string }[] = [];
+
+    while (currentDate <= endDateObj) {
+      const dayOfWeek = dayNames[currentDate.getDay()];
+
+      // Check if this day is in the selected_days array
+      if (daysArray.length === 0 || daysArray.includes(dayOfWeek)) {
+        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+        calendarEntries.push({ delivery_date: dateStr, status: 'T' });
+      }
+
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Bulk insert calendar entries
+    if (calendarEntries.length > 0) {
+      const insertValues = calendarEntries.map(entry =>
+        `(${customer_id}, ${orderId}, '${entry.delivery_date}', '${entry.status}', 1, 0)`
+      ).join(', ');
+
+      await query(`
+        INSERT INTO tiffin_calendar_entries (customer_id, order_id, delivery_date, status, quantity, price)
+        VALUES ${insertValues}
+        ON DUPLICATE KEY UPDATE status = VALUES(status), order_id = VALUES(order_id)
+      `);
+
+      console.log(`[CustomerOrders] Auto-created ${calendarEntries.length} calendar entries for order ${orderId}`);
+    }
+
     // Fetch the created order with details
     const createdOrders = (await query(
       `
