@@ -249,8 +249,12 @@ async function handleCreateCustomerOrder(
     // Auto-create calendar entries for all plan days with status 'T' (delivered)
     // This pre-populates the billing calendar so customers only need to mark absences
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const startDateObj = new Date(formattedStartDate);
-    const endDateObj = new Date(formattedEndDate);
+
+    // Parse dates as local dates (not UTC) to avoid timezone issues
+    const [startYear, startMonth, startDay] = formattedStartDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = formattedEndDate.split('-').map(Number);
+    const startDateObj = new Date(startYear, startMonth - 1, startDay);
+    const endDateObj = new Date(endYear, endMonth - 1, endDay);
 
     // Get the order price per day (for single-day pricing)
     const pricePerDay = Number(price) / (daysArray.length > 0 ? daysArray.length : 1);
