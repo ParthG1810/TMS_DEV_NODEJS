@@ -35,6 +35,7 @@ import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/p
 import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/tms';
 // local components
 import CombinedInvoiceDialog from './CombinedInvoiceDialog';
+import OrderInvoiceDialog from './OrderInvoiceDialog';
 
 // ----------------------------------------------------------------------
 
@@ -175,6 +176,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const [invoiceCustomer, setInvoiceCustomer] = useState<{
     id: number;
     name: string;
+  } | null>(null);
+
+  // Order invoice dialog state
+  const [openOrderInvoiceDialog, setOpenOrderInvoiceDialog] = useState(false);
+  const [orderInvoiceData, setOrderInvoiceData] = useState<{
+    orderId: number;
+    customerId: number;
+    customerName: string;
   } | null>(null);
 
   // Extra tiffin order dialog state
@@ -641,6 +650,33 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     setOpenInvoiceDialog(true);
   };
 
+  const handleViewOrderInvoice = (customer: ICalendarCustomerData) => {
+    const order = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+    if (!order) {
+      enqueueSnackbar('No order found', { variant: 'warning' });
+      return;
+    }
+    setOrderInvoiceData({
+      orderId: order.id,
+      customerId: customer.customer_id,
+      customerName: customer.customer_name,
+    });
+    setOpenOrderInvoiceDialog(true);
+  };
+
+  const handleSwitchToCombinedInvoice = () => {
+    // Close order invoice and open combined invoice
+    if (orderInvoiceData) {
+      setOpenOrderInvoiceDialog(false);
+      setInvoiceCustomer({
+        id: orderInvoiceData.customerId,
+        name: orderInvoiceData.customerName,
+      });
+      setOrderInvoiceData(null);
+      setOpenInvoiceDialog(true);
+    }
+  };
+
   const handleInvoiceApproved = () => {
     onUpdate(); // Refresh the calendar after invoice approval
   };
@@ -936,30 +972,43 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                     )}
 
                     {customer.billing_status !== 'calculating' && (
-                      <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            px: 0.75,
-                            py: 0.25,
-                            borderRadius: 0.5,
-                            fontSize: 9,
-                            bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
-                            color: `${getBillingStatusColor(customer.billing_status)}.darker`,
-                            textTransform: 'capitalize',
-                          }}
-                        >
-                          {customer.billing_status}
-                        </Typography>
-                        <Tooltip title="View Combined Invoice">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewInvoice(customer)}
-                            sx={{ p: 0.25 }}
+                      <Stack spacing={0.5} alignItems="center">
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              px: 0.75,
+                              py: 0.25,
+                              borderRadius: 0.5,
+                              fontSize: 9,
+                              bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
+                              color: `${getBillingStatusColor(customer.billing_status)}.darker`,
+                              textTransform: 'capitalize',
+                            }}
                           >
-                            <Iconify icon="eva:file-text-outline" width={14} />
-                          </IconButton>
-                        </Tooltip>
+                            {customer.billing_status}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={0.25}>
+                          <Tooltip title="View Order Invoice">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewOrderInvoice(customer)}
+                              sx={{ p: 0.25 }}
+                            >
+                              <Iconify icon="eva:file-outline" width={14} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="View Combined Invoice">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewInvoice(customer)}
+                              sx={{ p: 0.25 }}
+                            >
+                              <Iconify icon="eva:layers-outline" width={14} />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
                       </Stack>
                     )}
                   </Stack>
@@ -1105,6 +1154,20 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           customerName={invoiceCustomer.name}
           billingMonth={`${year}-${String(month).padStart(2, '0')}`}
           onApproved={handleInvoiceApproved}
+        />
+      )}
+
+      {/* Order Invoice Dialog */}
+      {orderInvoiceData && (
+        <OrderInvoiceDialog
+          open={openOrderInvoiceDialog}
+          onClose={() => {
+            setOpenOrderInvoiceDialog(false);
+            setOrderInvoiceData(null);
+          }}
+          orderId={orderInvoiceData.orderId}
+          billingMonth={`${year}-${String(month).padStart(2, '0')}`}
+          onViewCombined={handleSwitchToCombinedInvoice}
         />
       )}
     </Card>
