@@ -1,8 +1,9 @@
+-- ============================================================
 -- Migration: Create order_billing table for per-order billing
--- This allows each order/meal plan to have its own billing record
--- The monthly_billing table becomes the "combined invoice" that aggregates all order billings
+-- Run: mysql -u your_user -p your_database < create-order-billing-table.sql
+-- ============================================================
 
--- Create order_billing table
+-- Step 1: Create order_billing table
 CREATE TABLE IF NOT EXISTS order_billing (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
@@ -42,9 +43,7 @@ CREATE TABLE IF NOT EXISTS order_billing (
     UNIQUE KEY unique_order_month (order_id, billing_month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Add breakdown_json column to monthly_billing for storing per-order details
--- Note: This will error if column already exists - that's OK, just continue
--- To check first: SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'monthly_billing' AND COLUMN_NAME = 'breakdown_json';
+-- Step 2: Add breakdown_json column to monthly_billing (if not exists)
 SET @column_exists = (
     SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
@@ -61,15 +60,18 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
--- Drop existing triggers (we'll recreate them to work with order_billing)
+-- Step 3: Drop existing triggers
 DROP TRIGGER IF EXISTS tr_calendar_entry_after_insert;
 DROP TRIGGER IF EXISTS tr_calendar_entry_after_update;
 DROP TRIGGER IF EXISTS tr_calendar_entry_after_delete;
 
+-- Step 4: Drop existing stored procedure
+DROP PROCEDURE IF EXISTS sp_calculate_order_billing;
+
+-- Step 5: Create stored procedure
 DELIMITER $$
 
--- Stored procedure to calculate billing for a single order
-CREATE PROCEDURE IF NOT EXISTS sp_calculate_order_billing(
+CREATE PROCEDURE sp_calculate_order_billing(
     IN p_order_id INT,
     IN p_billing_month VARCHAR(7)
 )
@@ -77,6 +79,8 @@ BEGIN
     DECLARE v_customer_id INT;
     DECLARE v_order_price DECIMAL(10,2);
     DECLARE v_selected_days JSON;
+    DECLARE v_start_date DATE;
+    DECLARE v_end_date DATE;
     DECLARE v_total_delivered INT DEFAULT 0;
     DECLARE v_total_absent INT DEFAULT 0;
     DECLARE v_total_extra INT DEFAULT 0;
@@ -84,17 +88,29 @@ BEGIN
     DECLARE v_base_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_extra_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_total_amount DECIMAL(10,2) DEFAULT 0.00;
+    DECLARE v_month_start DATE;
+    DECLARE v_month_end DATE;
+    DECLARE v_effective_start DATE;
+    DECLARE v_effective_end DATE;
 
     -- Get order details
-    SELECT customer_id, price, selected_days
-    INTO v_customer_id, v_order_price, v_selected_days
+    SELECT customer_id, price, selected_days, start_date, end_date
+    INTO v_customer_id, v_order_price, v_selected_days, v_start_date, v_end_date
     FROM customer_orders
     WHERE id = p_order_id;
 
-    -- If order not found, exit
+    -- If order not found, exit silently
     IF v_customer_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Order not found';
+        LEAVE;
     END IF;
+
+    -- Calculate month boundaries
+    SET v_month_start = CONCAT(p_billing_month, '-01');
+    SET v_month_end = LAST_DAY(v_month_start);
+
+    -- Calculate effective date range (intersection of order dates and billing month)
+    SET v_effective_start = GREATEST(v_start_date, v_month_start);
+    SET v_effective_end = LEAST(v_end_date, v_month_end);
 
     -- Count calendar entries for this order in the billing month
     SELECT
@@ -104,13 +120,13 @@ BEGIN
     INTO v_total_delivered, v_total_absent, v_total_extra
     FROM tiffin_calendar_entries
     WHERE order_id = p_order_id
-    AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
+    AND delivery_date >= v_month_start
+    AND delivery_date <= v_month_end;
 
-    -- Count total plan days in the billing month
-    -- This counts how many times the selected days appear in the full month
+    -- Count total plan days within the effective date range
     SELECT COUNT(*) INTO v_total_plan_days
     FROM (
-        SELECT DATE_ADD(CONCAT(p_billing_month, '-01'), INTERVAL n DAY) as d
+        SELECT DATE_ADD(v_effective_start, INTERVAL n DAY) as d
         FROM (
             SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
             UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
@@ -121,8 +137,8 @@ BEGIN
             UNION SELECT 30
         ) nums
     ) dates
-    WHERE MONTH(d) = MONTH(CONCAT(p_billing_month, '-01'))
-    AND YEAR(d) = YEAR(CONCAT(p_billing_month, '-01'))
+    WHERE d >= v_effective_start
+    AND d <= v_effective_end
     AND (
         v_selected_days IS NULL OR
         JSON_LENGTH(v_selected_days) = 0 OR
@@ -137,14 +153,15 @@ BEGIN
 
     -- Calculate base amount: (order_price / total_plan_days) * delivered_count
     IF v_total_plan_days > 0 THEN
-        SET v_base_amount = (v_order_price / v_total_plan_days) * v_total_delivered;
+        SET v_base_amount = ROUND((v_order_price / v_total_plan_days) * v_total_delivered, 2);
     END IF;
 
     -- Calculate extra amount from 'E' entries
     SELECT COALESCE(SUM(price), 0) INTO v_extra_amount
     FROM tiffin_calendar_entries
     WHERE order_id = p_order_id
-    AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month
+    AND delivery_date >= v_month_start
+    AND delivery_date <= v_month_end
     AND status = 'E';
 
     SET v_total_amount = v_base_amount + v_extra_amount;
@@ -172,7 +189,11 @@ BEGIN
 
 END$$
 
--- Trigger: Auto-calculate order billing after entry insert
+DELIMITER ;
+
+-- Step 6: Create triggers
+DELIMITER $$
+
 CREATE TRIGGER tr_calendar_entry_after_insert
 AFTER INSERT ON tiffin_calendar_entries
 FOR EACH ROW
@@ -180,7 +201,6 @@ BEGIN
     CALL sp_calculate_order_billing(NEW.order_id, DATE_FORMAT(NEW.delivery_date, '%Y-%m'));
 END$$
 
--- Trigger: Auto-calculate order billing after entry update
 CREATE TRIGGER tr_calendar_entry_after_update
 AFTER UPDATE ON tiffin_calendar_entries
 FOR EACH ROW
@@ -192,7 +212,6 @@ BEGIN
     END IF;
 END$$
 
--- Trigger: Auto-calculate order billing after entry delete
 CREATE TRIGGER tr_calendar_entry_after_delete
 AFTER DELETE ON tiffin_calendar_entries
 FOR EACH ROW
@@ -202,5 +221,10 @@ END$$
 
 DELIMITER ;
 
--- Note: Run this migration on your database:
--- mysql -u your_user -p your_database < create-order-billing-table.sql
+-- ============================================================
+-- Verification queries (run these to confirm migration worked)
+-- ============================================================
+-- SELECT 'order_billing table' AS item, COUNT(*) AS exists_check FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'order_billing';
+-- SELECT 'sp_calculate_order_billing procedure' AS item, COUNT(*) AS exists_check FROM information_schema.routines WHERE routine_schema = DATABASE() AND routine_name = 'sp_calculate_order_billing';
+-- SELECT 'triggers' AS item, COUNT(*) AS exists_check FROM information_schema.triggers WHERE trigger_schema = DATABASE() AND trigger_name LIKE 'tr_calendar_entry%';
+-- ============================================================
