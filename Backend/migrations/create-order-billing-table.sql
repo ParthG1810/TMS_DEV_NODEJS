@@ -43,9 +43,23 @@ CREATE TABLE IF NOT EXISTS order_billing (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Add breakdown_json column to monthly_billing for storing per-order details
-ALTER TABLE monthly_billing
-ADD COLUMN IF NOT EXISTS breakdown_json JSON NULL COMMENT 'JSON array of per-order billing details'
-AFTER total_amount;
+-- Note: This will error if column already exists - that's OK, just continue
+-- To check first: SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'monthly_billing' AND COLUMN_NAME = 'breakdown_json';
+SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'monthly_billing'
+    AND COLUMN_NAME = 'breakdown_json'
+);
+
+SET @sql = IF(@column_exists = 0,
+    'ALTER TABLE monthly_billing ADD COLUMN breakdown_json JSON NULL COMMENT ''JSON array of per-order billing details'' AFTER total_amount',
+    'SELECT ''Column breakdown_json already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Drop existing triggers (we'll recreate them to work with order_billing)
 DROP TRIGGER IF EXISTS tr_calendar_entry_after_insert;
