@@ -68,7 +68,7 @@ DROP TRIGGER IF EXISTS tr_calendar_entry_after_delete;
 -- Step 4: Drop existing stored procedure
 DROP PROCEDURE IF EXISTS sp_calculate_order_billing;
 
--- Step 5: Create stored procedure
+-- Step 5: Create stored procedure (ORIGINAL CALCULATION LOGIC)
 DELIMITER $$
 
 CREATE PROCEDURE sp_calculate_order_billing(
@@ -79,8 +79,6 @@ BEGIN
     DECLARE v_customer_id INT;
     DECLARE v_order_price DECIMAL(10,2);
     DECLARE v_selected_days JSON;
-    DECLARE v_start_date DATE;
-    DECLARE v_end_date DATE;
     DECLARE v_total_delivered INT DEFAULT 0;
     DECLARE v_total_absent INT DEFAULT 0;
     DECLARE v_total_extra INT DEFAULT 0;
@@ -88,14 +86,10 @@ BEGIN
     DECLARE v_base_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_extra_amount DECIMAL(10,2) DEFAULT 0.00;
     DECLARE v_total_amount DECIMAL(10,2) DEFAULT 0.00;
-    DECLARE v_month_start DATE;
-    DECLARE v_month_end DATE;
-    DECLARE v_effective_start DATE;
-    DECLARE v_effective_end DATE;
 
     -- Get order details
-    SELECT customer_id, price, selected_days, start_date, end_date
-    INTO v_customer_id, v_order_price, v_selected_days, v_start_date, v_end_date
+    SELECT customer_id, price, selected_days
+    INTO v_customer_id, v_order_price, v_selected_days
     FROM customer_orders
     WHERE id = p_order_id;
 
@@ -103,14 +97,6 @@ BEGIN
     IF v_customer_id IS NULL THEN
         LEAVE;
     END IF;
-
-    -- Calculate month boundaries
-    SET v_month_start = CONCAT(p_billing_month, '-01');
-    SET v_month_end = LAST_DAY(v_month_start);
-
-    -- Calculate effective date range (intersection of order dates and billing month)
-    SET v_effective_start = GREATEST(v_start_date, v_month_start);
-    SET v_effective_end = LEAST(v_end_date, v_month_end);
 
     -- Count calendar entries for this order in the billing month
     SELECT
@@ -120,13 +106,13 @@ BEGIN
     INTO v_total_delivered, v_total_absent, v_total_extra
     FROM tiffin_calendar_entries
     WHERE order_id = p_order_id
-    AND delivery_date >= v_month_start
-    AND delivery_date <= v_month_end;
+    AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month;
 
-    -- Count total plan days within the effective date range
+    -- Count total plan days in the billing month
+    -- This counts how many times the selected days appear in the full month
     SELECT COUNT(*) INTO v_total_plan_days
     FROM (
-        SELECT DATE_ADD(v_effective_start, INTERVAL n DAY) as d
+        SELECT DATE_ADD(CONCAT(p_billing_month, '-01'), INTERVAL n DAY) as d
         FROM (
             SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
             UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
@@ -137,8 +123,8 @@ BEGIN
             UNION SELECT 30
         ) nums
     ) dates
-    WHERE d >= v_effective_start
-    AND d <= v_effective_end
+    WHERE MONTH(d) = MONTH(CONCAT(p_billing_month, '-01'))
+    AND YEAR(d) = YEAR(CONCAT(p_billing_month, '-01'))
     AND (
         v_selected_days IS NULL OR
         JSON_LENGTH(v_selected_days) = 0 OR
@@ -153,15 +139,14 @@ BEGIN
 
     -- Calculate base amount: (order_price / total_plan_days) * delivered_count
     IF v_total_plan_days > 0 THEN
-        SET v_base_amount = ROUND((v_order_price / v_total_plan_days) * v_total_delivered, 2);
+        SET v_base_amount = (v_order_price / v_total_plan_days) * v_total_delivered;
     END IF;
 
     -- Calculate extra amount from 'E' entries
     SELECT COALESCE(SUM(price), 0) INTO v_extra_amount
     FROM tiffin_calendar_entries
     WHERE order_id = p_order_id
-    AND delivery_date >= v_month_start
-    AND delivery_date <= v_month_end
+    AND DATE_FORMAT(delivery_date, '%Y-%m') = p_billing_month
     AND status = 'E';
 
     SET v_total_amount = v_base_amount + v_extra_amount;
