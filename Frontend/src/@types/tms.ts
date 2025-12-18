@@ -358,8 +358,13 @@ export type ICalendarCustomerData = {
   total_absent: number;
   total_extra: number;
   total_amount: number;
+  // Per-order billing status (for individual order finalization)
   billing_status: BillingStatus;
-  billing_id?: number;
+  billing_id?: number; // order_billing.id
+  order_billing_id?: number; // order_billing.id (alias)
+  // Combined invoice billing (for customer-level finalization)
+  combined_billing_id?: number;
+  combined_billing_status?: BillingStatus;
   orders?: Array<{
     id: number;
     start_date: string;

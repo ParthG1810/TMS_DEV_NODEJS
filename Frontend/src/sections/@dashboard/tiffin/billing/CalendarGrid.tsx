@@ -33,6 +33,9 @@ import { useDispatch } from '../../../../redux/store';
 import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/payment';
 // types
 import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/tms';
+// local components
+import CombinedInvoiceDialog from './CombinedInvoiceDialog';
+import OrderInvoiceDialog from './OrderInvoiceDialog';
 
 // ----------------------------------------------------------------------
 
@@ -167,6 +170,21 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const [selectedCustomer, setSelectedCustomer] = useState<ICalendarCustomerData | null>(null);
   const [openFinalizeDialog, setOpenFinalizeDialog] = useState(false);
   const [finalizingCustomerId, setFinalizingCustomerId] = useState<number | null>(null);
+
+  // Combined invoice dialog state
+  const [openInvoiceDialog, setOpenInvoiceDialog] = useState(false);
+  const [invoiceCustomer, setInvoiceCustomer] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+
+  // Order invoice dialog state
+  const [openOrderInvoiceDialog, setOpenOrderInvoiceDialog] = useState(false);
+  const [orderInvoiceData, setOrderInvoiceData] = useState<{
+    orderId: number;
+    customerId: number;
+    customerName: string;
+  } | null>(null);
 
   // Extra tiffin order dialog state
   const [openExtraDialog, setOpenExtraDialog] = useState(false);
@@ -558,8 +576,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   };
 
   const handleFinalize = async (customer: ICalendarCustomerData) => {
-    if (!customer.billing_id) {
-      enqueueSnackbar('No billing record found for this customer', { variant: 'warning' });
+    // Get the order for this row
+    const order = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+    if (!order) {
+      enqueueSnackbar('No order found for this row', { variant: 'warning' });
       return;
     }
 
@@ -585,26 +605,80 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     setFinalizingCustomerId(customer.customer_id);
 
     try {
-      const result = await dispatch(
-        finalizeBilling(customer.billing_id, 'admin', `Finalized for ${customer.customer_name}`)
-      );
+      // Call the order-billing finalize API (per-order finalization)
+      const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+      const response = await axios.post('/api/order-billing/finalize', {
+        order_id: order.id,
+        billing_month: billingMonth,
+        finalized_by: 'admin',
+      });
 
-      if (result.success) {
-        enqueueSnackbar('Billing finalized successfully', { variant: 'success' });
+      if (response.data.success) {
+        const { all_orders_finalized, total_orders, finalized_orders } = response.data.data;
 
-        // Wait for UI to refresh before clearing loading state
+        if (all_orders_finalized) {
+          enqueueSnackbar(
+            `Order finalized! All ${total_orders} orders for ${customer.customer_name} are now finalized.`,
+            { variant: 'success' }
+          );
+        } else {
+          enqueueSnackbar(
+            `Order finalized! ${finalized_orders}/${total_orders} orders finalized for ${customer.customer_name}.`,
+            { variant: 'success' }
+          );
+        }
+
+        // Refresh the UI
         await onUpdate();
-
-        // Clear finalizing state after refresh completes
         setFinalizingCustomerId(null);
       } else {
-        enqueueSnackbar(result.error || 'Failed to finalize billing', { variant: 'error' });
+        enqueueSnackbar(response.data.error || 'Failed to finalize order', { variant: 'error' });
         setFinalizingCustomerId(null);
       }
-    } catch (error) {
-      enqueueSnackbar('Failed to finalize billing', { variant: 'error' });
+    } catch (error: any) {
+      console.error('Error finalizing order:', error);
+      enqueueSnackbar(error.response?.data?.error || 'Failed to finalize order', { variant: 'error' });
       setFinalizingCustomerId(null);
     }
+  };
+
+  const handleViewInvoice = (customer: ICalendarCustomerData) => {
+    setInvoiceCustomer({
+      id: customer.customer_id,
+      name: customer.customer_name,
+    });
+    setOpenInvoiceDialog(true);
+  };
+
+  const handleViewOrderInvoice = (customer: ICalendarCustomerData) => {
+    const order = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+    if (!order) {
+      enqueueSnackbar('No order found', { variant: 'warning' });
+      return;
+    }
+    setOrderInvoiceData({
+      orderId: order.id,
+      customerId: customer.customer_id,
+      customerName: customer.customer_name,
+    });
+    setOpenOrderInvoiceDialog(true);
+  };
+
+  const handleSwitchToCombinedInvoice = () => {
+    // Close order invoice and open combined invoice
+    if (orderInvoiceData) {
+      setOpenOrderInvoiceDialog(false);
+      setInvoiceCustomer({
+        id: orderInvoiceData.customerId,
+        name: orderInvoiceData.customerName,
+      });
+      setOrderInvoiceData(null);
+      setOpenInvoiceDialog(true);
+    }
+  };
+
+  const handleInvoiceApproved = () => {
+    onUpdate(); // Refresh the calendar after invoice approval
   };
 
   const handleCreateExtraOrder = async () => {
@@ -898,20 +972,44 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                     )}
 
                     {customer.billing_status !== 'calculating' && (
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          px: 0.75,
-                          py: 0.25,
-                          borderRadius: 0.5,
-                          fontSize: 9,
-                          bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
-                          color: `${getBillingStatusColor(customer.billing_status)}.darker`,
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {customer.billing_status}
-                      </Typography>
+                      <Stack spacing={0.5} alignItems="center">
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              px: 0.75,
+                              py: 0.25,
+                              borderRadius: 0.5,
+                              fontSize: 9,
+                              bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
+                              color: `${getBillingStatusColor(customer.billing_status)}.darker`,
+                              textTransform: 'capitalize',
+                            }}
+                          >
+                            {customer.billing_status}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={0.25}>
+                          <Tooltip title="View Order Invoice">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewOrderInvoice(customer)}
+                              sx={{ p: 0.25 }}
+                            >
+                              <Iconify icon="eva:file-outline" width={14} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="View Combined Invoice">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewInvoice(customer)}
+                              sx={{ p: 0.25 }}
+                            >
+                              <Iconify icon="eva:layers-outline" width={14} />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </Stack>
                     )}
                   </Stack>
                 </StyledTableCell>
@@ -1043,6 +1141,35 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Combined Invoice Dialog */}
+      {invoiceCustomer && (
+        <CombinedInvoiceDialog
+          open={openInvoiceDialog}
+          onClose={() => {
+            setOpenInvoiceDialog(false);
+            setInvoiceCustomer(null);
+          }}
+          customerId={invoiceCustomer.id}
+          customerName={invoiceCustomer.name}
+          billingMonth={`${year}-${String(month).padStart(2, '0')}`}
+          onApproved={handleInvoiceApproved}
+        />
+      )}
+
+      {/* Order Invoice Dialog */}
+      {orderInvoiceData && (
+        <OrderInvoiceDialog
+          open={openOrderInvoiceDialog}
+          onClose={() => {
+            setOpenOrderInvoiceDialog(false);
+            setOrderInvoiceData(null);
+          }}
+          orderId={orderInvoiceData.orderId}
+          billingMonth={`${year}-${String(month).padStart(2, '0')}`}
+          onViewCombined={handleSwitchToCombinedInvoice}
+        />
+      )}
     </Card>
   );
 }

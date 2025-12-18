@@ -160,7 +160,7 @@ async function handleGetCalendarGrid(
       [month]
     );
 
-    // Get billing data for the month (per customer - shared across orders)
+    // Get billing data for the month (per customer - for combined invoice)
     const billings = await query<any[]>(
       `
         SELECT
@@ -177,10 +177,38 @@ async function handleGetCalendarGrid(
       [month]
     );
 
-    // Create billing lookup by customer_id
+    // Get order-level billing data
+    const orderBillings = await query<any[]>(
+      `
+        SELECT
+          order_id,
+          customer_id,
+          total_delivered,
+          total_absent,
+          total_extra,
+          total_plan_days,
+          base_amount,
+          extra_amount,
+          total_amount,
+          status,
+          id,
+          finalized_at
+        FROM order_billing
+        WHERE billing_month = ?
+      `,
+      [month]
+    );
+
+    // Create billing lookup by customer_id (for combined invoice)
     const billingMap = new Map<number, any>();
     billings.forEach((b) => {
       billingMap.set(Number(b.customer_id), b);
+    });
+
+    // Create order billing lookup by order_id
+    const orderBillingMap = new Map<number, any>();
+    orderBillings.forEach((ob) => {
+      orderBillingMap.set(Number(ob.order_id), ob);
     });
 
     // Format date helper
@@ -278,6 +306,9 @@ async function handleGetCalendarGrid(
           calculatedAmount = orderPrice + extraAmount;
         }
 
+        // Get order-level billing for this specific order
+        const orderBilling = orderBillingMap.get(orderId);
+
         return {
           customer_id: customerId,
           customer_name: order.customer_name,
@@ -287,8 +318,13 @@ async function handleGetCalendarGrid(
           total_absent: orderAbsent,
           total_extra: orderExtra,
           total_amount: Math.round(calculatedAmount * 100) / 100, // Round to 2 decimal places
-          billing_status: order.payment_status || 'calculating',
-          billing_id: billing?.id,
+          // Use order-level billing status (per-order finalization)
+          billing_status: orderBilling?.status || 'calculating',
+          billing_id: orderBilling?.id || null, // order_billing.id for per-order finalization
+          order_billing_id: orderBilling?.id || null,
+          // Combined invoice billing (per-customer)
+          combined_billing_id: billing?.id,
+          combined_billing_status: billing?.status || 'calculating',
           // Include single order for this row (for plan day calculation)
           orders: [{
             id: orderId,
