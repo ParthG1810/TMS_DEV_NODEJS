@@ -68,14 +68,14 @@ DROP TRIGGER IF EXISTS tr_calendar_entry_after_delete;
 -- Step 4: Drop existing stored procedure
 DROP PROCEDURE IF EXISTS sp_calculate_order_billing;
 
--- Step 5: Create stored procedure (ORIGINAL CALCULATION LOGIC)
+-- Step 5: Create stored procedure
 DELIMITER $$
 
 CREATE PROCEDURE sp_calculate_order_billing(
     IN p_order_id INT,
     IN p_billing_month VARCHAR(7)
 )
-BEGIN
+proc_label: BEGIN
     DECLARE v_customer_id INT;
     DECLARE v_order_price DECIMAL(10,2);
     DECLARE v_selected_days JSON;
@@ -95,7 +95,7 @@ BEGIN
 
     -- If order not found, exit silently
     IF v_customer_id IS NULL THEN
-        LEAVE;
+        LEAVE proc_label;
     END IF;
 
     -- Count calendar entries for this order in the billing month
@@ -191,7 +191,6 @@ AFTER UPDATE ON tiffin_calendar_entries
 FOR EACH ROW
 BEGIN
     CALL sp_calculate_order_billing(NEW.order_id, DATE_FORMAT(NEW.delivery_date, '%Y-%m'));
-    -- If order_id changed, also recalculate old order
     IF OLD.order_id != NEW.order_id THEN
         CALL sp_calculate_order_billing(OLD.order_id, DATE_FORMAT(OLD.delivery_date, '%Y-%m'));
     END IF;
