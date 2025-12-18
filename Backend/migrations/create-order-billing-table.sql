@@ -1,8 +1,9 @@
+-- ============================================================
 -- Migration: Create order_billing table for per-order billing
--- This allows each order/meal plan to have its own billing record
--- The monthly_billing table becomes the "combined invoice" that aggregates all order billings
+-- Run: mysql -u your_user -p your_database < create-order-billing-table.sql
+-- ============================================================
 
--- Create order_billing table
+-- Step 1: Create order_billing table
 CREATE TABLE IF NOT EXISTS order_billing (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
@@ -42,24 +43,39 @@ CREATE TABLE IF NOT EXISTS order_billing (
     UNIQUE KEY unique_order_month (order_id, billing_month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Add breakdown_json column to monthly_billing for storing per-order details
-ALTER TABLE monthly_billing
-ADD COLUMN IF NOT EXISTS breakdown_json JSON NULL COMMENT 'JSON array of per-order billing details'
-AFTER total_amount;
+-- Step 2: Add breakdown_json column to monthly_billing (if not exists)
+SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'monthly_billing'
+    AND COLUMN_NAME = 'breakdown_json'
+);
 
--- Drop existing triggers (we'll recreate them to work with order_billing)
+SET @sql = IF(@column_exists = 0,
+    'ALTER TABLE monthly_billing ADD COLUMN breakdown_json JSON NULL COMMENT ''JSON array of per-order billing details'' AFTER total_amount',
+    'SELECT ''Column breakdown_json already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 3: Drop existing triggers
 DROP TRIGGER IF EXISTS tr_calendar_entry_after_insert;
 DROP TRIGGER IF EXISTS tr_calendar_entry_after_update;
 DROP TRIGGER IF EXISTS tr_calendar_entry_after_delete;
 
+-- Step 4: Drop existing stored procedure
+DROP PROCEDURE IF EXISTS sp_calculate_order_billing;
+
+-- Step 5: Create stored procedure
 DELIMITER $$
 
--- Stored procedure to calculate billing for a single order
-CREATE PROCEDURE IF NOT EXISTS sp_calculate_order_billing(
+CREATE PROCEDURE sp_calculate_order_billing(
     IN p_order_id INT,
     IN p_billing_month VARCHAR(7)
 )
-BEGIN
+proc_label: BEGIN
     DECLARE v_customer_id INT;
     DECLARE v_order_price DECIMAL(10,2);
     DECLARE v_selected_days JSON;
@@ -77,9 +93,9 @@ BEGIN
     FROM customer_orders
     WHERE id = p_order_id;
 
-    -- If order not found, exit
+    -- If order not found, exit silently
     IF v_customer_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Order not found';
+        LEAVE proc_label;
     END IF;
 
     -- Count calendar entries for this order in the billing month
@@ -158,7 +174,11 @@ BEGIN
 
 END$$
 
--- Trigger: Auto-calculate order billing after entry insert
+DELIMITER ;
+
+-- Step 6: Create triggers
+DELIMITER $$
+
 CREATE TRIGGER tr_calendar_entry_after_insert
 AFTER INSERT ON tiffin_calendar_entries
 FOR EACH ROW
@@ -166,19 +186,16 @@ BEGIN
     CALL sp_calculate_order_billing(NEW.order_id, DATE_FORMAT(NEW.delivery_date, '%Y-%m'));
 END$$
 
--- Trigger: Auto-calculate order billing after entry update
 CREATE TRIGGER tr_calendar_entry_after_update
 AFTER UPDATE ON tiffin_calendar_entries
 FOR EACH ROW
 BEGIN
     CALL sp_calculate_order_billing(NEW.order_id, DATE_FORMAT(NEW.delivery_date, '%Y-%m'));
-    -- If order_id changed, also recalculate old order
     IF OLD.order_id != NEW.order_id THEN
         CALL sp_calculate_order_billing(OLD.order_id, DATE_FORMAT(OLD.delivery_date, '%Y-%m'));
     END IF;
 END$$
 
--- Trigger: Auto-calculate order billing after entry delete
 CREATE TRIGGER tr_calendar_entry_after_delete
 AFTER DELETE ON tiffin_calendar_entries
 FOR EACH ROW
@@ -188,5 +205,10 @@ END$$
 
 DELIMITER ;
 
--- Note: Run this migration on your database:
--- mysql -u your_user -p your_database < create-order-billing-table.sql
+-- ============================================================
+-- Verification queries (run these to confirm migration worked)
+-- ============================================================
+-- SELECT 'order_billing table' AS item, COUNT(*) AS exists_check FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'order_billing';
+-- SELECT 'sp_calculate_order_billing procedure' AS item, COUNT(*) AS exists_check FROM information_schema.routines WHERE routine_schema = DATABASE() AND routine_name = 'sp_calculate_order_billing';
+-- SELECT 'triggers' AS item, COUNT(*) AS exists_check FROM information_schema.triggers WHERE trigger_schema = DATABASE() AND trigger_name LIKE 'tr_calendar_entry%';
+-- ============================================================
