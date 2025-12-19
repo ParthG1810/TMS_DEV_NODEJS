@@ -570,11 +570,8 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         });
         // Note: onUpdate() will be called by the parent to refresh the data
       } catch (error: any) {
-        // Silently ignore 404 errors - billing record might not exist
-        if (error.response?.status !== 404) {
-          console.error('Error reverting billing status:', error);
-        }
-        // Don't show error to user - this is a background operation
+        // Silently ignore errors - billing record might not exist
+        // This is a background operation, no need to log or show to user
       }
     }
   };
