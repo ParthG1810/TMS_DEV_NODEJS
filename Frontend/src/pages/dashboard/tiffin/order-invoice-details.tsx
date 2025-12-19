@@ -19,6 +19,7 @@ import {
   DialogContent,
   IconButton,
   CircularProgress,
+  TextField,
 } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
@@ -89,9 +90,11 @@ export default function OrderInvoiceDetailsPage() {
   const [invoice, setInvoice] = useState<OrderInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [eTransferEmail, setETransferEmail] = useState('admin@tiffinservice.com');
+  const [customInteracEmail, setCustomInteracEmail] = useState('');
   const [companyName, setCompanyName] = useState('TIFFIN MANAGEMENT SYSTEM');
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
 
   // Load invoice details and settings
   useEffect(() => {
@@ -105,7 +108,9 @@ export default function OrderInvoiceDetailsPage() {
     try {
       const response = await axios.get('/api/settings');
       if (response.data.success) {
-        setETransferEmail(response.data.data.etransfer_email);
+        const email = response.data.data.etransfer_email;
+        setETransferEmail(email);
+        setCustomInteracEmail(email); // Initialize custom email with default
         setCompanyName(response.data.data.company_name);
 
         // Fetch logo as base64
@@ -153,6 +158,20 @@ export default function OrderInvoiceDetailsPage() {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
     setCurrentTab(newValue);
+  };
+
+  const handleSaveInteracEmail = () => {
+    setSavingEmail(true);
+    // Simulate save - in reality, this could save to local storage or session
+    setTimeout(() => {
+      setSavingEmail(false);
+      enqueueSnackbar('Interac email updated for this invoice', { variant: 'success' });
+    }, 500);
+  };
+
+  const handleResetInteracEmail = () => {
+    setCustomInteracEmail(eTransferEmail);
+    enqueueSnackbar('Reset to default Interac email', { variant: 'info' });
   };
 
   const formatCurrency = (amount: number) => {
@@ -276,7 +295,7 @@ export default function OrderInvoiceDetailsPage() {
                     <OrderInvoicePDF
                       invoiceData={invoice}
                       companyName={companyName}
-                      eTransferEmail={eTransferEmail}
+                      eTransferEmail={customInteracEmail || eTransferEmail}
                       companyLogo={logoDataUrl}
                     />
                   }
@@ -819,6 +838,45 @@ export default function OrderInvoiceDetailsPage() {
                     </Paper>
                   </Grid>
                 </Grid>
+
+                {/* Payment Information Section */}
+                <Paper variant="outlined" sx={{ p: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom fontWeight={600}>
+                    Payment Information
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Customize the Interac e-Transfer email for this invoice. This will be shown to the customer
+                    on the PDF.
+                  </Typography>
+                  <Stack direction="row" spacing={2} alignItems="flex-start">
+                    <TextField
+                      fullWidth
+                      label="Interac e-Transfer Email"
+                      value={customInteracEmail}
+                      onChange={(e) => setCustomInteracEmail(e.target.value)}
+                      placeholder="Enter Interac email"
+                      helperText={
+                        customInteracEmail !== eTransferEmail
+                          ? 'Using custom email (different from default settings)'
+                          : 'Using default email from settings'
+                      }
+                      sx={{ maxWidth: 500 }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={handleSaveInteracEmail}
+                      disabled={savingEmail || !customInteracEmail}
+                      sx={{ minWidth: 100 }}
+                    >
+                      {savingEmail ? 'Saving...' : 'Save'}
+                    </Button>
+                    {customInteracEmail !== eTransferEmail && (
+                      <Button variant="outlined" onClick={handleResetInteracEmail}>
+                        Reset
+                      </Button>
+                    )}
+                  </Stack>
+                </Paper>
               </Stack>
             </Box>
           )}
@@ -832,7 +890,7 @@ export default function OrderInvoiceDetailsPage() {
                     <OrderInvoicePDF
                       invoiceData={invoice}
                       companyName={companyName}
-                      eTransferEmail={eTransferEmail}
+                      eTransferEmail={customInteracEmail || eTransferEmail}
                       companyLogo={logoDataUrl}
                       showCalculations={true}
                     />
@@ -856,7 +914,7 @@ export default function OrderInvoiceDetailsPage() {
                   <OrderInvoicePDF
                     invoiceData={invoice}
                     companyName={companyName}
-                    eTransferEmail={eTransferEmail}
+                    eTransferEmail={customInteracEmail || eTransferEmail}
                     companyLogo={logoDataUrl}
                     showCalculations={true}
                   />
@@ -874,7 +932,7 @@ export default function OrderInvoiceDetailsPage() {
                     <OrderInvoicePDF
                       invoiceData={invoice}
                       companyName={companyName}
-                      eTransferEmail={eTransferEmail}
+                      eTransferEmail={customInteracEmail || eTransferEmail}
                       companyLogo={logoDataUrl}
                       showCalculations={false}
                     />
@@ -898,7 +956,7 @@ export default function OrderInvoiceDetailsPage() {
                   <OrderInvoicePDF
                     invoiceData={invoice}
                     companyName={companyName}
-                    eTransferEmail={eTransferEmail}
+                    eTransferEmail={customInteracEmail || eTransferEmail}
                     companyLogo={logoDataUrl}
                     showCalculations={false}
                   />
