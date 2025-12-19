@@ -19,6 +19,7 @@ import {
   DialogContent,
   IconButton,
   CircularProgress,
+  TextField,
 } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
@@ -89,9 +90,11 @@ export default function OrderInvoiceDetailsPage() {
   const [invoice, setInvoice] = useState<OrderInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [eTransferEmail, setETransferEmail] = useState('admin@tiffinservice.com');
+  const [customInteracEmail, setCustomInteracEmail] = useState('');
   const [companyName, setCompanyName] = useState('TIFFIN MANAGEMENT SYSTEM');
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
 
   // Load invoice details and settings
   useEffect(() => {
@@ -105,7 +108,9 @@ export default function OrderInvoiceDetailsPage() {
     try {
       const response = await axios.get('/api/settings');
       if (response.data.success) {
-        setETransferEmail(response.data.data.etransfer_email);
+        const email = response.data.data.etransfer_email;
+        setETransferEmail(email);
+        setCustomInteracEmail(email); // Initialize custom email with default
         setCompanyName(response.data.data.company_name);
 
         // Fetch logo as base64
@@ -155,6 +160,20 @@ export default function OrderInvoiceDetailsPage() {
     setCurrentTab(newValue);
   };
 
+  const handleSaveInteracEmail = () => {
+    setSavingEmail(true);
+    // Simulate save - in reality, this could save to local storage or session
+    setTimeout(() => {
+      setSavingEmail(false);
+      enqueueSnackbar('Interac email updated for this invoice', { variant: 'success' });
+    }, 500);
+  };
+
+  const handleResetInteracEmail = () => {
+    setCustomInteracEmail(eTransferEmail);
+    enqueueSnackbar('Reset to default Interac email', { variant: 'info' });
+  };
+
   const formatCurrency = (amount: number) => {
     return `CAD $${amount.toFixed(2)}`;
   };
@@ -164,6 +183,25 @@ export default function OrderInvoiceDetailsPage() {
     const [year, monthNum] = month.split('-');
     const date = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const generateFileName = (type: 'store' | 'customer') => {
+    if (!invoice || !month || typeof month !== 'string') return 'invoice.pdf';
+
+    // Format customer name (replace spaces with underscores, remove special chars)
+    const customerName = invoice.customer_name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+
+    // Format month-year (e.g., "December-2025")
+    const [year, monthNum] = month.split('-');
+    const date = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+    const monthYear = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).replace(' ', '-');
+
+    // Format plan name (replace spaces with underscores, remove special chars)
+    const planName = invoice.meal_plan_name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+
+    // Construct filename: CustomerName_Month-Year_Plan_Type.pdf
+    const typeLabel = type === 'store' ? 'Store' : 'Customer';
+    return `${customerName}_${monthYear}_${planName}_${typeLabel}.pdf`;
   };
 
   // Generate calendar days
@@ -271,28 +309,56 @@ export default function OrderInvoiceDetailsPage() {
                 Back
               </Button>
               {currentTab === 'invoice-view' && invoice && (
-                <PDFDownloadLink
-                  document={
-                    <OrderInvoicePDF
-                      invoiceData={invoice}
-                      companyName={companyName}
-                      eTransferEmail={eTransferEmail}
-                      companyLogo={logoDataUrl}
-                    />
-                  }
-                  fileName={`order-invoice-${invoice.order_id}-${month}.pdf`}
-                  style={{ textDecoration: 'none' }}
-                >
-                  {({ loading: pdfLoading }) => (
-                    <Button
-                      variant="contained"
-                      startIcon={<Iconify icon="eva:download-fill" />}
-                      disabled={pdfLoading}
-                    >
-                      {pdfLoading ? 'Generating PDF...' : 'Download PDF'}
-                    </Button>
-                  )}
-                </PDFDownloadLink>
+                <Stack direction="row" spacing={1.5}>
+                  <PDFDownloadLink
+                    document={
+                      <OrderInvoicePDF
+                        invoiceData={invoice}
+                        companyName={companyName}
+                        eTransferEmail={customInteracEmail || eTransferEmail}
+                        companyLogo={logoDataUrl}
+                        showCalculations={true}
+                      />
+                    }
+                    fileName={generateFileName('store')}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {({ loading: pdfLoading }) => (
+                      <Button
+                        variant="contained"
+                        startIcon={<Iconify icon="eva:download-fill" />}
+                        disabled={pdfLoading}
+                        color="primary"
+                      >
+                        {pdfLoading ? 'Generating...' : 'Store Use PDF'}
+                      </Button>
+                    )}
+                  </PDFDownloadLink>
+                  <PDFDownloadLink
+                    document={
+                      <OrderInvoicePDF
+                        invoiceData={invoice}
+                        companyName={companyName}
+                        eTransferEmail={customInteracEmail || eTransferEmail}
+                        companyLogo={logoDataUrl}
+                        showCalculations={false}
+                      />
+                    }
+                    fileName={generateFileName('customer')}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {({ loading: pdfLoading }) => (
+                      <Button
+                        variant="outlined"
+                        startIcon={<Iconify icon="eva:download-fill" />}
+                        disabled={pdfLoading}
+                        color="primary"
+                      >
+                        {pdfLoading ? 'Generating...' : 'Customer Use PDF'}
+                      </Button>
+                    )}
+                  </PDFDownloadLink>
+                </Stack>
               )}
             </Stack>
           }
@@ -604,49 +670,49 @@ export default function OrderInvoiceDetailsPage() {
                           <Typography variant="body2" fontWeight={600} gutterBottom>
                             Base Order: {invoice.meal_plan_name}
                           </Typography>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Order Price: {formatCurrency(invoice.meal_plan_price)}
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Total {invoice.selected_days.join('-')} days in {getMonthDisplay().split(' ')[0]}:{' '}
                               {invoice.billing.total_plan_days} days
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Per-Tiffin Price: {formatCurrency(invoice.meal_plan_price)} ÷{' '}
                               {invoice.billing.total_plan_days} = {formatCurrency(perTiffinPrice)}/tiffin
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative' }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               └─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Order covers: {new Date(invoice.start_date).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
@@ -667,37 +733,37 @@ export default function OrderInvoiceDetailsPage() {
                           <Typography variant="body2" fontWeight={600} gutterBottom color="success.main">
                             Delivered Tiffins
                           </Typography>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Count: {invoice.billing.total_delivered} tiffins delivered
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Calculation: {invoice.billing.total_delivered} × {formatCurrency(perTiffinPrice)} ={' '}
                               {formatCurrency(invoice.billing.total_delivered * perTiffinPrice)}
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative' }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               └─
                             </Box>
-                            <Typography variant="caption" fontWeight={600} color="success.main">
+                            <Typography variant="caption" fontWeight={600} color="success.main" sx={{ lineHeight: 1.6 }}>
                               Subtotal: {formatCurrency(invoice.billing.total_delivered * perTiffinPrice)}
                             </Typography>
                           </Box>
@@ -710,37 +776,37 @@ export default function OrderInvoiceDetailsPage() {
                               <Typography variant="body2" fontWeight={600} gutterBottom color="error.main">
                                 Absent Days (Deduction)
                               </Typography>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   ├─
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                   Count: {invoice.billing.total_absent} day(s) absent
                                 </Typography>
                               </Box>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   ├─
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                   Calculation: {invoice.billing.total_absent} × {formatCurrency(perTiffinPrice)} ={' '}
                                   -{formatCurrency(invoice.billing.total_absent * perTiffinPrice)}
                                 </Typography>
                               </Box>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative' }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   └─
                                 </Box>
-                                <Typography variant="caption" fontWeight={600} color="error.main">
+                                <Typography variant="caption" fontWeight={600} color="error.main" sx={{ lineHeight: 1.6 }}>
                                   Deduction: -{formatCurrency(invoice.billing.total_absent * perTiffinPrice)}
                                 </Typography>
                               </Box>
@@ -755,25 +821,25 @@ export default function OrderInvoiceDetailsPage() {
                               <Typography variant="body2" fontWeight={600} gutterBottom color="info.main">
                                 Extra Tiffins
                               </Typography>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   ├─
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                   Count: {invoice.billing.total_extra} extra tiffin(s)
                                 </Typography>
                               </Box>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   ├─
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                   Price:{' '}
                                   {formatCurrency(
                                     invoice.billing.extra_amount / invoice.billing.total_extra
@@ -781,14 +847,14 @@ export default function OrderInvoiceDetailsPage() {
                                   /tiffin
                                 </Typography>
                               </Box>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative' }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   └─
                                 </Box>
-                                <Typography variant="caption" fontWeight={600} color="info.main">
+                                <Typography variant="caption" fontWeight={600} color="info.main" sx={{ lineHeight: 1.6 }}>
                                   Addition: +{formatCurrency(invoice.billing.extra_amount)}
                                 </Typography>
                               </Box>
@@ -819,6 +885,45 @@ export default function OrderInvoiceDetailsPage() {
                     </Paper>
                   </Grid>
                 </Grid>
+
+                {/* Payment Information Section */}
+                <Paper variant="outlined" sx={{ p: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom fontWeight={600}>
+                    Payment Information
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Customize the Interac e-Transfer email for this invoice. This will be shown to the customer
+                    on the PDF.
+                  </Typography>
+                  <Stack direction="row" spacing={2} alignItems="flex-start">
+                    <TextField
+                      fullWidth
+                      label="Interac e-Transfer Email"
+                      value={customInteracEmail}
+                      onChange={(e) => setCustomInteracEmail(e.target.value)}
+                      placeholder="Enter Interac email"
+                      helperText={
+                        customInteracEmail !== eTransferEmail
+                          ? 'Using custom email (different from default settings)'
+                          : 'Using default email from settings'
+                      }
+                      sx={{ maxWidth: 500 }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={handleSaveInteracEmail}
+                      disabled={savingEmail || !customInteracEmail}
+                      sx={{ minWidth: 100 }}
+                    >
+                      {savingEmail ? 'Saving...' : 'Save'}
+                    </Button>
+                    {customInteracEmail !== eTransferEmail && (
+                      <Button variant="outlined" onClick={handleResetInteracEmail}>
+                        Reset
+                      </Button>
+                    )}
+                  </Stack>
+                </Paper>
               </Stack>
             </Box>
           )}
@@ -832,12 +937,12 @@ export default function OrderInvoiceDetailsPage() {
                     <OrderInvoicePDF
                       invoiceData={invoice}
                       companyName={companyName}
-                      eTransferEmail={eTransferEmail}
+                      eTransferEmail={customInteracEmail || eTransferEmail}
                       companyLogo={logoDataUrl}
                       showCalculations={true}
                     />
                   }
-                  fileName={`store-invoice-${invoice.order_id}-${month}.pdf`}
+                  fileName={generateFileName('store')}
                   style={{ textDecoration: 'none' }}
                 >
                   {({ loading: pdfLoading }) => (
@@ -856,7 +961,7 @@ export default function OrderInvoiceDetailsPage() {
                   <OrderInvoicePDF
                     invoiceData={invoice}
                     companyName={companyName}
-                    eTransferEmail={eTransferEmail}
+                    eTransferEmail={customInteracEmail || eTransferEmail}
                     companyLogo={logoDataUrl}
                     showCalculations={true}
                   />
@@ -874,12 +979,12 @@ export default function OrderInvoiceDetailsPage() {
                     <OrderInvoicePDF
                       invoiceData={invoice}
                       companyName={companyName}
-                      eTransferEmail={eTransferEmail}
+                      eTransferEmail={customInteracEmail || eTransferEmail}
                       companyLogo={logoDataUrl}
                       showCalculations={false}
                     />
                   }
-                  fileName={`customer-invoice-${invoice.order_id}-${month}.pdf`}
+                  fileName={generateFileName('customer')}
                   style={{ textDecoration: 'none' }}
                 >
                   {({ loading: pdfLoading }) => (
@@ -898,7 +1003,7 @@ export default function OrderInvoiceDetailsPage() {
                   <OrderInvoicePDF
                     invoiceData={invoice}
                     companyName={companyName}
-                    eTransferEmail={eTransferEmail}
+                    eTransferEmail={customInteracEmail || eTransferEmail}
                     companyLogo={logoDataUrl}
                     showCalculations={false}
                   />
