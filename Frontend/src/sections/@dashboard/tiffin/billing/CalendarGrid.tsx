@@ -396,21 +396,32 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         // Filter to find the extra tiffin order matching this exact date
         const customerOrders = allOrders.filter((order: any) => order.customer_id === customer.customer_id);
 
+        // Extra tiffin orders are single-day orders with a parent_order_id
         const extraTiffinOrder = customerOrders.find((order: any) => {
           const orderStartDate = order.start_date?.split('T')[0] || order.start_date;
           const orderEndDate = order.end_date?.split('T')[0] || order.end_date;
 
+          // Extra tiffins have:
+          // 1. start_date === end_date (single day)
+          // 2. Both dates match the clicked date
+          // 3. parent_order_id is set (links to main order)
           return (
             orderStartDate === date &&
             orderEndDate === date &&
-            order.meal_plan_frequency === 'Daily' &&
-            order.meal_plan_days === 'Single'
+            order.parent_order_id != null &&
+            order.parent_order_id > 0
           );
         });
 
         console.log('Extra tiffin order search:', {
           date: date,
           customer_orders_count: customerOrders.length,
+          all_customer_orders: customerOrders.map((o: any) => ({
+            id: o.id,
+            start: o.start_date?.split('T')[0],
+            end: o.end_date?.split('T')[0],
+            parent_id: o.parent_order_id,
+          })),
           found_extra_order: extraTiffinOrder,
           order_id: extraTiffinOrder?.id,
         });
@@ -428,6 +439,22 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           console.log('Delete order result:', deleteResult.data);
 
           if (deleteResult.data?.success) {
+            // Also delete the calendar entry
+            // The entry's order_id is set to parent_order_id, not the extra order's ID
+            try {
+              const calendarDeleteResult = await axios.delete('/api/calendar-entries', {
+                params: {
+                  order_id: extraTiffinOrder.parent_order_id, // Calendar entry uses parent order ID
+                  customer_id: customer.customer_id,
+                  delivery_date: date,
+                },
+              });
+              console.log('Delete calendar entry result:', calendarDeleteResult.data);
+            } catch (calendarError: any) {
+              console.error('Error deleting calendar entry:', calendarError);
+              // Continue anyway - order is already deleted
+            }
+
             enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
 
             // Revert billing status if it was finalized
