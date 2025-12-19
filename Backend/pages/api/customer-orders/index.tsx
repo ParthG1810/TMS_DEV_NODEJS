@@ -170,27 +170,21 @@ async function handleCreateCustomerOrder(
     } = req.body as any; // Use any to allow flexible type handling
 
     // Robust handling of selected_days - ensure it's always an array
-    console.log('[v2] Handling selected_days input:', typeof selected_days, selected_days);
     let daysArray: string[] = [];
 
     if (Array.isArray(selected_days)) {
       // Already an array - use as is
       daysArray = selected_days;
-      console.log('[v2] selected_days is array:', daysArray);
     } else if (typeof selected_days === 'string') {
       // String format - could be comma-separated or JSON string
       try {
         // Try parsing as JSON first
         daysArray = JSON.parse(selected_days);
-        console.log('[v2] selected_days parsed from JSON string:', daysArray);
       } catch {
         // If JSON parse fails, treat as comma-separated string
         daysArray = selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
-        console.log('[v2] selected_days parsed from comma-separated string:', daysArray);
       }
     }
-
-    console.log('[v2] Final daysArray before validation:', daysArray);
 
     // Validation
     const errors = await validateCustomerOrderInput({
@@ -239,7 +233,6 @@ async function handleCreateCustomerOrder(
 
     // Convert selected_days to JSON string for database storage
     const selectedDaysJson = JSON.stringify(daysArray);
-    console.log('[v2] Storing in database as JSON:', selectedDaysJson);
 
     // Insert customer order with payment_status='calculating' (initial state)
     // parent_order_id is used to link extra tiffin orders to their parent meal plan
@@ -291,8 +284,6 @@ async function handleCreateCustomerOrder(
         VALUES ${insertValues}
         ON DUPLICATE KEY UPDATE status = VALUES(status), order_id = VALUES(order_id)
       `);
-
-      console.log(`[CustomerOrders] Auto-created ${calendarEntries.length} calendar entries for order ${orderId}`);
     }
 
     // Fetch the created order with details
@@ -316,28 +307,21 @@ async function handleCreateCustomerOrder(
     )) as any[];
 
     // Parse JSON selected_days with defensive handling
-    console.log('[v2] Retrieved from database:', typeof createdOrders[0].selected_days, createdOrders[0].selected_days);
-
     let parsedDays: string[];
 
     // Check if it's already an array (MySQL driver may auto-parse JSON columns)
     if (Array.isArray(createdOrders[0].selected_days)) {
       parsedDays = createdOrders[0].selected_days;
-      console.log('[v2] selected_days already an array:', parsedDays);
     } else if (typeof createdOrders[0].selected_days === 'string') {
       // It's a string - try parsing
       try {
         parsedDays = JSON.parse(createdOrders[0].selected_days);
-        console.log('[v2] Successfully parsed selected_days from JSON string:', parsedDays);
       } catch (error) {
-        console.error('[v2] JSON.parse failed, trying comma-separated parsing');
         // If parse fails, try to handle as comma-separated string
         parsedDays = createdOrders[0].selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
-        console.log('[v2] Parsed as comma-separated string:', parsedDays);
       }
     } else {
       parsedDays = [];
-      console.error('[v2] Unexpected type for selected_days:', typeof createdOrders[0].selected_days);
     }
 
     const orderWithParsedDays = {

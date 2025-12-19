@@ -204,7 +204,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         const response = await axios.get('/api/meal-plans');
         setMealPlans(response.data.data || []);
       } catch (error) {
-        console.error('Error fetching meal plans:', error);
+        // Silently handle error
       }
     };
     fetchMealPlans();
@@ -279,7 +279,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     // Check if this cell is already being processed
     if (processingRef.current.has(cellKey)) {
-      console.log('Already processing this cell, ignoring duplicate click:', cellKey);
       return;
     }
 
@@ -359,7 +358,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
         onUpdate(); // Refresh the calendar
       } catch (error) {
-        console.error('Error updating calendar entry:', error);
         enqueueSnackbar('Failed to update entry', { variant: 'error' });
       } finally {
         // Remove from processing set
@@ -386,13 +384,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
         const allOrders = ordersResponse.data?.data?.orders || [];
 
-        console.log('All customer orders for month:', {
-          month: monthStr,
-          customer_id: customer.customer_id,
-          total_orders: allOrders.length,
-          orders: allOrders,
-        });
-
         // Filter to find the extra tiffin order matching this exact date
         const customerOrders = allOrders.filter((order: any) => order.customer_id === customer.customer_id);
 
@@ -413,30 +404,8 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           );
         });
 
-        console.log('Extra tiffin order search:', {
-          date: date,
-          customer_orders_count: customerOrders.length,
-          all_customer_orders: customerOrders.map((o: any) => ({
-            id: o.id,
-            start: o.start_date?.split('T')[0],
-            end: o.end_date?.split('T')[0],
-            parent_id: o.parent_order_id,
-          })),
-          found_extra_order: extraTiffinOrder,
-          order_id: extraTiffinOrder?.id,
-        });
-
         if (extraTiffinOrder) {
-          console.log('Deleting extra tiffin order:', {
-            order_id: extraTiffinOrder.id,
-            start_date: extraTiffinOrder.start_date,
-            end_date: extraTiffinOrder.end_date,
-            frequency: extraTiffinOrder.meal_plan_frequency,
-            days: extraTiffinOrder.meal_plan_days,
-          });
-
           const deleteResult = await axios.delete(`/api/customer-orders/${extraTiffinOrder.id}`);
-          console.log('Delete order result:', deleteResult.data);
 
           if (deleteResult.data?.success) {
             // Also delete the calendar entry
@@ -449,9 +418,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                   delivery_date: date,
                 },
               });
-              console.log('Delete calendar entry result:', calendarDeleteResult.data);
             } catch (calendarError: any) {
-              console.error('Error deleting calendar entry:', calendarError);
               // Continue anyway - order is already deleted
             }
 
@@ -471,32 +438,25 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 billing_month: billingMonth,
               });
 
-              console.log('Billing recalculation result:', recalcResult.data);
-
               if (recalcResult.data?.success) {
                 // Billing successfully recalculated, now refresh UI
                 onUpdate();
               } else {
-                console.error('Recalculation failed:', recalcResult.data);
                 enqueueSnackbar('Billing recalculation failed - refreshing anyway', { variant: 'warning' });
                 onUpdate();
               }
             } catch (recalcError: any) {
-              console.error('Error recalculating billing:', recalcError);
               enqueueSnackbar('Error recalculating billing - refreshing anyway', { variant: 'warning' });
               onUpdate();
             }
           } else {
-            console.error('Delete failed:', deleteResult.data);
             enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
           }
         } else {
           // If no extra order found, it might have been a manually created calendar entry
-          console.error('No extra tiffin order found for date:', date);
           enqueueSnackbar('No extra tiffin order found to remove', { variant: 'warning' });
         }
       } catch (error: any) {
-        console.error('Error removing extra tiffin:', error);
         const errorMsg = error.response?.data?.error || error.message || 'Failed to remove extra tiffin';
         enqueueSnackbar(errorMsg, { variant: 'error' });
       } finally {
@@ -637,7 +597,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         setFinalizingCustomerId(null);
       }
     } catch (error: any) {
-      console.error('Error finalizing order:', error);
       enqueueSnackbar(error.response?.data?.error || 'Failed to finalize order', { variant: 'error' });
       setFinalizingCustomerId(null);
     }
@@ -704,7 +663,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         });
       } catch (deleteError) {
         // Ignore error if entry doesn't exist
-        console.log('No existing entry to delete (expected for new extra tiffins)');
       }
 
       // Create a new order for the extra tiffin
@@ -725,14 +683,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         // Use parent_order_id for the calendar entry so it appears in the parent order's row
         const entryOrderId = extraOrderData.parent_order_id || newOrderId;
 
-        console.log('Created extra tiffin order:', {
-          order_id: newOrderId,
-          parent_order_id: extraOrderData.parent_order_id,
-          entry_order_id: entryOrderId,
-          order_data: orderResult.data.data,
-          delivery_date: extraOrderData.delivery_date,
-        });
-
         // Create the calendar entry with 'E' status
         // Use parent_order_id so the entry appears in the parent order's row in the billing calendar
         const result = await dispatch(
@@ -745,8 +695,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             price: priceValue,
           })
         );
-
-        console.log('Calendar entry creation result:', result);
 
         if (result.success) {
           enqueueSnackbar('Extra tiffin order created successfully', { variant: 'success' });
@@ -769,7 +717,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         enqueueSnackbar('Failed to create extra order', { variant: 'error' });
       }
     } catch (error) {
-      console.error('Error creating extra order:', error);
       enqueueSnackbar('Failed to create extra order', { variant: 'error' });
     }
   };
