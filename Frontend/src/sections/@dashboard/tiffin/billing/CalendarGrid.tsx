@@ -465,9 +465,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 // NOW refresh the UI after all backend operations are done
                 console.log('About to show snackbar and refresh UI');
                 enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
-                console.log('Snackbar shown, calling onUpdate()');
+                console.log('Snackbar shown, waiting 500ms before refresh to ensure DB commit');
+
+                // Add small delay to ensure database transaction is fully committed
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                console.log('Calling onUpdate() to refresh calendar data');
                 await onUpdate();
-                console.log('onUpdate() completed');
+                console.log('onUpdate() refresh completed');
               } else {
                 console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
                 enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
