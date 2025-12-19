@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 // @mui
 import {
   Card,
@@ -35,7 +36,7 @@ import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/p
 import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/tms';
 // local components
 import CombinedInvoiceDialog from './CombinedInvoiceDialog';
-import OrderInvoiceDialog from './OrderInvoiceDialog';
+import { PATH_DASHBOARD } from '../../../../routes/paths';
 
 // ----------------------------------------------------------------------
 
@@ -164,6 +165,7 @@ interface CalendarGridProps {
 }
 
 export default function CalendarGrid({ year, month, customers, onUpdate }: CalendarGridProps) {
+  const router = useRouter();
   const dispatch = useDispatch();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -176,14 +178,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const [invoiceCustomer, setInvoiceCustomer] = useState<{
     id: number;
     name: string;
-  } | null>(null);
-
-  // Order invoice dialog state
-  const [openOrderInvoiceDialog, setOpenOrderInvoiceDialog] = useState(false);
-  const [orderInvoiceData, setOrderInvoiceData] = useState<{
-    orderId: number;
-    customerId: number;
-    customerName: string;
   } | null>(null);
 
   // Extra tiffin order dialog state
@@ -656,25 +650,16 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       enqueueSnackbar('No order found', { variant: 'warning' });
       return;
     }
-    setOrderInvoiceData({
-      orderId: order.id,
-      customerId: customer.customer_id,
-      customerName: customer.customer_name,
-    });
-    setOpenOrderInvoiceDialog(true);
-  };
 
-  const handleSwitchToCombinedInvoice = () => {
-    // Close order invoice and open combined invoice
-    if (orderInvoiceData) {
-      setOpenOrderInvoiceDialog(false);
-      setInvoiceCustomer({
-        id: orderInvoiceData.customerId,
-        name: orderInvoiceData.customerName,
-      });
-      setOrderInvoiceData(null);
-      setOpenInvoiceDialog(true);
-    }
+    // Navigate to the new order invoice page
+    const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+    router.push({
+      pathname: '/dashboard/tiffin/order-invoice-details',
+      query: {
+        orderId: order.id,
+        month: billingMonth,
+      },
+    });
   };
 
   const handleInvoiceApproved = () => {
@@ -1157,19 +1142,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         />
       )}
 
-      {/* Order Invoice Dialog */}
-      {orderInvoiceData && (
-        <OrderInvoiceDialog
-          open={openOrderInvoiceDialog}
-          onClose={() => {
-            setOpenOrderInvoiceDialog(false);
-            setOrderInvoiceData(null);
-          }}
-          orderId={orderInvoiceData.orderId}
-          billingMonth={`${year}-${String(month).padStart(2, '0')}`}
-          onViewCombined={handleSwitchToCombinedInvoice}
-        />
-      )}
     </Card>
   );
 }
