@@ -46,10 +46,10 @@ import DashboardLayout from '../../../layouts/dashboard';
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
-  { id: 'id', label: 'Order', align: 'left' },
   { id: 'customer_name', label: 'Customer', align: 'left' },
-  { id: 'start_date', label: 'Date', align: 'left' },
-  { id: 'items', label: 'Items', align: 'center' },
+  { id: 'period', label: 'Period', align: 'left' },
+  { id: 'quantity', label: 'Qty', align: 'center' },
+  { id: 'selected_days', label: 'Days', align: 'left' },
   { id: 'price', label: 'Price', align: 'right' },
   { id: 'payment_status', label: 'Status', align: 'left' },
   { id: '' },
