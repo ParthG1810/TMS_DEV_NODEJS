@@ -181,6 +181,12 @@ export default function OrderInvoiceDialog({
     }
   };
 
+  const formatDate = (date: string) => {
+    if (!date) return '-';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
   const formatCurrency = (amount: number) => {
     return `CAD $${amount.toFixed(2)}`;
   };
@@ -270,7 +276,7 @@ export default function OrderInvoiceDialog({
             <Typography variant="h5">Order Invoice</Typography>
             {invoice && (
               <Typography variant="body2" color="text.secondary">
-                {invoice.customer_name} - {invoice.meal_plan_name} - {getMonthDisplay()}
+                {invoice.meal_plan_name} - {getMonthDisplay()}
               </Typography>
             )}
           </Stack>
@@ -286,255 +292,394 @@ export default function OrderInvoiceDialog({
             <CircularProgress />
           </Box>
         ) : invoice ? (
-          <Grid container spacing={3}>
-            {/* Left Half: Calendar View */}
-            <Grid item xs={12} md={6}>
-              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
-                <Typography variant="subtitle1" gutterBottom fontWeight={600}>
-                  Delivery Calendar
-                </Typography>
-
-                {/* Day headers */}
-                <Grid container spacing={0.5} sx={{ mb: 1 }}>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                    <Grid item xs key={day}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        fontWeight={600}
-                        textAlign="center"
-                        display="block"
-                      >
-                        {day}
+          <Stack spacing={3}>
+            {/* Customer & Order Info */}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                  <Typography variant="subtitle2" gutterBottom color="text.secondary">
+                    Customer Details
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    <Typography variant="body1" fontWeight={600}>
+                      {invoice.customer_name}
+                    </Typography>
+                    {invoice.customer_phone && (
+                      <Typography variant="body2" color="text.secondary">
+                        {invoice.customer_phone}
                       </Typography>
-                    </Grid>
-                  ))}
-                </Grid>
-
-                {/* Calendar days */}
-                <Grid container spacing={0.5}>
-                  {generateCalendarDays().map((item, index) => (
-                    <Grid item xs key={index}>
-                      <CalendarDay status={item.entry?.status} isPlanDay={item.isPlanDay}>
-                        {item.day && (
-                          <>
-                            <DayNumber status={item.entry?.status}>{item.day}</DayNumber>
-                            {item.entry && (
-                              <StatusIcon status={item.entry.status}>
-                                {item.entry.status === 'T'
-                                  ? '✓'
-                                  : item.entry.status === 'A'
-                                  ? '✗'
-                                  : '+'}
-                              </StatusIcon>
-                            )}
-                          </>
-                        )}
-                      </CalendarDay>
-                    </Grid>
-                  ))}
-                </Grid>
-
-                {/* Summary */}
-                <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2 }}>
-                  <Chip
-                    label={`${invoice.billing.total_delivered} Delivered`}
-                    size="small"
-                    sx={{
-                      bgcolor: alpha('#00AB55', 0.12),
-                      color: '#00AB55',
-                      fontWeight: 600,
-                    }}
-                  />
-                  <Chip
-                    label={`${invoice.billing.total_absent} Absent`}
-                    size="small"
-                    sx={{
-                      bgcolor: alpha('#FF5630', 0.12),
-                      color: '#FF5630',
-                      fontWeight: 600,
-                    }}
-                  />
-                  <Chip
-                    label={`${invoice.billing.total_extra} Extra`}
-                    size="small"
-                    sx={{
-                      bgcolor: alpha('#00B8D9', 0.12),
-                      color: '#00B8D9',
-                      fontWeight: 600,
-                    }}
-                  />
-                </Stack>
-              </Paper>
+                    )}
+                    {invoice.customer_address && (
+                      <Typography variant="body2" color="text.secondary">
+                        {invoice.customer_address}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                  <Typography variant="subtitle2" gutterBottom color="text.secondary">
+                    Order Details
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    <Typography variant="body1" fontWeight={600}>
+                      {invoice.meal_plan_name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Price: {formatCurrency(invoice.meal_plan_price)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Period: {formatDate(invoice.start_date)} - {formatDate(invoice.end_date)}
+                    </Typography>
+                    {invoice.selected_days.length > 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        Days: {invoice.selected_days.join(', ')}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
             </Grid>
 
-            {/* Right Half: Billing Calculation */}
-            <Grid item xs={12} md={6}>
-              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
-                <Typography variant="subtitle1" gutterBottom fontWeight={600}>
-                  Billing Calculation Breakdown
-                </Typography>
-
-                <Stack spacing={2}>
-                  {/* Base Order */}
-                  <Box>
-                    <Typography variant="body2" fontWeight={600} gutterBottom>
-                      Base Order: {invoice.meal_plan_name}
+            {/* Billing Summary */}
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle2" gutterBottom color="text.secondary">
+                Billing Summary
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={3}>
+                  <Stack alignItems="center" spacing={0.5}>
+                    <Typography variant="h4" color="text.secondary">
+                      {invoice.billing.total_plan_days}
                     </Typography>
-                    <CalculationRow>
-                      <Typography variant="caption" color="text.secondary">
-                        Order Price: {formatCurrency(invoice.meal_plan_price)}
-                      </Typography>
-                    </CalculationRow>
-                    <CalculationRow>
-                      <Typography variant="caption" color="text.secondary">
-                        Total {invoice.selected_days.join('-')} days in{' '}
-                        {getMonthDisplay().split(' ')[0]}: {invoice.billing.total_plan_days} days
-                      </Typography>
-                    </CalculationRow>
-                    <CalculationRow>
-                      <Typography variant="caption" color="text.secondary">
-                        Per-Tiffin Price: {formatCurrency(invoice.meal_plan_price)} ÷{' '}
-                        {invoice.billing.total_plan_days} = {formatCurrency(perTiffinPrice)}
-                        /tiffin
-                      </Typography>
-                    </CalculationRow>
-                    <CalculationRow>
-                      <Typography variant="caption" color="text.secondary">
-                        Order covers: {new Date(invoice.start_date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}{' '}
-                        -{' '}
-                        {new Date(invoice.end_date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </Typography>
-                    </CalculationRow>
-                  </Box>
-
-                  <Divider />
-
-                  {/* Delivered Tiffins */}
-                  <Box>
-                    <Typography variant="body2" fontWeight={600} gutterBottom color="success.main">
-                      Delivered Tiffins
+                    <Typography variant="caption" color="text.secondary">
+                      Plan Days
                     </Typography>
-                    <CalculationRow>
-                      <Typography variant="caption" color="text.secondary">
-                        Count: {invoice.billing.total_delivered} tiffins delivered
-                      </Typography>
-                    </CalculationRow>
-                    <CalculationRow>
-                      <Typography variant="caption" color="text.secondary">
-                        Calculation: {invoice.billing.total_delivered} × {formatCurrency(perTiffinPrice)} ={' '}
-                        {formatCurrency(deliveredAmount)}
-                      </Typography>
-                    </CalculationRow>
-                    <CalculationRow>
-                      <Typography variant="caption" fontWeight={600} color="success.main">
-                        Subtotal: {formatCurrency(deliveredAmount)}
-                      </Typography>
-                    </CalculationRow>
-                  </Box>
+                  </Stack>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Stack alignItems="center" spacing={0.5}>
+                    <Typography variant="h4" color="success.main">
+                      {invoice.billing.total_delivered}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Delivered
+                    </Typography>
+                  </Stack>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Stack alignItems="center" spacing={0.5}>
+                    <Typography variant="h4" color="error.main">
+                      {invoice.billing.total_absent}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Absent
+                    </Typography>
+                  </Stack>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Stack alignItems="center" spacing={0.5}>
+                    <Typography variant="h4" color="info.main">
+                      {invoice.billing.total_extra}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Extra
+                    </Typography>
+                  </Stack>
+                </Grid>
+              </Grid>
 
-                  <Divider />
+              <Divider sx={{ my: 2 }} />
 
-                  {/* Absent Days */}
-                  {invoice.billing.total_absent > 0 && (
-                    <>
-                      <Box>
-                        <Typography variant="body2" fontWeight={600} gutterBottom color="error.main">
-                          Absent Days (Deduction)
+              <Grid container spacing={2}>
+                <Grid item xs={4}>
+                  <Stack alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      Base Amount
+                    </Typography>
+                    <Typography variant="h6">{formatCurrency(invoice.billing.base_amount)}</Typography>
+                  </Stack>
+                </Grid>
+                <Grid item xs={4}>
+                  <Stack alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      Extra Amount
+                    </Typography>
+                    <Typography variant="h6" color="info.main">
+                      +{formatCurrency(invoice.billing.extra_amount)}
+                    </Typography>
+                  </Stack>
+                </Grid>
+                <Grid item xs={4}>
+                  <Stack alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      Total Amount
+                    </Typography>
+                    <Typography variant="h5" color="primary.main" fontWeight={700}>
+                      {formatCurrency(invoice.billing.total_amount)}
+                    </Typography>
+                  </Stack>
+                </Grid>
+              </Grid>
+
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                <Chip
+                  label={invoice.billing.status === 'finalized' ? 'Finalized' : 'Calculating'}
+                  color={invoice.billing.status === 'finalized' ? 'success' : 'warning'}
+                  size="small"
+                />
+                {invoice.billing.finalized_at && (
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                    on {new Date(invoice.billing.finalized_at).toLocaleDateString()}
+                  </Typography>
+                )}
+              </Box>
+            </Paper>
+
+            {/* Calendar & Calculation Breakdown - Two Column Layout */}
+            <Grid container spacing={3}>
+              {/* Left Half: Calendar View */}
+              <Grid item xs={12} md={6}>
+                <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                  <Typography variant="subtitle1" gutterBottom fontWeight={600}>
+                    Delivery Calendar
+                  </Typography>
+
+                  {/* Day headers */}
+                  <Grid container spacing={0.5} sx={{ mb: 1 }}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                      <Grid item xs key={day}>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          fontWeight={600}
+                          textAlign="center"
+                          display="block"
+                        >
+                          {day}
                         </Typography>
-                        <CalculationRow>
-                          <Typography variant="caption" color="text.secondary">
-                            Count: {invoice.billing.total_absent} day(s) absent
-                          </Typography>
-                        </CalculationRow>
-                        <CalculationRow>
-                          <Typography variant="caption" color="text.secondary">
-                            Calculation: {invoice.billing.total_absent} ×{' '}
-                            {formatCurrency(perTiffinPrice)} = -{formatCurrency(absentDeduction)}
-                          </Typography>
-                        </CalculationRow>
-                        <CalculationRow>
-                          <Typography variant="caption" fontWeight={600} color="error.main">
-                            Deduction: -{formatCurrency(absentDeduction)}
-                          </Typography>
-                        </CalculationRow>
-                      </Box>
-                      <Divider />
-                    </>
-                  )}
+                      </Grid>
+                    ))}
+                  </Grid>
 
-                  {/* Extra Tiffins */}
-                  {invoice.billing.total_extra > 0 && (
-                    <>
-                      <Box>
-                        <Typography variant="body2" fontWeight={600} gutterBottom color="info.main">
-                          Extra Tiffins
-                        </Typography>
-                        <CalculationRow>
-                          <Typography variant="caption" color="text.secondary">
-                            Count: {invoice.billing.total_extra} extra tiffin(s)
-                          </Typography>
-                        </CalculationRow>
-                        <CalculationRow>
-                          <Typography variant="caption" color="text.secondary">
-                            Price: {formatCurrency(invoice.billing.extra_amount / invoice.billing.total_extra)}/tiffin
-                          </Typography>
-                        </CalculationRow>
-                        <CalculationRow>
-                          <Typography variant="caption" fontWeight={600} color="info.main">
-                            Addition: +{formatCurrency(invoice.billing.extra_amount)}
-                          </Typography>
-                        </CalculationRow>
-                      </Box>
-                      <Divider />
-                    </>
-                  )}
+                  {/* Calendar days */}
+                  <Grid container spacing={0.5}>
+                    {generateCalendarDays().map((item, index) => (
+                      <Grid item xs key={index}>
+                        <CalendarDay status={item.entry?.status} isPlanDay={item.isPlanDay}>
+                          {item.day && (
+                            <>
+                              <DayNumber status={item.entry?.status}>{item.day}</DayNumber>
+                              {item.entry && (
+                                <StatusIcon status={item.entry.status}>
+                                  {item.entry.status === 'T'
+                                    ? '✓'
+                                    : item.entry.status === 'A'
+                                    ? '✗'
+                                    : '+'}
+                                </StatusIcon>
+                              )}
+                            </>
+                          )}
+                        </CalendarDay>
+                      </Grid>
+                    ))}
+                  </Grid>
 
-                  {/* Final Total */}
-                  <Box
-                    sx={{
-                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
-                      p: 2,
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="h6" fontWeight={700}>
-                        Total Amount
+                  {/* Summary */}
+                  <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2 }}>
+                    <Chip
+                      label={`${invoice.billing.total_delivered} Delivered`}
+                      size="small"
+                      sx={{
+                        bgcolor: alpha('#00AB55', 0.12),
+                        color: '#00AB55',
+                        fontWeight: 600,
+                      }}
+                    />
+                    <Chip
+                      label={`${invoice.billing.total_absent} Absent`}
+                      size="small"
+                      sx={{
+                        bgcolor: alpha('#FF5630', 0.12),
+                        color: '#FF5630',
+                        fontWeight: 600,
+                      }}
+                    />
+                    <Chip
+                      label={`${invoice.billing.total_extra} Extra`}
+                      size="small"
+                      sx={{
+                        bgcolor: alpha('#00B8D9', 0.12),
+                        color: '#00B8D9',
+                        fontWeight: 600,
+                      }}
+                    />
+                  </Stack>
+                </Paper>
+              </Grid>
+
+              {/* Right Half: Billing Calculation */}
+              <Grid item xs={12} md={6}>
+                <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                  <Typography variant="subtitle1" gutterBottom fontWeight={600}>
+                    Billing Calculation Breakdown
+                  </Typography>
+
+                  <Stack spacing={2}>
+                    {/* Base Order */}
+                    <Box>
+                      <Typography variant="body2" fontWeight={600} gutterBottom>
+                        Base Order: {invoice.meal_plan_name}
                       </Typography>
-                      <Typography variant="h4" color="primary.main" fontWeight={700}>
-                        {formatCurrency(invoice.billing.total_amount)}
-                      </Typography>
-                    </Stack>
-                    <Stack
-                      direction="row"
-                      justifyContent="center"
-                      alignItems="center"
-                      spacing={1}
-                      sx={{ mt: 1 }}
-                    >
-                      <Chip
-                        label={invoice.billing.status === 'finalized' ? 'Finalized' : 'Calculating'}
-                        color={invoice.billing.status === 'finalized' ? 'success' : 'warning'}
-                        size="small"
-                      />
-                      {invoice.billing.finalized_at && (
+                      <CalculationRow>
                         <Typography variant="caption" color="text.secondary">
-                          on {new Date(invoice.billing.finalized_at).toLocaleDateString()}
+                          Order Price: {formatCurrency(invoice.meal_plan_price)}
                         </Typography>
-                      )}
-                    </Stack>
-                  </Box>
-                </Stack>
-              </Paper>
+                      </CalculationRow>
+                      <CalculationRow>
+                        <Typography variant="caption" color="text.secondary">
+                          Total {invoice.selected_days.join('-')} days in{' '}
+                          {getMonthDisplay().split(' ')[0]}: {invoice.billing.total_plan_days} days
+                        </Typography>
+                      </CalculationRow>
+                      <CalculationRow>
+                        <Typography variant="caption" color="text.secondary">
+                          Per-Tiffin Price: {formatCurrency(invoice.meal_plan_price)} ÷{' '}
+                          {invoice.billing.total_plan_days} = {formatCurrency(perTiffinPrice)}
+                          /tiffin
+                        </Typography>
+                      </CalculationRow>
+                      <CalculationRow>
+                        <Typography variant="caption" color="text.secondary">
+                          Order covers:{' '}
+                          {new Date(invoice.start_date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}{' '}
+                          -{' '}
+                          {new Date(invoice.end_date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </Typography>
+                      </CalculationRow>
+                    </Box>
+
+                    <Divider />
+
+                    {/* Delivered Tiffins */}
+                    <Box>
+                      <Typography variant="body2" fontWeight={600} gutterBottom color="success.main">
+                        Delivered Tiffins
+                      </Typography>
+                      <CalculationRow>
+                        <Typography variant="caption" color="text.secondary">
+                          Count: {invoice.billing.total_delivered} tiffins delivered
+                        </Typography>
+                      </CalculationRow>
+                      <CalculationRow>
+                        <Typography variant="caption" color="text.secondary">
+                          Calculation: {invoice.billing.total_delivered} ×{' '}
+                          {formatCurrency(perTiffinPrice)} = {formatCurrency(deliveredAmount)}
+                        </Typography>
+                      </CalculationRow>
+                      <CalculationRow>
+                        <Typography variant="caption" fontWeight={600} color="success.main">
+                          Subtotal: {formatCurrency(deliveredAmount)}
+                        </Typography>
+                      </CalculationRow>
+                    </Box>
+
+                    <Divider />
+
+                    {/* Absent Days */}
+                    {invoice.billing.total_absent > 0 && (
+                      <>
+                        <Box>
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            gutterBottom
+                            color="error.main"
+                          >
+                            Absent Days (Deduction)
+                          </Typography>
+                          <CalculationRow>
+                            <Typography variant="caption" color="text.secondary">
+                              Count: {invoice.billing.total_absent} day(s) absent
+                            </Typography>
+                          </CalculationRow>
+                          <CalculationRow>
+                            <Typography variant="caption" color="text.secondary">
+                              Calculation: {invoice.billing.total_absent} ×{' '}
+                              {formatCurrency(perTiffinPrice)} = -{formatCurrency(absentDeduction)}
+                            </Typography>
+                          </CalculationRow>
+                          <CalculationRow>
+                            <Typography variant="caption" fontWeight={600} color="error.main">
+                              Deduction: -{formatCurrency(absentDeduction)}
+                            </Typography>
+                          </CalculationRow>
+                        </Box>
+                        <Divider />
+                      </>
+                    )}
+
+                    {/* Extra Tiffins */}
+                    {invoice.billing.total_extra > 0 && (
+                      <>
+                        <Box>
+                          <Typography variant="body2" fontWeight={600} gutterBottom color="info.main">
+                            Extra Tiffins
+                          </Typography>
+                          <CalculationRow>
+                            <Typography variant="caption" color="text.secondary">
+                              Count: {invoice.billing.total_extra} extra tiffin(s)
+                            </Typography>
+                          </CalculationRow>
+                          <CalculationRow>
+                            <Typography variant="caption" color="text.secondary">
+                              Price:{' '}
+                              {formatCurrency(
+                                invoice.billing.extra_amount / invoice.billing.total_extra
+                              )}
+                              /tiffin
+                            </Typography>
+                          </CalculationRow>
+                          <CalculationRow>
+                            <Typography variant="caption" fontWeight={600} color="info.main">
+                              Addition: +{formatCurrency(invoice.billing.extra_amount)}
+                            </Typography>
+                          </CalculationRow>
+                        </Box>
+                        <Divider />
+                      </>
+                    )}
+
+                    {/* Final Total */}
+                    <Box
+                      sx={{
+                        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                        p: 2,
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="h6" fontWeight={700}>
+                          Total Amount
+                        </Typography>
+                        <Typography variant="h4" color="primary.main" fontWeight={700}>
+                          {formatCurrency(invoice.billing.total_amount)}
+                        </Typography>
+                      </Stack>
+                    </Box>
+                  </Stack>
+                </Paper>
+              </Grid>
             </Grid>
-          </Grid>
+          </Stack>
         ) : (
           <Box sx={{ py: 5, textAlign: 'center' }}>
             <Typography color="text.secondary">No invoice data found</Typography>
