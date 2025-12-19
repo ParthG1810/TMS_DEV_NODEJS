@@ -215,21 +215,26 @@ async function handleCreateCustomerOrder(
     const formattedEndDate = new Date(end_date).toISOString().split('T')[0];
 
     // Check for duplicate orders (same customer, meal plan, and date range)
-    const duplicateCheck = (await query(
-      `SELECT id FROM customer_orders
-       WHERE customer_id = ?
-       AND meal_plan_id = ?
-       AND start_date = ?
-       AND end_date = ?
-       LIMIT 1`,
-      [customer_id, meal_plan_id, formattedStartDate, formattedEndDate]
-    )) as any[];
+    // Only check for duplicates if this is NOT an extra tiffin order (no parent_order_id)
+    // Extra tiffin orders (with parent_order_id) are allowed to have the same dates
+    if (!parent_order_id) {
+      const duplicateCheck = (await query(
+        `SELECT id FROM customer_orders
+         WHERE customer_id = ?
+         AND meal_plan_id = ?
+         AND start_date = ?
+         AND end_date = ?
+         AND (parent_order_id IS NULL OR parent_order_id = 0)
+         LIMIT 1`,
+        [customer_id, meal_plan_id, formattedStartDate, formattedEndDate]
+      )) as any[];
 
-    if (duplicateCheck.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Duplicate order: An order with the same customer, meal plan, and date range already exists',
-      });
+      if (duplicateCheck.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Duplicate order: An order with the same customer, meal plan, and date range already exists',
+        });
+      }
     }
 
     // Convert selected_days to JSON string for database storage
