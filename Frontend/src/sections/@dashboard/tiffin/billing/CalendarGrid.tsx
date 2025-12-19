@@ -463,56 +463,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 }
 
                 // NOW refresh the UI after all backend operations are done
-                console.log('About to show snackbar and refresh UI');
-                enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
+                console.log('All deletion operations completed successfully');
+                console.log('Refreshing UI...');
 
-                // Poll API until the deletion is reflected in the data
-                console.log('Polling API to verify deletion before refresh...');
-                const maxRetries = 10;
-                const baseDelay = 200; // Start with 200ms
-                let retries = 0;
-                let deletionConfirmed = false;
-
-                while (retries < maxRetries && !deletionConfirmed) {
-                  // Wait before checking (exponential backoff)
-                  const delay = baseDelay * Math.pow(1.5, retries);
-                  await new Promise(resolve => setTimeout(resolve, delay));
-
-                  try {
-                    // Check if the calendar entry is still there
-                    const checkResult = await axios.get('/api/calendar-entries', {
-                      params: {
-                        customer_id: customer.customer_id,
-                        start_date: date,
-                        end_date: date,
-                      },
-                    });
-
-                    const entries = checkResult.data?.data || [];
-                    const entryStillExists = entries.some((e: any) =>
-                      e.delivery_date?.split('T')[0] === date && e.status === 'E'
-                    );
-
-                    if (!entryStillExists) {
-                      deletionConfirmed = true;
-                      console.log(`Deletion confirmed after ${retries + 1} attempts (${delay}ms delay)`);
-                    } else {
-                      retries++;
-                      console.log(`Entry still exists, retry ${retries}/${maxRetries}`);
-                    }
-                  } catch (error) {
-                    console.error('Error checking deletion status:', error);
-                    retries++;
-                  }
-                }
-
-                if (!deletionConfirmed) {
-                  console.warn('Max retries reached, forcing refresh anyway');
-                }
-
-                console.log('Calling onUpdate() to refresh calendar data');
+                // Refresh calendar data
                 await onUpdate();
-                console.log('onUpdate() refresh completed');
+
+                console.log('UI refresh completed');
+                enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
               } else {
                 console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
                 enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
