@@ -604,49 +604,49 @@ export default function OrderInvoiceDetailsPage() {
                           <Typography variant="body2" fontWeight={600} gutterBottom>
                             Base Order: {invoice.meal_plan_name}
                           </Typography>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Order Price: {formatCurrency(invoice.meal_plan_price)}
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Total {invoice.selected_days.join('-')} days in {getMonthDisplay().split(' ')[0]}:{' '}
                               {invoice.billing.total_plan_days} days
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Per-Tiffin Price: {formatCurrency(invoice.meal_plan_price)} ÷{' '}
                               {invoice.billing.total_plan_days} = {formatCurrency(perTiffinPrice)}/tiffin
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative' }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               └─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Order covers: {new Date(invoice.start_date).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
@@ -667,37 +667,37 @@ export default function OrderInvoiceDetailsPage() {
                           <Typography variant="body2" fontWeight={600} gutterBottom color="success.main">
                             Delivered Tiffins
                           </Typography>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Count: {invoice.billing.total_delivered} tiffins delivered
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               ├─
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                               Calculation: {invoice.billing.total_delivered} × {formatCurrency(perTiffinPrice)} ={' '}
                               {formatCurrency(invoice.billing.total_delivered * perTiffinPrice)}
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 2, position: 'relative' }}>
+                          <Box sx={{ pl: 3.5, position: 'relative' }}>
                             <Box
                               component="span"
-                              sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                              sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                             >
                               └─
                             </Box>
-                            <Typography variant="caption" fontWeight={600} color="success.main">
+                            <Typography variant="caption" fontWeight={600} color="success.main" sx={{ lineHeight: 1.6 }}>
                               Subtotal: {formatCurrency(invoice.billing.total_delivered * perTiffinPrice)}
                             </Typography>
                           </Box>
@@ -710,37 +710,37 @@ export default function OrderInvoiceDetailsPage() {
                               <Typography variant="body2" fontWeight={600} gutterBottom color="error.main">
                                 Absent Days (Deduction)
                               </Typography>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   ├─
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                   Count: {invoice.billing.total_absent} day(s) absent
                                 </Typography>
                               </Box>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   ├─
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                   Calculation: {invoice.billing.total_absent} × {formatCurrency(perTiffinPrice)} ={' '}
                                   -{formatCurrency(invoice.billing.total_absent * perTiffinPrice)}
                                 </Typography>
                               </Box>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative' }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   └─
                                 </Box>
-                                <Typography variant="caption" fontWeight={600} color="error.main">
+                                <Typography variant="caption" fontWeight={600} color="error.main" sx={{ lineHeight: 1.6 }}>
                                   Deduction: -{formatCurrency(invoice.billing.total_absent * perTiffinPrice)}
                                 </Typography>
                               </Box>
@@ -755,25 +755,25 @@ export default function OrderInvoiceDetailsPage() {
                               <Typography variant="body2" fontWeight={600} gutterBottom color="info.main">
                                 Extra Tiffins
                               </Typography>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   ├─
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                   Count: {invoice.billing.total_extra} extra tiffin(s)
                                 </Typography>
                               </Box>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative', mb: 0.5 }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   ├─
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                                   Price:{' '}
                                   {formatCurrency(
                                     invoice.billing.extra_amount / invoice.billing.total_extra
@@ -781,14 +781,14 @@ export default function OrderInvoiceDetailsPage() {
                                   /tiffin
                                 </Typography>
                               </Box>
-                              <Box sx={{ pl: 2, position: 'relative' }}>
+                              <Box sx={{ pl: 3.5, position: 'relative' }}>
                                 <Box
                                   component="span"
-                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled' }}
+                                  sx={{ position: 'absolute', left: 0, color: 'text.disabled', fontSize: 12 }}
                                 >
                                   └─
                                 </Box>
-                                <Typography variant="caption" fontWeight={600} color="info.main">
+                                <Typography variant="caption" fontWeight={600} color="info.main" sx={{ lineHeight: 1.6 }}>
                                   Addition: +{formatCurrency(invoice.billing.extra_amount)}
                                 </Typography>
                               </Box>
