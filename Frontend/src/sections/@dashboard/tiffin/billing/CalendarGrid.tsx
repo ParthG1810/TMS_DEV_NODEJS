@@ -419,15 +419,29 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               console.log('Delete calendar entry result:', calendarDeleteResult.data);
 
               if (calendarDeleteResult.data?.success) {
+                console.log('Calendar entry deleted successfully, refreshing UI...');
+
+                // Revert billing status BEFORE recalculating
+                await revertBillingIfFinalized(customer);
+
+                // Recalculate billing to update totals
+                try {
+                  const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+                  console.log('Recalculating billing for month:', billingMonth);
+
+                  const recalcResult = await axios.post('/api/monthly-billing', {
+                    customer_id: customer.customer_id,
+                    billing_month: billingMonth,
+                  });
+
+                  console.log('Billing recalculation completed:', recalcResult.data);
+                } catch (recalcError: any) {
+                  console.error('Error recalculating billing:', recalcError);
+                }
+
+                // NOW refresh the UI after all backend operations are done
                 enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
-
-                // Refresh UI IMMEDIATELY after calendar entry deletion
-                // This ensures the 'E' marker is removed from the calendar right away
-                console.log('Refreshing UI after calendar entry deletion...');
                 onUpdate();
-
-                // Small delay to allow UI to update before recalculating billing
-                await new Promise(resolve => setTimeout(resolve, 200));
               } else {
                 console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
                 enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
@@ -442,36 +456,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
             }
 
-            // Revert billing status if it was finalized
-            await revertBillingIfFinalized(customer);
-
-            // Explicitly recalculate billing to ensure accurate data
-            // This calls sp_calculate_monthly_billing stored procedure
-            try {
-              const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
-              enqueueSnackbar('Recalculating billing...', { variant: 'info' });
-
-              const recalcResult = await axios.post('/api/monthly-billing', {
-                customer_id: customer.customer_id,
-                billing_month: billingMonth,
-              });
-
-              console.log('Billing recalculation result:', recalcResult.data);
-
-              if (recalcResult.data?.success) {
-                // Billing successfully recalculated, refresh UI one final time
-                console.log('Final UI refresh after billing recalculation...');
-                onUpdate();
-              } else {
-                console.error('Recalculation failed:', recalcResult.data);
-                enqueueSnackbar('Billing recalculation failed - refreshing anyway', { variant: 'warning' });
-                onUpdate();
-              }
-            } catch (recalcError: any) {
-              console.error('Error recalculating billing:', recalcError);
-              enqueueSnackbar('Error recalculating billing - refreshing anyway', { variant: 'warning' });
-              onUpdate();
-            }
             return; // Exit early
           } else {
             console.error('Delete failed:', deleteResult.data);
