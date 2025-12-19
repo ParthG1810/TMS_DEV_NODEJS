@@ -123,6 +123,8 @@ export default function OrderInvoiceDetailsPage() {
             }
           } catch (error) {
             console.error('Error fetching logo:', error);
+            // Logo file doesn't exist or can't be loaded - invoice will work without it
+            setLogoDataUrl('');
           }
         }
       }
