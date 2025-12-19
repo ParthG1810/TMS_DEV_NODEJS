@@ -405,7 +405,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           console.log('Delete order result:', deleteResult.data);
 
           if (deleteResult.data?.success) {
-            enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
+            console.log('Order deleted successfully, now deleting calendar entry for date:', date);
 
             // Also delete the associated calendar entry
             try {
@@ -417,9 +417,21 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 },
               });
               console.log('Delete calendar entry result:', calendarDeleteResult.data);
+
+              if (calendarDeleteResult.data?.success) {
+                enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
+              } else {
+                console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
+                enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
+              }
             } catch (calendarError: any) {
               console.error('Error deleting calendar entry:', calendarError);
-              // Continue anyway - order is already deleted
+              console.error('Calendar deletion error details:', {
+                message: calendarError.message,
+                response: calendarError.response?.data,
+                status: calendarError.response?.status,
+              });
+              enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
             }
 
             // Revert billing status if it was finalized
