@@ -396,13 +396,21 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         // Filter to find the extra tiffin order matching this exact date
         const customerOrders = allOrders.filter((order: any) => order.customer_id === customer.customer_id);
 
-        // Extra tiffin orders are single-day orders (start_date === end_date === specific date)
+        // Extra tiffin orders are single-day orders with a parent_order_id
         const extraTiffinOrder = customerOrders.find((order: any) => {
           const orderStartDate = order.start_date?.split('T')[0] || order.start_date;
           const orderEndDate = order.end_date?.split('T')[0] || order.end_date;
 
-          // Look for orders where start and end are both this specific date (single-day order = extra tiffin)
-          return orderStartDate === date && orderEndDate === date;
+          // Extra tiffins have:
+          // 1. start_date === end_date (single day)
+          // 2. Both dates match the clicked date
+          // 3. parent_order_id is set (links to main order)
+          return (
+            orderStartDate === date &&
+            orderEndDate === date &&
+            order.parent_order_id != null &&
+            order.parent_order_id > 0
+          );
         });
 
         console.log('Extra tiffin order search:', {
@@ -412,6 +420,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             id: o.id,
             start: o.start_date?.split('T')[0],
             end: o.end_date?.split('T')[0],
+            parent_id: o.parent_order_id,
           })),
           found_extra_order: extraTiffinOrder,
           order_id: extraTiffinOrder?.id,
