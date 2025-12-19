@@ -272,6 +272,7 @@ interface OrderInvoicePDFProps {
   companyName: string;
   eTransferEmail: string;
   companyLogo?: string;
+  showCalculations?: boolean;
 }
 
 // ----------------------------------------------------------------------
@@ -281,6 +282,7 @@ export default function OrderInvoicePDF({
   companyName,
   eTransferEmail,
   companyLogo,
+  showCalculations = true,
 }: OrderInvoicePDFProps) {
   const { billing_month, billing, calendar_entries } = invoiceData;
 
@@ -424,80 +426,84 @@ export default function OrderInvoicePDF({
           </View>
         </View>
 
-        <View style={styles.divider} />
+        {showCalculations && (
+          <>
+            <View style={styles.divider} />
 
-        {/* Billing Calculation Breakdown */}
-        <View style={styles.calculationSection}>
-          <Text style={styles.calculationTitle}>Billing Calculation Breakdown</Text>
+            {/* Billing Calculation Breakdown */}
+            <View style={styles.calculationSection}>
+              <Text style={styles.calculationTitle}>Billing Calculation Breakdown</Text>
 
-          <Text style={styles.calculationRowBold}>
-            Base Order: {invoiceData.meal_plan_name}
-          </Text>
-          <Text style={styles.calculationRow}>├─ Order Price: {formatCurrency(invoiceData.meal_plan_price)}</Text>
-          <Text style={styles.calculationRow}>
-            ├─ Total {invoiceData.selected_days.join('-')} days in {monthName}: {billing.total_plan_days} days
-          </Text>
-          <Text style={styles.calculationRow}>
-            ├─ Per-Tiffin Price: {formatCurrency(invoiceData.meal_plan_price)} ÷ {billing.total_plan_days} ={' '}
-            {formatCurrency(perTiffinPrice)}/tiffin
-          </Text>
-          <Text style={styles.calculationRow}>
-            └─ Order covers: {new Date(invoiceData.start_date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            })}{' '}
-            -{' '}
-            {new Date(invoiceData.end_date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            })}
-          </Text>
-
-          <Text style={styles.calculationRowBold}>Delivered Tiffins</Text>
-          <Text style={styles.calculationRow}>
-            ├─ Count: {billing.total_delivered} tiffins delivered
-          </Text>
-          <Text style={styles.calculationRow}>
-            ├─ Calculation: {billing.total_delivered} × {formatCurrency(perTiffinPrice)} ={' '}
-            {formatCurrency(billing.total_delivered * perTiffinPrice)}
-          </Text>
-          <Text style={styles.calculationRow}>
-            └─ Subtotal: {formatCurrency(billing.total_delivered * perTiffinPrice)}
-          </Text>
-
-          {billing.total_absent > 0 && (
-            <>
-              <Text style={styles.calculationRowBold}>Absent Days (Deduction)</Text>
+              <Text style={styles.calculationRowBold}>
+                Base Order: {invoiceData.meal_plan_name}
+              </Text>
+              <Text style={styles.calculationRow}>├─ Order Price: {formatCurrency(invoiceData.meal_plan_price)}</Text>
               <Text style={styles.calculationRow}>
-                ├─ Count: {billing.total_absent} day(s) absent
+                ├─ Total {invoiceData.selected_days.join('-')} days in {monthName}: {billing.total_plan_days} days
               </Text>
               <Text style={styles.calculationRow}>
-                ├─ Calculation: {billing.total_absent} × {formatCurrency(perTiffinPrice)} = -
-                {formatCurrency(billing.total_absent * perTiffinPrice)}
+                ├─ Per-Tiffin Price: {formatCurrency(invoiceData.meal_plan_price)} ÷ {billing.total_plan_days} ={' '}
+                {formatCurrency(perTiffinPrice)}/tiffin
               </Text>
               <Text style={styles.calculationRow}>
-                └─ Deduction: -{formatCurrency(billing.total_absent * perTiffinPrice)}
+                └─ Order covers: {new Date(invoiceData.start_date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}{' '}
+                -{' '}
+                {new Date(invoiceData.end_date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}
               </Text>
-            </>
-          )}
 
-          {billing.total_extra > 0 && (
-            <>
-              <Text style={styles.calculationRowBold}>Extra Tiffins</Text>
+              <Text style={styles.calculationRowBold}>Delivered Tiffins</Text>
               <Text style={styles.calculationRow}>
-                ├─ Count: {billing.total_extra} extra tiffin(s)
+                ├─ Count: {billing.total_delivered} tiffins delivered
               </Text>
               <Text style={styles.calculationRow}>
-                ├─ Price: {formatCurrency(billing.extra_amount / billing.total_extra)}/tiffin
+                ├─ Calculation: {billing.total_delivered} × {formatCurrency(perTiffinPrice)} ={' '}
+                {formatCurrency(billing.total_delivered * perTiffinPrice)}
               </Text>
               <Text style={styles.calculationRow}>
-                └─ Addition: +{formatCurrency(billing.extra_amount)}
+                └─ Subtotal: {formatCurrency(billing.total_delivered * perTiffinPrice)}
               </Text>
-            </>
-          )}
-        </View>
 
-        <View style={styles.divider} />
+              {billing.total_absent > 0 && (
+                <>
+                  <Text style={styles.calculationRowBold}>Absent Days (Deduction)</Text>
+                  <Text style={styles.calculationRow}>
+                    ├─ Count: {billing.total_absent} day(s) absent
+                  </Text>
+                  <Text style={styles.calculationRow}>
+                    ├─ Calculation: {billing.total_absent} × {formatCurrency(perTiffinPrice)} = -
+                    {formatCurrency(billing.total_absent * perTiffinPrice)}
+                  </Text>
+                  <Text style={styles.calculationRow}>
+                    └─ Deduction: -{formatCurrency(billing.total_absent * perTiffinPrice)}
+                  </Text>
+                </>
+              )}
+
+              {billing.total_extra > 0 && (
+                <>
+                  <Text style={styles.calculationRowBold}>Extra Tiffins</Text>
+                  <Text style={styles.calculationRow}>
+                    ├─ Count: {billing.total_extra} extra tiffin(s)
+                  </Text>
+                  <Text style={styles.calculationRow}>
+                    ├─ Price: {formatCurrency(billing.extra_amount / billing.total_extra)}/tiffin
+                  </Text>
+                  <Text style={styles.calculationRow}>
+                    └─ Addition: +{formatCurrency(billing.extra_amount)}
+                  </Text>
+                </>
+              )}
+            </View>
+
+            <View style={styles.divider} />
+          </>
+        )}
 
         {/* Total Amount */}
         <View style={styles.totalSection}>
