@@ -407,6 +407,21 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           if (deleteResult.data?.success) {
             enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
 
+            // Also delete the associated calendar entry
+            try {
+              const calendarDeleteResult = await axios.delete('/api/calendar-entries', {
+                params: {
+                  order_id: extraTiffinOrder.id,
+                  customer_id: customer.customer_id,
+                  delivery_date: date,
+                },
+              });
+              console.log('Delete calendar entry result:', calendarDeleteResult.data);
+            } catch (calendarError: any) {
+              console.error('Error deleting calendar entry:', calendarError);
+              // Continue anyway - order is already deleted
+            }
+
             // Revert billing status if it was finalized
             await revertBillingIfFinalized(customer);
 
@@ -562,8 +577,11 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           status: 'calculating',
         });
         // Note: onUpdate() will be called by the parent to refresh the data
-      } catch (error) {
-        console.error('Error reverting billing status:', error);
+      } catch (error: any) {
+        // Silently ignore 404 errors - billing record might not exist
+        if (error.response?.status !== 404) {
+          console.error('Error reverting billing status:', error);
+        }
         // Don't show error to user - this is a background operation
       }
     }
