@@ -185,6 +185,25 @@ export default function OrderInvoiceDetailsPage() {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
+  const generateFileName = (type: 'store' | 'customer') => {
+    if (!invoice || !month || typeof month !== 'string') return 'invoice.pdf';
+
+    // Format customer name (replace spaces with underscores, remove special chars)
+    const customerName = invoice.customer_name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+
+    // Format month-year (e.g., "December-2025")
+    const [year, monthNum] = month.split('-');
+    const date = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+    const monthYear = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).replace(' ', '-');
+
+    // Format plan name (replace spaces with underscores, remove special chars)
+    const planName = invoice.meal_plan_name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+
+    // Construct filename: CustomerName_Month-Year_Plan_Type.pdf
+    const typeLabel = type === 'store' ? 'Store' : 'Customer';
+    return `${customerName}_${monthYear}_${planName}_${typeLabel}.pdf`;
+  };
+
   // Generate calendar days
   const generateCalendarDays = () => {
     if (!invoice || !month || typeof month !== 'string') return [];
@@ -290,28 +309,56 @@ export default function OrderInvoiceDetailsPage() {
                 Back
               </Button>
               {currentTab === 'invoice-view' && invoice && (
-                <PDFDownloadLink
-                  document={
-                    <OrderInvoicePDF
-                      invoiceData={invoice}
-                      companyName={companyName}
-                      eTransferEmail={customInteracEmail || eTransferEmail}
-                      companyLogo={logoDataUrl}
-                    />
-                  }
-                  fileName={`order-invoice-${invoice.order_id}-${month}.pdf`}
-                  style={{ textDecoration: 'none' }}
-                >
-                  {({ loading: pdfLoading }) => (
-                    <Button
-                      variant="contained"
-                      startIcon={<Iconify icon="eva:download-fill" />}
-                      disabled={pdfLoading}
-                    >
-                      {pdfLoading ? 'Generating PDF...' : 'Download PDF'}
-                    </Button>
-                  )}
-                </PDFDownloadLink>
+                <Stack direction="row" spacing={1.5}>
+                  <PDFDownloadLink
+                    document={
+                      <OrderInvoicePDF
+                        invoiceData={invoice}
+                        companyName={companyName}
+                        eTransferEmail={customInteracEmail || eTransferEmail}
+                        companyLogo={logoDataUrl}
+                        showCalculations={true}
+                      />
+                    }
+                    fileName={generateFileName('store')}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {({ loading: pdfLoading }) => (
+                      <Button
+                        variant="contained"
+                        startIcon={<Iconify icon="eva:download-fill" />}
+                        disabled={pdfLoading}
+                        color="primary"
+                      >
+                        {pdfLoading ? 'Generating...' : 'Store Use PDF'}
+                      </Button>
+                    )}
+                  </PDFDownloadLink>
+                  <PDFDownloadLink
+                    document={
+                      <OrderInvoicePDF
+                        invoiceData={invoice}
+                        companyName={companyName}
+                        eTransferEmail={customInteracEmail || eTransferEmail}
+                        companyLogo={logoDataUrl}
+                        showCalculations={false}
+                      />
+                    }
+                    fileName={generateFileName('customer')}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {({ loading: pdfLoading }) => (
+                      <Button
+                        variant="outlined"
+                        startIcon={<Iconify icon="eva:download-fill" />}
+                        disabled={pdfLoading}
+                        color="primary"
+                      >
+                        {pdfLoading ? 'Generating...' : 'Customer Use PDF'}
+                      </Button>
+                    )}
+                  </PDFDownloadLink>
+                </Stack>
               )}
             </Stack>
           }
@@ -895,7 +942,7 @@ export default function OrderInvoiceDetailsPage() {
                       showCalculations={true}
                     />
                   }
-                  fileName={`store-invoice-${invoice.order_id}-${month}.pdf`}
+                  fileName={generateFileName('store')}
                   style={{ textDecoration: 'none' }}
                 >
                   {({ loading: pdfLoading }) => (
@@ -937,7 +984,7 @@ export default function OrderInvoiceDetailsPage() {
                       showCalculations={false}
                     />
                   }
-                  fileName={`customer-invoice-${invoice.order_id}-${month}.pdf`}
+                  fileName={generateFileName('customer')}
                   style={{ textDecoration: 'none' }}
                 >
                   {({ loading: pdfLoading }) => (
