@@ -105,6 +105,17 @@ async function handlePut(
     );
 
     if (existing.length === 0) {
+      // If billing doesn't exist and we're trying to set it to 'calculating',
+      // that's already achieved - return success instead of 404
+      if (body.status === 'calculating') {
+        return res.status(200).json({
+          success: true,
+          data: null,
+          message: 'Billing record does not exist, no action needed',
+        });
+      }
+
+      // For other operations, return 404
       return res.status(404).json({
         success: false,
         error: 'Billing record not found',
