@@ -67,7 +67,7 @@ interface OrderInvoice {
   calendar_entries: CalendarEntry[];
 }
 
-const TAB_OPTIONS = ['invoice-view', 'pdf-export'];
+const TAB_OPTIONS = ['invoice-view', 'store-use', 'customer-use'];
 
 // ----------------------------------------------------------------------
 
@@ -301,7 +301,8 @@ export default function OrderInvoiceDetailsPage() {
         <Card>
           <Tabs value={currentTab} onChange={handleTabChange} sx={{ px: 3, bgcolor: 'background.neutral' }}>
             <Tab label="Invoice View" value="invoice-view" />
-            <Tab label="PDF Export" value="pdf-export" />
+            <Tab label="Store Use" value="store-use" />
+            <Tab label="Customer Use" value="customer-use" />
           </Tabs>
 
           <Divider />
@@ -822,17 +823,87 @@ export default function OrderInvoiceDetailsPage() {
             </Box>
           )}
 
-          {/* PDF Export Tab */}
-          {currentTab === 'pdf-export' && invoice && (
-            <Box sx={{ height: 900 }}>
-              <PDFViewer width="100%" height="100%">
-                <OrderInvoicePDF
-                  invoiceData={invoice}
-                  companyName={companyName}
-                  eTransferEmail={eTransferEmail}
-                  companyLogo={logoDataUrl}
-                />
-              </PDFViewer>
+          {/* Store Use Tab - PDF with calculations */}
+          {currentTab === 'store-use' && invoice && (
+            <Box sx={{ p: 3 }}>
+              <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+                <PDFDownloadLink
+                  document={
+                    <OrderInvoicePDF
+                      invoiceData={invoice}
+                      companyName={companyName}
+                      eTransferEmail={eTransferEmail}
+                      companyLogo={logoDataUrl}
+                      showCalculations={true}
+                    />
+                  }
+                  fileName={`store-invoice-${invoice.order_id}-${month}.pdf`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  {({ loading: pdfLoading }) => (
+                    <Button
+                      variant="contained"
+                      startIcon={<Iconify icon="eva:download-fill" />}
+                      disabled={pdfLoading}
+                    >
+                      {pdfLoading ? 'Generating PDF...' : 'Download PDF'}
+                    </Button>
+                  )}
+                </PDFDownloadLink>
+              </Stack>
+              <Box sx={{ height: 850, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <PDFViewer width="100%" height="100%">
+                  <OrderInvoicePDF
+                    invoiceData={invoice}
+                    companyName={companyName}
+                    eTransferEmail={eTransferEmail}
+                    companyLogo={logoDataUrl}
+                    showCalculations={true}
+                  />
+                </PDFViewer>
+              </Box>
+            </Box>
+          )}
+
+          {/* Customer Use Tab - PDF without calculations */}
+          {currentTab === 'customer-use' && invoice && (
+            <Box sx={{ p: 3 }}>
+              <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+                <PDFDownloadLink
+                  document={
+                    <OrderInvoicePDF
+                      invoiceData={invoice}
+                      companyName={companyName}
+                      eTransferEmail={eTransferEmail}
+                      companyLogo={logoDataUrl}
+                      showCalculations={false}
+                    />
+                  }
+                  fileName={`customer-invoice-${invoice.order_id}-${month}.pdf`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  {({ loading: pdfLoading }) => (
+                    <Button
+                      variant="contained"
+                      startIcon={<Iconify icon="eva:download-fill" />}
+                      disabled={pdfLoading}
+                    >
+                      {pdfLoading ? 'Generating PDF...' : 'Download PDF'}
+                    </Button>
+                  )}
+                </PDFDownloadLink>
+              </Stack>
+              <Box sx={{ height: 850, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <PDFViewer width="100%" height="100%">
+                  <OrderInvoicePDF
+                    invoiceData={invoice}
+                    companyName={companyName}
+                    eTransferEmail={eTransferEmail}
+                    companyLogo={logoDataUrl}
+                    showCalculations={false}
+                  />
+                </PDFViewer>
+              </Box>
             </Box>
           )}
         </Card>
