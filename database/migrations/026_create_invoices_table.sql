@@ -39,9 +39,12 @@ CREATE TABLE IF NOT EXISTS invoices (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Step 2: Update order_billing table - add invoice_id and update status enum
--- First, modify the status enum to include 'invoiced'
+-- Modify the status enum to include 'approved' and 'invoiced'
+-- Flow: calculating → finalized → approved → invoiced
+-- User can reject at finalized or approved to go back to calculating
+-- User can generate invoice from finalized or approved
 ALTER TABLE order_billing
-    MODIFY COLUMN status ENUM('calculating', 'finalized', 'invoiced') NOT NULL DEFAULT 'calculating';
+    MODIFY COLUMN status ENUM('calculating', 'finalized', 'approved', 'invoiced') NOT NULL DEFAULT 'calculating';
 
 -- Add invoice_id column to link order_billing to invoices
 SET @column_exists = (
@@ -172,6 +175,7 @@ LEFT JOIN order_billing ob ON ob.invoice_id = i.id
 GROUP BY i.id;
 
 -- Step 6: Create view for available orders for invoicing
+-- Orders with status 'finalized' or 'approved' can be selected for invoice generation
 CREATE OR REPLACE VIEW v_available_for_invoice AS
 SELECT
     ob.id,
@@ -198,7 +202,7 @@ FROM order_billing ob
 INNER JOIN customers c ON ob.customer_id = c.id
 INNER JOIN customer_orders co ON ob.order_id = co.id
 INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
-WHERE ob.status = 'finalized'
+WHERE ob.status IN ('finalized', 'approved')
 AND ob.invoice_id IS NULL
 AND (co.parent_order_id IS NULL OR co.parent_order_id = 0)
 ORDER BY ob.customer_id, ob.billing_month, mp.meal_name;

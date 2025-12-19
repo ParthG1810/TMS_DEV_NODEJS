@@ -19,7 +19,7 @@ interface OrderBilling {
   base_amount: number;
   extra_amount: number;
   total_amount: number;
-  status: 'calculating' | 'finalized' | 'invoiced';
+  status: 'calculating' | 'finalized' | 'approved' | 'invoiced';
   finalized_at: string | null;
   finalized_by: string | null;
   invoice_id: number | null;
@@ -116,10 +116,10 @@ async function handleUpdate(
   const { status, finalized_by } = req.body;
 
   // Validate status
-  if (status && !['calculating', 'finalized', 'invoiced'].includes(status)) {
+  if (status && !['calculating', 'finalized', 'approved', 'invoiced'].includes(status)) {
     return res.status(400).json({
       success: false,
-      error: 'Invalid status. Must be "calculating", "finalized", or "invoiced"',
+      error: 'Invalid status. Must be "calculating", "finalized", "approved", or "invoiced"',
     });
   }
 
@@ -167,6 +167,12 @@ async function handleUpdate(
         updates.push('finalized_by = ?');
         params.push(finalized_by);
       }
+    } else if (status === 'approved') {
+      // Keep finalized_at but update finalized_by if provided
+      if (finalized_by) {
+        updates.push('finalized_by = ?');
+        params.push(finalized_by);
+      }
     } else if (status === 'calculating') {
       updates.push('finalized_at = NULL');
       updates.push('finalized_by = NULL');
@@ -193,8 +199,8 @@ async function handleUpdate(
       `UPDATE customer_orders SET payment_status = 'calculating' WHERE id = ?`,
       [currentBilling.order_id]
     );
-  } else if (status === 'finalized') {
-    // Finalized - set order to pending
+  } else if (status === 'finalized' || status === 'approved') {
+    // Finalized or Approved - set order to pending
     await query(
       `UPDATE customer_orders SET payment_status = 'pending' WHERE id = ?`,
       [currentBilling.order_id]

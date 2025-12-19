@@ -31,6 +31,7 @@ import { useSettingsContext } from '../../../components/settings';
 import axios from '../../../utils/axios';
 import { useSnackbar } from '../../../components/snackbar';
 import OrderInvoicePDF from '../../../sections/@dashboard/tiffin/OrderInvoicePDF';
+import { InvoiceGenerationModal } from '../../../sections/@dashboard/tiffin/invoice';
 
 // ----------------------------------------------------------------------
 
@@ -61,9 +62,10 @@ interface OrderInvoice {
     base_amount: number;
     extra_amount: number;
     total_amount: number;
-    status: 'calculating' | 'finalized';
+    status: 'calculating' | 'finalized' | 'approved' | 'invoiced';
     finalized_at: string | null;
     finalized_by: string | null;
+    invoice_id: number | null;
   };
   calendar_entries: CalendarEntry[];
 }
@@ -95,6 +97,8 @@ export default function OrderInvoiceDetailsPage() {
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Load invoice details and settings
   useEffect(() => {
@@ -174,6 +178,76 @@ export default function OrderInvoiceDetailsPage() {
   const handleResetInteracEmail = () => {
     setCustomInteracEmail(eTransferEmail);
     enqueueSnackbar('Reset to default Interac email', { variant: 'info' });
+  };
+
+  // Get the order_billing id from the API response
+  const getOrderBillingId = async () => {
+    if (!orderId || !month) return null;
+    try {
+      const response = await axios.get('/api/order-billing', {
+        params: { order_id: orderId, billing_month: month },
+      });
+      if (response.data.success && response.data.data.length > 0) {
+        return response.data.data[0].id;
+      }
+    } catch (error) {
+      console.error('Error getting order billing id:', error);
+    }
+    return null;
+  };
+
+  const handleApprove = async () => {
+    try {
+      setActionLoading(true);
+      const billingId = await getOrderBillingId();
+      if (!billingId) {
+        enqueueSnackbar('Order billing not found', { variant: 'error' });
+        return;
+      }
+
+      const response = await axios.put(`/api/order-billing/${billingId}`, {
+        status: 'approved',
+      });
+
+      if (response.data.success) {
+        enqueueSnackbar('Order approved successfully', { variant: 'success' });
+        fetchInvoiceDetails();
+      } else {
+        enqueueSnackbar(response.data.error || 'Failed to approve order', { variant: 'error' });
+      }
+    } catch (error: any) {
+      console.error('Error approving order:', error);
+      enqueueSnackbar(error.message || 'Failed to approve order', { variant: 'error' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReject = async () => {
+    try {
+      setActionLoading(true);
+      const billingId = await getOrderBillingId();
+      if (!billingId) {
+        enqueueSnackbar('Order billing not found', { variant: 'error' });
+        return;
+      }
+
+      const response = await axios.put(`/api/order-billing/${billingId}`, {
+        status: 'calculating',
+      });
+
+      if (response.data.success) {
+        enqueueSnackbar('Order rejected and sent back for recalculation', { variant: 'success' });
+        fetchInvoiceDetails();
+      } else {
+        enqueueSnackbar(response.data.error || 'Failed to reject order', { variant: 'error' });
+      }
+    } catch (error: any) {
+      console.error('Error rejecting order:', error);
+      enqueueSnackbar(error.message || 'Failed to reject order', { variant: 'error' });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -360,6 +434,40 @@ export default function OrderInvoiceDetailsPage() {
                       </Button>
                     )}
                   </PDFDownloadLink>
+                  {/* Action buttons based on status */}
+                  {invoice.billing.status === 'finalized' && (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      startIcon={<Iconify icon="eva:checkmark-circle-2-outline" />}
+                      onClick={handleApprove}
+                      disabled={actionLoading}
+                    >
+                      Approve
+                    </Button>
+                  )}
+                  {(invoice.billing.status === 'finalized' || invoice.billing.status === 'approved') && (
+                    <>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<Iconify icon="solar:document-add-bold" />}
+                        onClick={() => setShowInvoiceModal(true)}
+                        disabled={actionLoading}
+                      >
+                        Generate Invoice
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={<Iconify icon="eva:close-circle-outline" />}
+                        onClick={handleReject}
+                        disabled={actionLoading}
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  )}
                 </Stack>
               )}
             </Stack>
@@ -391,8 +499,24 @@ export default function OrderInvoiceDetailsPage() {
                     </Typography>
                   </Box>
                   <Chip
-                    label={invoice.billing.status === 'finalized' ? 'Finalized' : 'Calculating'}
-                    color={invoice.billing.status === 'finalized' ? 'success' : 'warning'}
+                    label={
+                      invoice.billing.status === 'invoiced'
+                        ? 'Invoiced'
+                        : invoice.billing.status === 'approved'
+                        ? 'Approved'
+                        : invoice.billing.status === 'finalized'
+                        ? 'Finalized'
+                        : 'Calculating'
+                    }
+                    color={
+                      invoice.billing.status === 'invoiced'
+                        ? 'info'
+                        : invoice.billing.status === 'approved'
+                        ? 'success'
+                        : invoice.billing.status === 'finalized'
+                        ? 'primary'
+                        : 'warning'
+                    }
                   />
                 </Stack>
 
@@ -1014,6 +1138,18 @@ export default function OrderInvoiceDetailsPage() {
             </Box>
           )}
         </Card>
+
+        {/* Invoice Generation Modal */}
+        <InvoiceGenerationModal
+          open={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          customerId={invoice.customer_id}
+          billingMonth={invoice.billing_month}
+          onSuccess={() => {
+            setShowInvoiceModal(false);
+            fetchInvoiceDetails();
+          }}
+        />
       </Container>
     </>
   );

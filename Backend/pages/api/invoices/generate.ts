@@ -131,12 +131,12 @@ export default async function handler(
       });
     }
 
-    // Check all are finalized
-    const notFinalized = orderBillings.filter(ob => ob.status !== 'finalized');
-    if (notFinalized.length > 0) {
+    // Check all are finalized or approved
+    const notReady = orderBillings.filter(ob => ob.status !== 'finalized' && ob.status !== 'approved');
+    if (notReady.length > 0) {
       return res.status(400).json({
         success: false,
-        error: `Order billings must be finalized before generating invoice. Not finalized: ${notFinalized.map(ob => ob.id).join(', ')}`,
+        error: `Order billings must be finalized or approved before generating invoice. Not ready: ${notReady.map(ob => ob.id).join(', ')}`,
       });
     }
 
