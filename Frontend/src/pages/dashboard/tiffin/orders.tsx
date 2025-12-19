@@ -359,15 +359,49 @@ export default function OrdersPage() {
   };
 
   const handleExport = () => {
-    // Create CSV export
-    const headers = ['Order ID', 'Customer', 'Date', 'Items', 'Price', 'Status'];
+    // Create CSV export with all fields from database
+    const headers = [
+      'Order ID',
+      'Customer ID',
+      'Customer Name',
+      'Customer Phone',
+      'Customer Address',
+      'Meal Plan ID',
+      'Meal Plan Name',
+      'Meal Plan Description',
+      'Meal Plan Frequency',
+      'Meal Plan Days',
+      'Quantity',
+      'Selected Days',
+      'Price',
+      'Payment ID',
+      'Payment Status',
+      'Start Date',
+      'End Date',
+      'Created At',
+      'Updated At',
+    ];
+
     const csvData = dataFiltered.map((order) => [
       order.id,
-      order.customer_name,
-      new Date(order.start_date).toLocaleDateString(),
-      order.selected_days && order.selected_days.length > 0 ? order.selected_days.length : 7,
+      order.customer_id,
+      `"${order.customer_name || ''}"`, // Quote to handle commas in names
+      `"${order.customer_phone || ''}"`,
+      `"${order.customer_address || ''}"`,
+      order.meal_plan_id,
+      `"${order.meal_plan_name || ''}"`,
+      `"${order.meal_plan_description || ''}"`,
+      order.meal_plan_frequency || '',
+      order.meal_plan_days || '',
+      order.quantity,
+      `"${order.selected_days ? order.selected_days.join(';') : ''}"`, // Use semicolon as separator
       order.price,
+      order.payment_id || '',
       order.payment_status || 'calculating',
+      order.start_date,
+      order.end_date,
+      order.created_at,
+      order.updated_at,
     ]);
 
     const csvContent = [
