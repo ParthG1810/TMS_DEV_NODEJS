@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { query } from '../../../src/lib/db';
+import { query } from '../../../src/config/database';
 
 interface ApiResponse<T> {
   success: boolean;
