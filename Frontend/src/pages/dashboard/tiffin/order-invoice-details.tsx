@@ -464,79 +464,92 @@ export default function OrderInvoiceDetailsPage() {
                       </Typography>
 
                       {/* Day headers */}
-                      <Grid container spacing={0.2} sx={{ mb: 0.5, maxWidth: 350, mx: 'auto' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, width: 280, mx: 'auto' }}>
                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                          <Grid item xs key={day}>
+                          <Box
+                            key={day}
+                            sx={{
+                              width: '13%',
+                              margin: '1.5px',
+                              textAlign: 'center',
+                            }}
+                          >
                             <Typography
                               variant="caption"
                               color="text.secondary"
                               fontWeight={600}
-                              textAlign="center"
-                              display="block"
-                              sx={{ fontSize: 10 }}
+                              sx={{ fontSize: 8 }}
                             >
                               {day}
                             </Typography>
-                          </Grid>
+                          </Box>
                         ))}
-                      </Grid>
+                      </Box>
 
                       {/* Calendar days */}
-                      <Grid container spacing={0.2} sx={{ maxWidth: 350, mx: 'auto' }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          width: 280,
+                          mx: 'auto',
+                          mb: 1,
+                        }}
+                      >
                         {generateCalendarDays().map((item, index) => (
-                          <Grid item xs key={index}>
-                            <Box
-                              sx={{
-                                width: '100%',
-                                aspectRatio: '1',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                borderRadius: 0.5,
-                                position: 'relative',
-                                minHeight: 28,
-                                backgroundColor: item.entry
-                                  ? item.entry.status === 'T'
-                                    ? 'rgba(76, 175, 80, 0.2)'
-                                    : item.entry.status === 'A'
-                                    ? 'rgba(244, 67, 54, 0.2)'
-                                    : 'rgba(33, 150, 243, 0.2)'
-                                  : item.isPlanDay
-                                  ? alpha(theme.palette.grey[400], 0.05)
-                                  : 'transparent',
-                              }}
-                            >
-                              {item.day && (
-                                <Stack alignItems="center" spacing={0}>
-                                  <Typography sx={{ fontSize: 11, fontWeight: 500, marginBottom: 0.5 }}>
-                                    {item.day}
+                          <Box
+                            key={index}
+                            sx={{
+                              width: '13%',
+                              margin: '1.5px',
+                              padding: '4px',
+                              minHeight: 28,
+                              borderRadius: '3px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: item.entry
+                                ? item.entry.status === 'T'
+                                  ? 'rgba(76, 175, 80, 0.2)'
+                                  : item.entry.status === 'A'
+                                  ? 'rgba(244, 67, 54, 0.2)'
+                                  : 'rgba(33, 150, 243, 0.2)'
+                                : item.isPlanDay
+                                ? alpha(theme.palette.grey[400], 0.05)
+                                : 'transparent',
+                            }}
+                          >
+                            {item.day && (
+                              <>
+                                <Typography sx={{ fontSize: 9, fontWeight: 500, mb: 0.2 }}>
+                                  {item.day}
+                                </Typography>
+                                {item.entry && (
+                                  <Typography
+                                    sx={{
+                                      fontSize: 9,
+                                      fontWeight: 700,
+                                      color:
+                                        item.entry.status === 'T'
+                                          ? '#4caf50'
+                                          : item.entry.status === 'A'
+                                          ? '#f44336'
+                                          : '#2196f3',
+                                    }}
+                                  >
+                                    {item.entry.status === 'T'
+                                      ? '✓'
+                                      : item.entry.status === 'A'
+                                      ? '✗'
+                                      : '+'}
                                   </Typography>
-                                  {item.entry && (
-                                    <Box
-                                      sx={{
-                                        fontSize: 11,
-                                        fontWeight: 'bold',
-                                        color:
-                                          item.entry.status === 'T'
-                                            ? '#4caf50'
-                                            : item.entry.status === 'A'
-                                            ? '#f44336'
-                                            : '#2196f3',
-                                      }}
-                                    >
-                                      {item.entry.status === 'T'
-                                        ? '✓'
-                                        : item.entry.status === 'A'
-                                        ? '✗'
-                                        : '+'}
-                                    </Box>
-                                  )}
-                                </Stack>
-                              )}
-                            </Box>
-                          </Grid>
+                                )}
+                              </>
+                            )}
+                          </Box>
                         ))}
-                      </Grid>
+                      </Box>
 
                       {/* Summary */}
                       <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ mt: 2 }}>
