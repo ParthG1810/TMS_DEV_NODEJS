@@ -420,6 +420,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
               if (calendarDeleteResult.data?.success) {
                 enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
+
+                // Refresh UI IMMEDIATELY after calendar entry deletion
+                // This ensures the 'E' marker is removed from the calendar right away
+                console.log('Refreshing UI after calendar entry deletion...');
+                onUpdate();
+
+                // Small delay to allow UI to update before recalculating billing
+                await new Promise(resolve => setTimeout(resolve, 200));
               } else {
                 console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
                 enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
@@ -451,7 +459,8 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               console.log('Billing recalculation result:', recalcResult.data);
 
               if (recalcResult.data?.success) {
-                // Billing successfully recalculated, now refresh UI
+                // Billing successfully recalculated, refresh UI one final time
+                console.log('Final UI refresh after billing recalculation...');
                 onUpdate();
               } else {
                 console.error('Recalculation failed:', recalcResult.data);
