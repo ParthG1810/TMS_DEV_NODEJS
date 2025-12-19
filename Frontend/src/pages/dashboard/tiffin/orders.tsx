@@ -11,6 +11,10 @@ import {
   Container,
   IconButton,
   TableContainer,
+  Tabs,
+  Tab,
+  Box,
+  alpha,
 } from '@mui/material';
 // routes
 import { PATH_DASHBOARD } from '../../../routes/paths';
@@ -42,13 +46,22 @@ import DashboardLayout from '../../../layouts/dashboard';
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
+  { id: 'id', label: 'Order', align: 'left' },
   { id: 'customer_name', label: 'Customer', align: 'left' },
-  { id: 'meal_plan_name', label: 'Meal Plan', align: 'left' },
-  { id: 'quantity', label: 'Qty', align: 'center' },
-  { id: 'selected_days', label: 'Days', align: 'left' },
-  { id: 'price', label: 'Price (CAD $)', align: 'right' },
-  { id: 'dates', label: 'Period', align: 'left' },
+  { id: 'start_date', label: 'Date', align: 'left' },
+  { id: 'items', label: 'Items', align: 'center' },
+  { id: 'price', label: 'Price', align: 'right' },
+  { id: 'payment_status', label: 'Status', align: 'left' },
   { id: '' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'calculating', label: 'Calculating' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'finalized', label: 'Finalized' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'partial_paid', label: 'Partial Paid' },
 ];
 
 // ----------------------------------------------------------------------
@@ -81,6 +94,9 @@ export default function OrdersPage() {
 
   const [tableData, setTableData] = useState<ICustomerOrder[]>([]);
   const [filterName, setFilterName] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
+  const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
   const [openConfirm, setOpenConfirm] = useState(false);
 
   useEffect(() => {
@@ -97,12 +113,24 @@ export default function OrdersPage() {
     inputData: tableData,
     comparator: getComparator(order, orderBy),
     filterName,
+    filterStatus,
+    filterStartDate,
+    filterEndDate,
   });
 
   const dataInPage = dataFiltered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const denseHeight = dense ? 52 : 72;
-  const isFiltered = filterName !== '';
-  const isNotFound = (!dataFiltered.length && !!filterName) || (!isLoading && !dataFiltered.length);
+  const isFiltered = filterName !== '' || filterStatus !== 'all' || filterStartDate !== null || filterEndDate !== null;
+  const isNotFound = (!dataFiltered.length && isFiltered) || (!isLoading && !dataFiltered.length);
+
+  // Calculate status counts
+  const getStatusCount = (status: string) => {
+    if (status === 'all') return tableData.length;
+    return tableData.filter((order) => {
+      const orderStatus = order.payment_status || 'calculating';
+      return orderStatus === status;
+    }).length;
+  };
 
   const handleOpenConfirm = () => setOpenConfirm(true);
   const handleCloseConfirm = () => setOpenConfirm(false);
@@ -110,6 +138,21 @@ export default function OrdersPage() {
   const handleFilterName = (event: React.ChangeEvent<HTMLInputElement>) => {
     setPage(0);
     setFilterName(event.target.value);
+  };
+
+  const handleFilterStatus = (event: React.SyntheticEvent, newValue: string) => {
+    setPage(0);
+    setFilterStatus(newValue);
+  };
+
+  const handleFilterStartDate = (date: Date | null) => {
+    setPage(0);
+    setFilterStartDate(date);
+  };
+
+  const handleFilterEndDate = (date: Date | null) => {
+    setPage(0);
+    setFilterEndDate(date);
   };
 
   const handleDeleteRow = async (id: number) => {
@@ -213,6 +256,46 @@ export default function OrdersPage() {
 
   const handleResetFilter = () => {
     setFilterName('');
+    setFilterStatus('all');
+    setFilterStartDate(null);
+    setFilterEndDate(null);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleImport = () => {
+    enqueueSnackbar('Import functionality coming soon', { variant: 'info' });
+  };
+
+  const handleExport = () => {
+    // Create CSV export
+    const headers = ['Order ID', 'Customer', 'Date', 'Items', 'Price', 'Status'];
+    const csvData = dataFiltered.map((order) => [
+      order.id,
+      order.customer_name,
+      new Date(order.start_date).toLocaleDateString(),
+      order.selected_days && order.selected_days.length > 0 ? order.selected_days.length : 7,
+      order.price,
+      order.payment_status || 'calculating',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map((row) => row.join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `tiffin-orders-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    enqueueSnackbar('Orders exported successfully', { variant: 'success' });
   };
 
   return (
@@ -241,11 +324,58 @@ export default function OrdersPage() {
         />
 
         <Card>
+          {/* Status Tabs */}
+          <Tabs
+            value={filterStatus}
+            onChange={handleFilterStatus}
+            sx={{
+              px: 2.5,
+              pt: 2,
+              bgcolor: 'background.neutral',
+              borderBottom: (theme) => `solid 1px ${alpha(theme.palette.grey[500], 0.24)}`,
+            }}
+          >
+            {STATUS_OPTIONS.map((tab) => (
+              <Tab
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                icon={
+                  <Box
+                    sx={{
+                      minWidth: 20,
+                      height: 20,
+                      borderRadius: '6px',
+                      bgcolor: filterStatus === tab.value ? 'primary.main' : 'grey.400',
+                      color: 'common.white',
+                      fontSize: 11,
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      ml: 1,
+                    }}
+                  >
+                    {getStatusCount(tab.value)}
+                  </Box>
+                }
+                iconPosition="end"
+              />
+            ))}
+          </Tabs>
+
           <OrderTableToolbar
             isFiltered={isFiltered}
             filterName={filterName}
+            filterStartDate={filterStartDate}
+            filterEndDate={filterEndDate}
             onFilterName={handleFilterName}
+            onFilterStartDate={handleFilterStartDate}
+            onFilterEndDate={handleFilterEndDate}
             onResetFilter={handleResetFilter}
+            onPrint={handlePrint}
+            onImport={handleImport}
+            onExport={handleExport}
           />
 
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
@@ -355,10 +485,16 @@ function applyFilter({
   inputData,
   comparator,
   filterName,
+  filterStatus,
+  filterStartDate,
+  filterEndDate,
 }: {
   inputData: ICustomerOrder[];
   comparator: (a: any, b: any) => number;
   filterName: string;
+  filterStatus: string;
+  filterStartDate: Date | null;
+  filterEndDate: Date | null;
 }) {
   const stabilizedThis = inputData.map((el, index) => [el, index] as const);
 
@@ -370,12 +506,44 @@ function applyFilter({
 
   inputData = stabilizedThis.map((el) => el[0]);
 
+  // Filter by search text
   if (filterName) {
     inputData = inputData.filter(
       (order) =>
         order.customer_name?.toLowerCase().indexOf(filterName.toLowerCase()) !== -1 ||
-        order.meal_plan_name?.toLowerCase().indexOf(filterName.toLowerCase()) !== -1
+        order.meal_plan_name?.toLowerCase().indexOf(filterName.toLowerCase()) !== -1 ||
+        order.id?.toString().indexOf(filterName) !== -1
     );
+  }
+
+  // Filter by status
+  if (filterStatus !== 'all') {
+    inputData = inputData.filter((order) => {
+      const orderStatus = order.payment_status || 'calculating';
+      return orderStatus === filterStatus;
+    });
+  }
+
+  // Filter by start date
+  if (filterStartDate) {
+    inputData = inputData.filter((order) => {
+      const orderDate = new Date(order.start_date);
+      orderDate.setHours(0, 0, 0, 0);
+      const startDate = new Date(filterStartDate);
+      startDate.setHours(0, 0, 0, 0);
+      return orderDate >= startDate;
+    });
+  }
+
+  // Filter by end date
+  if (filterEndDate) {
+    inputData = inputData.filter((order) => {
+      const orderDate = new Date(order.start_date);
+      orderDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(filterEndDate);
+      endDate.setHours(0, 0, 0, 0);
+      return orderDate <= endDate;
+    });
   }
 
   return inputData;
