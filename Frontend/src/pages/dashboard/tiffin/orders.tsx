@@ -262,7 +262,96 @@ export default function OrdersPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    // Create a print-friendly table view
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Tiffin Orders</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20px;
+            }
+            h1 {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .text-right {
+              text-align: right;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Tiffin Order List</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Period</th>
+                <th class="text-center">Qty</th>
+                <th>Days</th>
+                <th class="text-right">Price</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dataFiltered.map((order) => `
+                <tr>
+                  <td>
+                    <strong>${order.customer_name}</strong><br/>
+                    <small>${order.meal_plan_name}</small>
+                  </td>
+                  <td>${new Date(order.start_date).toLocaleDateString()} - ${new Date(order.end_date).toLocaleDateString()}</td>
+                  <td class="text-center">${order.quantity}</td>
+                  <td>${order.selected_days && order.selected_days.length > 0 ? order.selected_days.join(', ') : 'All Days'}</td>
+                  <td class="text-right">CAD $${Number(order.price).toFixed(2)}</td>
+                  <td>${order.payment_status || 'Calculating'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+
+    // Wait for content to load before printing
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
   };
 
   const handleImport = () => {
@@ -378,17 +467,18 @@ export default function OrdersPage() {
             onExport={handleExport}
           />
 
-          <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
+          <TableContainer sx={{ position: 'relative', overflow: 'auto' }}>
             <TableSelectedAction
               dense={dense}
               numSelected={selected.length}
-              rowCount={tableData.length}
-              onSelectAllRows={(checked) =>
-                onSelectAllRows(
-                  checked,
-                  tableData.map((row) => String(row.id))
-                )
-              }
+              rowCount={tableData.filter((row) => !row.payment_status || row.payment_status === 'calculating').length}
+              onSelectAllRows={(checked) => {
+                // Only select orders with "calculating" status (or no status)
+                const calculatingOrders = tableData
+                  .filter((row) => !row.payment_status || row.payment_status === 'calculating')
+                  .map((row) => String(row.id));
+                onSelectAllRows(checked, calculatingOrders);
+              }}
               action={
                 <Tooltip title="Delete">
                   <IconButton color="primary" onClick={handleOpenConfirm}>
@@ -404,15 +494,16 @@ export default function OrdersPage() {
                   order={order}
                   orderBy={orderBy}
                   headLabel={TABLE_HEAD}
-                  rowCount={tableData.length}
+                  rowCount={tableData.filter((row) => !row.payment_status || row.payment_status === 'calculating').length}
                   numSelected={selected.length}
                   onSort={onSort}
-                  onSelectAllRows={(checked) =>
-                    onSelectAllRows(
-                      checked,
-                      tableData.map((row) => String(row.id))
-                    )
-                  }
+                  onSelectAllRows={(checked) => {
+                    // Only select orders with "calculating" status (or no status)
+                    const calculatingOrders = tableData
+                      .filter((row) => !row.payment_status || row.payment_status === 'calculating')
+                      .map((row) => String(row.id));
+                    onSelectAllRows(checked, calculatingOrders);
+                  }}
                 />
 
                 <TableBody>
