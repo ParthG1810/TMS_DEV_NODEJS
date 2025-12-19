@@ -208,11 +208,11 @@ export default async function handler(
           invoice_id: ob.invoice_id,
           invoice_number: ob.invoice_number,
         });
-      } else if (ob.status === 'finalized') {
-        // Finalized and available for invoice
+      } else if (ob.status === 'finalized' || ob.status === 'approved') {
+        // Finalized or Approved - available for invoice
         availableOrders.push(formatted);
       } else {
-        // Still calculating
+        // Still calculating or other status
         notReadyOrders.push({
           id: ob.id,
           order_id: ob.order_id,
