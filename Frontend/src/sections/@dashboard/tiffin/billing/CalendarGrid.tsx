@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 // @mui
 import {
@@ -194,6 +194,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
   const [selectedMealPlan, setSelectedMealPlan] = useState<number | null>(null);
   const [extraPrice, setExtraPrice] = useState<string>('');
 
+  // Processing lock to prevent duplicate execution of handleCellClick
+  const processingRef = useRef<Set<string>>(new Set());
+
   // Fetch meal plans on component mount
   useEffect(() => {
     const fetchMealPlans = async () => {
@@ -270,6 +273,16 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     currentStatus: CalendarEntryStatus | null,
     isPlanDay: boolean
   ) => {
+    // Create unique key for this cell to prevent duplicate processing
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const cellKey = `${customer.customer_id}-${date}`;
+
+    // Check if this cell is already being processed
+    if (processingRef.current.has(cellKey)) {
+      console.log('Already processing this cell, ignoring duplicate click:', cellKey);
+      return;
+    }
+
     // Block editing if billing is pending, finalized, or paid
     if (customer.billing_status && ['pending', 'finalized', 'paid'].includes(customer.billing_status)) {
       enqueueSnackbar(
@@ -281,7 +294,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     // Get customer's orders
     const orders = customer.orders || [];
-    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     // Find an order that covers this date
     const activeOrder = orders.find((order) => {
@@ -292,6 +304,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     // For plan days: cycle through Blank → T → A → Blank
     if (isPlanDay && activeOrder) {
+      // Add to processing set
+      processingRef.current.add(cellKey);
+
       // Determine next status in the cycle
       let newStatus: CalendarEntryStatus | null = null;
       let shouldDelete = false;
@@ -346,11 +361,19 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
       } catch (error) {
         console.error('Error updating calendar entry:', error);
         enqueueSnackbar('Failed to update entry', { variant: 'error' });
+      } finally {
+        // Remove from processing set
+        processingRef.current.delete(cellKey);
       }
+
+      return; // Exit early for plan days
     }
 
     // For non-plan days with 'E' status: remove the entry and delete the order
     if (!isPlanDay && currentStatus === 'E') {
+      // Add to processing set
+      processingRef.current.add(cellKey);
+
       try {
         // Get all orders for this customer in the current month
         const monthStr = `${year}-${String(month).padStart(2, '0')}`;
@@ -440,8 +463,11 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 }
 
                 // NOW refresh the UI after all backend operations are done
+                console.log('About to show snackbar and refresh UI');
                 enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
-                onUpdate();
+                console.log('Snackbar shown, calling onUpdate()');
+                await onUpdate();
+                console.log('onUpdate() completed');
               } else {
                 console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
                 enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
@@ -455,12 +481,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               });
               enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
             }
-
-            return; // Exit early
           } else {
             console.error('Delete failed:', deleteResult.data);
             enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
-            return;
           }
         } else {
           console.log('No extra tiffin order found - just deleting calendar entry');
@@ -510,14 +533,18 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           } else {
             console.error('Delete failed:', deleteResult.data);
             enqueueSnackbar('Failed to remove entry: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
-            return;
           }
         }
       } catch (error: any) {
         console.error('Error removing extra tiffin:', error);
         const errorMsg = error.response?.data?.error || error.message || 'Failed to remove extra tiffin';
         enqueueSnackbar(errorMsg, { variant: 'error' });
+      } finally {
+        // Remove from processing set
+        processingRef.current.delete(cellKey);
       }
+
+      return; // Exit early for extra tiffin removal
     }
   };
 
