@@ -19,9 +19,10 @@ interface OrderBilling {
   base_amount: number;
   extra_amount: number;
   total_amount: number;
-  status: 'calculating' | 'finalized';
+  status: 'calculating' | 'finalized' | 'invoiced';
   finalized_at: string | null;
   finalized_by: string | null;
+  invoice_id: number | null;
 }
 
 export default async function handler(
@@ -115,10 +116,10 @@ async function handleUpdate(
   const { status, finalized_by } = req.body;
 
   // Validate status
-  if (status && !['calculating', 'finalized'].includes(status)) {
+  if (status && !['calculating', 'finalized', 'invoiced'].includes(status)) {
     return res.status(400).json({
       success: false,
-      error: 'Invalid status. Must be "calculating" or "finalized"',
+      error: 'Invalid status. Must be "calculating", "finalized", or "invoiced"',
     });
   }
 
@@ -136,6 +137,21 @@ async function handleUpdate(
   }
 
   const currentBilling = currentBillings[0];
+
+  // Check if trying to change status from invoiced or to calculating when has invoice
+  if (currentBilling.status === 'invoiced') {
+    return res.status(400).json({
+      success: false,
+      error: 'Cannot modify an order billing that has an invoice. Delete the invoice first.',
+    });
+  }
+
+  if (currentBilling.invoice_id && status === 'calculating') {
+    return res.status(400).json({
+      success: false,
+      error: 'Cannot reject an order billing that has an invoice. Delete the invoice first.',
+    });
+  }
 
   // Build update query
   const updates: string[] = [];
@@ -169,6 +185,21 @@ async function handleUpdate(
     `UPDATE order_billing SET ${updates.join(', ')} WHERE id = ?`,
     params
   );
+
+  // Update customer_orders payment_status based on new status
+  if (status === 'calculating') {
+    // Rejected - set order back to calculating
+    await query(
+      `UPDATE customer_orders SET payment_status = 'calculating' WHERE id = ?`,
+      [currentBilling.order_id]
+    );
+  } else if (status === 'finalized') {
+    // Finalized - set order to pending
+    await query(
+      `UPDATE customer_orders SET payment_status = 'pending' WHERE id = ?`,
+      [currentBilling.order_id]
+    );
+  }
 
   // Fetch updated record
   const updatedBillings = await query<OrderBilling[]>(
