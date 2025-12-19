@@ -439,6 +439,22 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           console.log('Delete order result:', deleteResult.data);
 
           if (deleteResult.data?.success) {
+            // Also delete the calendar entry
+            // The entry's order_id is set to parent_order_id, not the extra order's ID
+            try {
+              const calendarDeleteResult = await axios.delete('/api/calendar-entries', {
+                params: {
+                  order_id: extraTiffinOrder.parent_order_id, // Calendar entry uses parent order ID
+                  customer_id: customer.customer_id,
+                  delivery_date: date,
+                },
+              });
+              console.log('Delete calendar entry result:', calendarDeleteResult.data);
+            } catch (calendarError: any) {
+              console.error('Error deleting calendar entry:', calendarError);
+              // Continue anyway - order is already deleted
+            }
+
             enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
 
             // Revert billing status if it was finalized
