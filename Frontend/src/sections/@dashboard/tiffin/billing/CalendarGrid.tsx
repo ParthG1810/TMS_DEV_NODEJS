@@ -428,88 +428,13 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           console.log('Delete order result:', deleteResult.data);
 
           if (deleteResult.data?.success) {
-            console.log('Order deleted successfully, now deleting calendar entry for date:', date);
-
-            // Also delete the associated calendar entry
-            try {
-              const calendarDeleteResult = await axios.delete('/api/calendar-entries', {
-                params: {
-                  order_id: extraTiffinOrder.id,
-                  customer_id: customer.customer_id,
-                  delivery_date: date,
-                },
-              });
-              console.log('Delete calendar entry result:', calendarDeleteResult.data);
-
-              if (calendarDeleteResult.data?.success) {
-                enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
-
-                // Revert billing status BEFORE recalculating
-                await revertBillingIfFinalized(customer);
-
-                // Recalculate billing to update totals
-                try {
-                  const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
-                  enqueueSnackbar('Recalculating billing...', { variant: 'info' });
-
-                  const recalcResult = await axios.post('/api/monthly-billing', {
-                    customer_id: customer.customer_id,
-                    billing_month: billingMonth,
-                  });
-
-                  console.log('Billing recalculation completed:', recalcResult.data);
-
-                  if (recalcResult.data?.success) {
-                    // Billing successfully recalculated, now refresh UI
-                    onUpdate();
-                  } else {
-                    console.error('Recalculation failed:', recalcResult.data);
-                    enqueueSnackbar('Billing recalculation failed - refreshing anyway', { variant: 'warning' });
-                    onUpdate();
-                  }
-                } catch (recalcError: any) {
-                  console.error('Error recalculating billing:', recalcError);
-                  enqueueSnackbar('Error recalculating billing - refreshing anyway', { variant: 'warning' });
-                  onUpdate();
-                }
-              } else {
-                console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
-                enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
-              }
-            } catch (calendarError: any) {
-              console.error('Error deleting calendar entry:', calendarError);
-              console.error('Calendar deletion error details:', {
-                message: calendarError.message,
-                response: calendarError.response?.data,
-                status: calendarError.response?.status,
-              });
-              enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
-            }
-          } else {
-            console.error('Delete failed:', deleteResult.data);
-            enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
-          }
-        } else {
-          console.log('No extra tiffin order found - just deleting calendar entry');
-          // Fallback: just delete the calendar entry if no matching order found
-          // Use order_id from current row for isolation
-          const currentOrder = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
-          const deleteResult = await axios.delete('/api/calendar-entries', {
-            params: {
-              order_id: currentOrder?.id,
-              customer_id: customer.customer_id,
-              delivery_date: date,
-            },
-          });
-          console.log('Delete calendar entry result:', deleteResult.data);
-
-          if (deleteResult.data?.success) {
-            enqueueSnackbar('Calendar entry removed', { variant: 'success' });
+            enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
 
             // Revert billing status if it was finalized
             await revertBillingIfFinalized(customer);
 
             // Explicitly recalculate billing to ensure accurate data
+            // This calls sp_calculate_monthly_billing stored procedure
             try {
               const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
               enqueueSnackbar('Recalculating billing...', { variant: 'info' });
@@ -536,8 +461,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
             }
           } else {
             console.error('Delete failed:', deleteResult.data);
-            enqueueSnackbar('Failed to remove entry: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
+            enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
           }
+        } else {
+          // If no extra order found, it might have been a manually created calendar entry
+          console.error('No extra tiffin order found for date:', date);
+          enqueueSnackbar('No extra tiffin order found to remove', { variant: 'warning' });
         }
       } catch (error: any) {
         console.error('Error removing extra tiffin:', error);
