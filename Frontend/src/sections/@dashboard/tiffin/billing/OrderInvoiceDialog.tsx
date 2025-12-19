@@ -32,49 +32,41 @@ const CalendarDay = styled(Box)<{ status?: string; isPlanDay?: boolean }>(
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: theme.shape.borderRadius,
-    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: 3,
     position: 'relative',
+    minHeight: 28,
+    // Match My Use tab calendar colors exactly
     backgroundColor: status
       ? status === 'T'
-        ? alpha(theme.palette.success.main, 0.12)
+        ? 'rgba(76, 175, 80, 0.2)' // Success color
         : status === 'A'
-        ? alpha(theme.palette.error.main, 0.12)
+        ? 'rgba(244, 67, 54, 0.2)' // Error color
         : status === 'E'
-        ? alpha(theme.palette.info.main, 0.12)
-        : theme.palette.background.paper
+        ? 'rgba(33, 150, 243, 0.2)' // Info color
+        : 'transparent'
       : isPlanDay
       ? alpha(theme.palette.grey[400], 0.05)
-      : theme.palette.background.paper,
+      : 'transparent',
   })
 );
 
 const DayNumber = styled(Typography)<{ status?: string }>(({ theme, status }) => ({
-  fontSize: 13,
+  fontSize: 11,
   fontWeight: 500,
-  color: status
-    ? status === 'T'
-      ? theme.palette.success.dark
-      : status === 'A'
-      ? theme.palette.error.dark
-      : status === 'E'
-      ? theme.palette.info.dark
-      : theme.palette.text.primary
-    : theme.palette.text.primary,
+  marginBottom: 1,
+  color: theme.palette.text.primary,
 }));
 
 const StatusIcon = styled(Box)<{ status: string }>(({ theme, status }) => ({
-  position: 'absolute',
-  bottom: 2,
-  right: 2,
-  fontSize: 14,
+  fontSize: 11,
   fontWeight: 'bold',
+  // Match My Use tab calendar status colors exactly
   color:
     status === 'T'
-      ? theme.palette.success.main
+      ? '#4caf50' // Success green
       : status === 'A'
-      ? theme.palette.error.main
-      : theme.palette.info.main,
+      ? '#f44336' // Error red
+      : '#2196f3', // Info blue
 }));
 
 const CalculationRow = styled(Box)(({ theme }) => ({
@@ -446,8 +438,8 @@ export default function OrderInvoiceDialog({
                     Delivery Calendar
                   </Typography>
 
-                  {/* Day headers */}
-                  <Grid container spacing={0.5} sx={{ mb: 1 }}>
+                  {/* Day headers - Compact like My Use tab */}
+                  <Grid container spacing={0.2} sx={{ mb: 0.5, maxWidth: 350, mx: 'auto' }}>
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                       <Grid item xs key={day}>
                         <Typography
@@ -456,6 +448,7 @@ export default function OrderInvoiceDialog({
                           fontWeight={600}
                           textAlign="center"
                           display="block"
+                          sx={{ fontSize: 10 }}
                         >
                           {day}
                         </Typography>
@@ -463,13 +456,13 @@ export default function OrderInvoiceDialog({
                     ))}
                   </Grid>
 
-                  {/* Calendar days */}
-                  <Grid container spacing={0.5}>
+                  {/* Calendar days - Compact like My Use tab */}
+                  <Grid container spacing={0.2} sx={{ maxWidth: 350, mx: 'auto' }}>
                     {generateCalendarDays().map((item, index) => (
                       <Grid item xs key={index}>
                         <CalendarDay status={item.entry?.status} isPlanDay={item.isPlanDay}>
                           {item.day && (
-                            <>
+                            <Stack alignItems="center" spacing={0}>
                               <DayNumber status={item.entry?.status}>{item.day}</DayNumber>
                               {item.entry && (
                                 <StatusIcon status={item.entry.status}>
@@ -480,40 +473,46 @@ export default function OrderInvoiceDialog({
                                     : '+'}
                                 </StatusIcon>
                               )}
-                            </>
+                            </Stack>
                           )}
                         </CalendarDay>
                       </Grid>
                     ))}
                   </Grid>
 
-                  {/* Summary */}
-                  <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2 }}>
+                  {/* Summary - Compact like My Use tab */}
+                  <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ mt: 1.5 }}>
                     <Chip
                       label={`${invoice.billing.total_delivered} Delivered`}
                       size="small"
                       sx={{
-                        bgcolor: alpha('#00AB55', 0.12),
-                        color: '#00AB55',
+                        bgcolor: 'rgba(76, 175, 80, 0.2)',
+                        color: '#4caf50',
                         fontWeight: 600,
+                        fontSize: 11,
+                        height: 22,
                       }}
                     />
                     <Chip
                       label={`${invoice.billing.total_absent} Absent`}
                       size="small"
                       sx={{
-                        bgcolor: alpha('#FF5630', 0.12),
-                        color: '#FF5630',
+                        bgcolor: 'rgba(244, 67, 54, 0.2)',
+                        color: '#f44336',
                         fontWeight: 600,
+                        fontSize: 11,
+                        height: 22,
                       }}
                     />
                     <Chip
                       label={`${invoice.billing.total_extra} Extra`}
                       size="small"
                       sx={{
-                        bgcolor: alpha('#00B8D9', 0.12),
-                        color: '#00B8D9',
+                        bgcolor: 'rgba(33, 150, 243, 0.2)',
+                        color: '#2196f3',
                         fontWeight: 600,
+                        fontSize: 11,
+                        height: 22,
                       }}
                     />
                   </Stack>
