@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 // @mui
@@ -42,6 +42,7 @@ import {
 // sections
 import { OrderTableRow, OrderTableToolbar } from '../../../sections/@dashboard/tiffin/order/list';
 import DashboardLayout from '../../../layouts/dashboard';
+import axios from '../../../utils/axios';
 
 // ----------------------------------------------------------------------
 
@@ -98,6 +99,9 @@ export default function OrdersPage() {
   const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
   const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
   const [openConfirm, setOpenConfirm] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     dispatch(getCustomerOrders());
@@ -355,7 +359,105 @@ export default function OrdersPage() {
   };
 
   const handleImport = () => {
-    enqueueSnackbar('Import functionality coming soon', { variant: 'info' });
+    // Trigger file input click
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset input
+    event.target.value = '';
+
+    if (!file.name.endsWith('.csv')) {
+      enqueueSnackbar('Please select a CSV file', { variant: 'error' });
+      return;
+    }
+
+    setImporting(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        enqueueSnackbar('CSV file is empty', { variant: 'error' });
+        setImporting(false);
+        return;
+      }
+
+      // Skip header row
+      const dataLines = lines.slice(1);
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const line of dataLines) {
+        try {
+          // Parse CSV line (handle quoted fields)
+          const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+          const cleanValues = values.map((v) => v.replace(/^"|"$/g, '').trim());
+
+          if (cleanValues.length < 19) {
+            errorCount++;
+            errors.push(`Line skipped: insufficient columns (${cleanValues.length}/19)`);
+            continue;
+          }
+
+          // Map CSV columns to order fields
+          const orderData = {
+            customer_id: parseInt(cleanValues[1]),
+            meal_plan_id: parseInt(cleanValues[5]),
+            quantity: parseInt(cleanValues[10]),
+            selected_days: cleanValues[11] ? cleanValues[11].split(';').filter((d) => d) : [],
+            price: parseFloat(cleanValues[12]),
+            start_date: cleanValues[15],
+            end_date: cleanValues[16],
+          };
+
+          // Validate required fields
+          if (
+            !orderData.customer_id ||
+            !orderData.meal_plan_id ||
+            !orderData.quantity ||
+            !orderData.price ||
+            !orderData.start_date ||
+            !orderData.end_date
+          ) {
+            errorCount++;
+            errors.push(`Line skipped: missing required fields`);
+            continue;
+          }
+
+          // Create order via API
+          await axios.post('/api/customer-orders', orderData);
+          successCount++;
+        } catch (error: any) {
+          errorCount++;
+          errors.push(error.response?.data?.error || error.message || 'Unknown error');
+        }
+      }
+
+      // Show results
+      if (successCount > 0) {
+        enqueueSnackbar(`Imported ${successCount} order(s) successfully`, { variant: 'success' });
+        // Refresh data
+        dispatch(getCustomerOrders());
+      }
+
+      if (errorCount > 0) {
+        const errorMsg = `${errorCount} order(s) failed. ${errors.slice(0, 3).join(', ')}${
+          errors.length > 3 ? '...' : ''
+        }`;
+        enqueueSnackbar(errorMsg, { variant: 'warning' });
+      }
+    } catch (error: any) {
+      console.error('Import error:', error);
+      enqueueSnackbar('Failed to import orders', { variant: 'error' });
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleExport = () => {
@@ -426,6 +528,15 @@ export default function OrdersPage() {
       <Head>
         <title>Tiffin Orders | TMS</title>
       </Head>
+
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
 
       <Container maxWidth={false}>
         <CustomBreadcrumbs
