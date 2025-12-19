@@ -28,6 +28,12 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse<any>>
 ) {
+  // Handle CORS preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   const { id } = req.query;
 
   if (!id || Array.isArray(id)) {
