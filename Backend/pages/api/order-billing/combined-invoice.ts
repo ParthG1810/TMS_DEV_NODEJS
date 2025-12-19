@@ -52,6 +52,12 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse<CombinedInvoice>>
 ) {
+  // Handle CORS preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({
       success: false,
