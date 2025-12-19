@@ -34,6 +34,12 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse<any>>
 ) {
+  // Handle CORS preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   try {
     switch (req.method) {
       case 'GET':
