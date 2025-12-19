@@ -113,6 +113,18 @@ export default async function handler(
 
     console.log(`[Finalize] Updated ${(updateResult as any).affectedRows} row(s) to finalized status`);
 
+    // Update the order's payment status from 'calculating' to 'pending'
+    // This includes the main order AND any extra tiffin orders (child orders)
+    await query(
+      `UPDATE customer_orders
+       SET payment_status = 'pending'
+       WHERE (id = ? OR parent_order_id = ?)
+       AND payment_status = 'calculating'`,
+      [orderIdNum, orderIdNum]
+    );
+
+    console.log(`[Finalize] Updated order payment_status to 'pending' for order_id=${orderIdNum} and its child orders`);
+
     // Check if all orders for this customer are now finalized
     const customerOrders = await query<any[]>(
       `SELECT co.id as order_id, ob.status
