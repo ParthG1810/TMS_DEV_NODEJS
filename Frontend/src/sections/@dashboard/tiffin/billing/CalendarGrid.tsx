@@ -463,11 +463,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 }
 
                 // NOW refresh the UI after all backend operations are done
-                console.log('About to show snackbar and refresh UI');
-                enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
-                console.log('Snackbar shown, calling onUpdate()');
+                console.log('All deletion operations completed successfully');
+                console.log('Refreshing UI...');
+
+                // Refresh calendar data
                 await onUpdate();
-                console.log('onUpdate() completed');
+
+                console.log('UI refresh completed');
+                enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
               } else {
                 console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
                 enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
