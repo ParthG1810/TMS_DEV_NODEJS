@@ -135,42 +135,47 @@ export default function OrderTableRow({
           </Tooltip>
         </TableCell>
 
+        <TableCell sx={{ fontWeight: 600 }}>#{row.id}</TableCell>
+
         <TableCell>
-          {customer_name}
-          {statusInfo && (
+          <Box>
+            <Box sx={{ fontWeight: 500 }}>{customer_name}</Box>
+            <Box sx={{ fontSize: 12, color: 'text.secondary' }}>
+              {row.customer_email || 'No email'}
+            </Box>
+          </Box>
+        </TableCell>
+
+        <TableCell>
+          <Box>
+            <Box>{format(new Date(start_date), 'dd MMM yyyy')}</Box>
+            <Box sx={{ fontSize: 12, color: 'text.secondary' }}>
+              {format(new Date(start_date), 'h:mm a')}
+            </Box>
+          </Box>
+        </TableCell>
+
+        <TableCell align="center">
+          <Box sx={{ fontWeight: 500 }}>
+            {selected_days && selected_days.length > 0 ? selected_days.length : 7}
+          </Box>
+        </TableCell>
+
+        <TableCell align="right">
+          <Box sx={{ fontWeight: 600 }}>${Number(price).toFixed(2)}</Box>
+        </TableCell>
+
+        <TableCell>
+          {statusInfo ? (
             <Chip
               label={statusInfo.label}
               size="small"
               color={statusInfo.color}
-              sx={{ ml: 1, fontSize: 10 }}
               icon={<Iconify icon={statusInfo.icon} width={14} />}
             />
+          ) : (
+            <Chip label="Draft" size="small" color="default" />
           )}
-        </TableCell>
-
-        <TableCell>{meal_plan_name}</TableCell>
-
-        <TableCell align="center">{quantity}</TableCell>
-
-        <TableCell>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-            {selected_days && selected_days.length > 0 ? (
-              selected_days.slice(0, 3).map((day) => (
-                <Chip key={day} label={day.substring(0, 3)} size="small" />
-              ))
-            ) : (
-              <Chip label="All" size="small" />
-            )}
-            {selected_days && selected_days.length > 3 && (
-              <Chip label={`+${selected_days.length - 3}`} size="small" variant="outlined" />
-            )}
-          </Box>
-        </TableCell>
-
-        <TableCell align="right">CAD ${Number(price).toFixed(2)}</TableCell>
-
-        <TableCell>
-          {format(new Date(start_date), 'dd MMM yyyy')} - {format(new Date(end_date), 'dd MMM yyyy')}
         </TableCell>
 
         <TableCell align="right">
