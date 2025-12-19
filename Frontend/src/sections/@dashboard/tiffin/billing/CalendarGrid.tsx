@@ -442,7 +442,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               console.log('Delete calendar entry result:', calendarDeleteResult.data);
 
               if (calendarDeleteResult.data?.success) {
-                console.log('Calendar entry deleted successfully, refreshing UI...');
+                enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
 
                 // Revert billing status BEFORE recalculating
                 await revertBillingIfFinalized(customer);
@@ -450,7 +450,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                 // Recalculate billing to update totals
                 try {
                   const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
-                  console.log('Recalculating billing for month:', billingMonth);
+                  enqueueSnackbar('Recalculating billing...', { variant: 'info' });
 
                   const recalcResult = await axios.post('/api/monthly-billing', {
                     customer_id: customer.customer_id,
@@ -458,22 +458,20 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                   });
 
                   console.log('Billing recalculation completed:', recalcResult.data);
+
+                  if (recalcResult.data?.success) {
+                    // Billing successfully recalculated, now refresh UI
+                    onUpdate();
+                  } else {
+                    console.error('Recalculation failed:', recalcResult.data);
+                    enqueueSnackbar('Billing recalculation failed - refreshing anyway', { variant: 'warning' });
+                    onUpdate();
+                  }
                 } catch (recalcError: any) {
                   console.error('Error recalculating billing:', recalcError);
+                  enqueueSnackbar('Error recalculating billing - refreshing anyway', { variant: 'warning' });
+                  onUpdate();
                 }
-
-                // NOW refresh the UI after all backend operations are done
-                console.log('All deletion operations completed successfully');
-
-                // Small delay to ensure DB transaction commits
-                console.log('Waiting for database commit...');
-                await new Promise(resolve => setTimeout(resolve, 300));
-
-                console.log('Refreshing UI...');
-                await onUpdate();
-
-                console.log('UI refresh completed');
-                enqueueSnackbar('Extra tiffin order and calendar entry removed', { variant: 'success' });
               } else {
                 console.error('Calendar entry deletion failed:', calendarDeleteResult.data);
                 enqueueSnackbar('Order removed but calendar entry deletion failed', { variant: 'warning' });
@@ -506,13 +504,15 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           console.log('Delete calendar entry result:', deleteResult.data);
 
           if (deleteResult.data?.success) {
+            enqueueSnackbar('Calendar entry removed', { variant: 'success' });
+
             // Revert billing status if it was finalized
             await revertBillingIfFinalized(customer);
 
             // Explicitly recalculate billing to ensure accurate data
             try {
               const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
-              console.log('Recalculating billing for month:', billingMonth);
+              enqueueSnackbar('Recalculating billing...', { variant: 'info' });
 
               const recalcResult = await axios.post('/api/monthly-billing', {
                 customer_id: customer.customer_id,
@@ -520,22 +520,20 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               });
 
               console.log('Billing recalculation result:', recalcResult.data);
+
+              if (recalcResult.data?.success) {
+                // Billing successfully recalculated, now refresh UI
+                onUpdate();
+              } else {
+                console.error('Recalculation failed:', recalcResult.data);
+                enqueueSnackbar('Billing recalculation failed - refreshing anyway', { variant: 'warning' });
+                onUpdate();
+              }
             } catch (recalcError: any) {
               console.error('Error recalculating billing:', recalcError);
+              enqueueSnackbar('Error recalculating billing - refreshing anyway', { variant: 'warning' });
+              onUpdate();
             }
-
-            // NOW refresh the UI after all backend operations are done
-            console.log('All deletion operations completed successfully');
-
-            // Small delay to ensure DB transaction commits
-            console.log('Waiting for database commit...');
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-            console.log('Refreshing UI...');
-            await onUpdate();
-
-            console.log('UI refresh completed');
-            enqueueSnackbar('Calendar entry removed', { variant: 'success' });
           } else {
             console.error('Delete failed:', deleteResult.data);
             enqueueSnackbar('Failed to remove entry: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
