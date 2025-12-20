@@ -124,6 +124,8 @@ export const PATH_DASHBOARD = {
     billingCalendar: path(ROOTS_DASHBOARD, '/tiffin/billing-calendar'),
     billingStatus: path(ROOTS_DASHBOARD, '/tiffin/billing-status'),
     billingDetails: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/billing-details?id=${id}`),
+    invoices: path(ROOTS_DASHBOARD, '/tiffin/invoices'),
+    invoiceDetails: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/invoices/${id}`),
     settings: path(ROOTS_DASHBOARD, '/tiffin/settings'),
   },
   payments: {
