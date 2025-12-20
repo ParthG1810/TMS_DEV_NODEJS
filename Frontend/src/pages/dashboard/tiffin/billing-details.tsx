@@ -43,6 +43,7 @@ import { getCustomerOrders } from '../../../redux/slices/customerOrder';
 import { fCurrency } from '../../../utils/formatNumber';
 import { fDate } from '../../../utils/formatTime';
 import BillingReceiptPDF from '../../../sections/@dashboard/tiffin/BillingReceiptPDF';
+import { InvoiceGenerationModal } from '../../../sections/@dashboard/tiffin/invoice';
 
 // ----------------------------------------------------------------------
 
@@ -141,6 +142,7 @@ export default function BillingDetailsPage() {
   const [companyLogo, setCompanyLogo] = useState('');
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   // Load billing details and settings
   useEffect(() => {
@@ -442,6 +444,14 @@ export default function BillingDetailsPage() {
                   </Button>
                 )}
               </PDFDownloadLink>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<Iconify icon="solar:document-add-bold" />}
+                onClick={() => setShowInvoiceModal(true)}
+              >
+                Generate Invoice
+              </Button>
               {billing.status === 'pending' && (
                 <>
                   <Button
@@ -545,6 +555,18 @@ export default function BillingDetailsPage() {
             <Button onClick={() => setShowPdfPreview(false)}>Close</Button>
           </DialogActions>
         </Dialog>
+
+        {/* Invoice Generation Modal */}
+        <InvoiceGenerationModal
+          open={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          customerId={billing.customer_id}
+          billingMonth={billing.billing_month}
+          onSuccess={() => {
+            setShowInvoiceModal(false);
+            fetchBillingDetails();
+          }}
+        />
       </Container>
     </>
   );
