@@ -388,6 +388,22 @@ export default function OrderInvoiceDetailsPage() {
               >
                 Back
               </Button>
+              <Button
+                variant="outlined"
+                startIcon={<Iconify icon="eva:layers-outline" />}
+                onClick={() =>
+                  router.push({
+                    pathname: '/dashboard/tiffin/combined-invoice',
+                    query: {
+                      customerId: invoice?.customer_id,
+                      customerName: invoice?.customer_name,
+                      month: invoice?.billing_month,
+                    },
+                  })
+                }
+              >
+                View Combined Invoice
+              </Button>
               {currentTab === 'invoice-view' && invoice && (
                 <Stack direction="row" spacing={1.5}>
                   <PDFDownloadLink
