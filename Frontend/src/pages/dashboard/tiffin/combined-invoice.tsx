@@ -321,22 +321,42 @@ export default function CombinedInvoicePage() {
               }
               action={
                 invoice.can_approve && (
-                  <Button
-                    color="inherit"
-                    size="small"
-                    variant="outlined"
-                    onClick={handleApprove}
-                    disabled={approving}
-                    startIcon={
-                      approving ? (
-                        <CircularProgress size={16} color="inherit" />
-                      ) : (
-                        <Iconify icon="eva:checkmark-circle-2-fill" />
-                      )
-                    }
-                  >
-                    {approving ? 'Approving...' : 'Approve Invoice'}
-                  </Button>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      color="inherit"
+                      size="small"
+                      variant="outlined"
+                      onClick={handleApprove}
+                      disabled={approving}
+                      startIcon={
+                        approving ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <Iconify icon="eva:checkmark-circle-2-fill" />
+                        )
+                      }
+                    >
+                      {approving ? 'Approving...' : 'Approve Invoice'}
+                    </Button>
+                    <Button
+                      color="primary"
+                      size="small"
+                      variant="contained"
+                      onClick={() =>
+                        router.push({
+                          pathname: '/dashboard/tiffin/generate-invoice',
+                          query: {
+                            customerId: invoice?.customer_id,
+                            customerName: invoice?.customer_name,
+                            month: invoice?.billing_month,
+                          },
+                        })
+                      }
+                      startIcon={<Iconify icon="solar:document-add-bold" />}
+                    >
+                      Generate Invoice
+                    </Button>
+                  </Stack>
                 )
               }
             >

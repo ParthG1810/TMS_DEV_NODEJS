@@ -54,11 +54,16 @@ interface AvailableOrder {
   total_delivered: number;
   total_absent: number;
   total_extra: number;
+  total_plan_days: number;
+  base_amount: number;
+  extra_amount: number;
   total_amount: number;
   status: string;
   finalized_at: string | null;
   meal_plan_name: string;
   order_price: number;
+  start_date: string;
+  end_date: string;
 }
 
 interface InvoicedOrder extends AvailableOrder {
@@ -212,6 +217,12 @@ export default function GenerateInvoicePage() {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  };
+
   const getMonthDisplay = () => {
     if (!month || typeof month !== 'string') return '';
     return formatMonth(month);
@@ -334,7 +345,9 @@ export default function GenerateInvoicePage() {
                             onChange={handleToggleAll}
                           />
                         </TableCell>
-                        <TableCell>Order / Meal Plan</TableCell>
+                        <TableCell>Meal Plan</TableCell>
+                        <TableCell align="center">Period</TableCell>
+                        <TableCell align="center">Plan Days</TableCell>
                         <TableCell align="center">Delivered</TableCell>
                         <TableCell align="center">Absent</TableCell>
                         <TableCell align="center">Extra</TableCell>
@@ -353,47 +366,47 @@ export default function GenerateInvoicePage() {
                             <Checkbox checked={selectedOrderIds.includes(order.id)} />
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
+                            <Typography variant="body2" fontWeight={600}>
                               {order.meal_plan_name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              Order #{order.order_id}
+                              Plan: {fCurrency(order.order_price)}
                             </Typography>
                           </TableCell>
                           <TableCell align="center">
-                            <Chip
-                              label={order.total_delivered}
-                              size="small"
-                              sx={{
-                                bgcolor: alpha(theme.palette.success.main, 0.1),
-                                color: theme.palette.success.dark,
-                              }}
-                            />
+                            <Typography variant="body2">
+                              {formatDate(order.start_date)} - {formatDate(order.end_date)}
+                            </Typography>
                           </TableCell>
                           <TableCell align="center">
-                            <Chip
-                              label={order.total_absent}
-                              size="small"
-                              sx={{
-                                bgcolor: alpha(theme.palette.error.main, 0.1),
-                                color: theme.palette.error.dark,
-                              }}
-                            />
+                            <Typography variant="body2">
+                              {order.total_plan_days}
+                            </Typography>
                           </TableCell>
                           <TableCell align="center">
-                            <Chip
-                              label={order.total_extra}
-                              size="small"
-                              sx={{
-                                bgcolor: alpha(theme.palette.info.main, 0.1),
-                                color: theme.palette.info.dark,
-                              }}
-                            />
+                            <Typography variant="body2" fontWeight={600} color="success.main">
+                              {order.total_delivered}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" fontWeight={600} color="error.main">
+                              {order.total_absent}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" fontWeight={600} color="info.main">
+                              {order.total_extra}
+                            </Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Typography variant="body2" fontWeight="bold">
+                            <Typography variant="body2" fontWeight={700}>
                               {fCurrency(order.total_amount)}
                             </Typography>
+                            {order.extra_amount > 0 && (
+                              <Typography variant="caption" color="text.secondary">
+                                (Base: {fCurrency(order.base_amount)} + Extra: {fCurrency(order.extra_amount)})
+                              </Typography>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
