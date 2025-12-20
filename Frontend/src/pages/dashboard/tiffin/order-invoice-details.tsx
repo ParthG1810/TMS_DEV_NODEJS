@@ -470,8 +470,7 @@ export default function OrderInvoiceDetailsPage() {
                         router.push({
                           pathname: '/dashboard/tiffin/generate-invoice',
                           query: {
-                            customerId: invoice?.customer_id,
-                            customerName: invoice?.customer_name,
+                            orderId: invoice?.order_id,
                             month: invoice?.billing_month,
                           },
                         })
