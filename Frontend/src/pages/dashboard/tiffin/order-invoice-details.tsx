@@ -31,7 +31,6 @@ import { useSettingsContext } from '../../../components/settings';
 import axios from '../../../utils/axios';
 import { useSnackbar } from '../../../components/snackbar';
 import OrderInvoicePDF from '../../../sections/@dashboard/tiffin/OrderInvoicePDF';
-import { InvoiceGenerationModal } from '../../../sections/@dashboard/tiffin/invoice';
 
 // ----------------------------------------------------------------------
 
@@ -97,7 +96,6 @@ export default function OrderInvoiceDetailsPage() {
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Load invoice details and settings
@@ -388,6 +386,22 @@ export default function OrderInvoiceDetailsPage() {
               >
                 Back
               </Button>
+              <Button
+                variant="outlined"
+                startIcon={<Iconify icon="eva:layers-outline" />}
+                onClick={() =>
+                  router.push({
+                    pathname: '/dashboard/tiffin/combined-invoice',
+                    query: {
+                      customerId: invoice?.customer_id,
+                      customerName: invoice?.customer_name,
+                      month: invoice?.billing_month,
+                    },
+                  })
+                }
+              >
+                View Combined Invoice
+              </Button>
               {currentTab === 'invoice-view' && invoice && (
                 <Stack direction="row" spacing={1.5}>
                   <PDFDownloadLink
@@ -456,7 +470,16 @@ export default function OrderInvoiceDetailsPage() {
                         variant="contained"
                         color="primary"
                         startIcon={<Iconify icon="solar:document-add-bold" />}
-                        onClick={() => setShowInvoiceModal(true)}
+                        onClick={() =>
+                          router.push({
+                            pathname: '/dashboard/tiffin/generate-invoice',
+                            query: {
+                              customerId: invoice?.customer_id,
+                              customerName: invoice?.customer_name,
+                              month: invoice?.billing_month,
+                            },
+                          })
+                        }
                         disabled={actionLoading}
                       >
                         Generate Invoice
@@ -1142,18 +1165,6 @@ export default function OrderInvoiceDetailsPage() {
             </Box>
           )}
         </Card>
-
-        {/* Invoice Generation Modal */}
-        <InvoiceGenerationModal
-          open={showInvoiceModal}
-          onClose={() => setShowInvoiceModal(false)}
-          customerId={invoice.customer_id}
-          billingMonth={invoice.billing_month}
-          onSuccess={() => {
-            setShowInvoiceModal(false);
-            fetchInvoiceDetails();
-          }}
-        />
       </Container>
     </>
   );
