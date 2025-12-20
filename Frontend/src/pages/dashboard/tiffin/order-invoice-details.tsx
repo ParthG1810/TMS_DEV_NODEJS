@@ -378,81 +378,115 @@ export default function OrderInvoiceDetailsPage() {
             { name: `Invoice #${invoice.order_id}` },
           ]}
           action={
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="outlined"
-                startIcon={<Iconify icon="eva:arrow-back-fill" />}
-                onClick={() => router.back()}
-              >
-                Back
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<Iconify icon="eva:layers-outline" />}
-                onClick={() =>
-                  router.push({
-                    pathname: '/dashboard/tiffin/combined-invoice',
-                    query: {
-                      customerId: invoice?.customer_id,
-                      customerName: invoice?.customer_name,
-                      month: invoice?.billing_month,
-                    },
-                  })
-                }
-              >
-                View Combined Invoice
-              </Button>
+            <Stack spacing={1} alignItems="flex-end">
+              {/* Row 1: Store Use PDF, Customer Use PDF, Back */}
+              <Stack direction="row" spacing={1}>
+                {currentTab === 'invoice-view' && invoice && (
+                  <>
+                    <PDFDownloadLink
+                      document={
+                        <OrderInvoicePDF
+                          invoiceData={invoice}
+                          companyName={companyName}
+                          eTransferEmail={customInteracEmail || eTransferEmail}
+                          companyLogo={logoDataUrl}
+                          showCalculations={true}
+                        />
+                      }
+                      fileName={generateFileName('store')}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      {({ loading: pdfLoading }) => (
+                        <Button
+                          variant="contained"
+                          startIcon={<Iconify icon="eva:download-fill" />}
+                          disabled={pdfLoading}
+                          color="primary"
+                        >
+                          {pdfLoading ? 'Generating...' : 'Store Use PDF'}
+                        </Button>
+                      )}
+                    </PDFDownloadLink>
+                    <PDFDownloadLink
+                      document={
+                        <OrderInvoicePDF
+                          invoiceData={invoice}
+                          companyName={companyName}
+                          eTransferEmail={customInteracEmail || eTransferEmail}
+                          companyLogo={logoDataUrl}
+                          showCalculations={false}
+                        />
+                      }
+                      fileName={generateFileName('customer')}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      {({ loading: pdfLoading }) => (
+                        <Button
+                          variant="outlined"
+                          startIcon={<Iconify icon="eva:download-fill" />}
+                          disabled={pdfLoading}
+                          color="primary"
+                        >
+                          {pdfLoading ? 'Generating...' : 'Customer Use PDF'}
+                        </Button>
+                      )}
+                    </PDFDownloadLink>
+                  </>
+                )}
+                <Button
+                  variant="outlined"
+                  startIcon={<Iconify icon="eva:arrow-back-fill" />}
+                  onClick={() => router.back()}
+                >
+                  Back
+                </Button>
+              </Stack>
+
+              {/* Row 2: View Combined Invoice, Generate Invoice */}
               {currentTab === 'invoice-view' && invoice && (
-                <Stack direction="row" spacing={1.5}>
-                  <PDFDownloadLink
-                    document={
-                      <OrderInvoicePDF
-                        invoiceData={invoice}
-                        companyName={companyName}
-                        eTransferEmail={customInteracEmail || eTransferEmail}
-                        companyLogo={logoDataUrl}
-                        showCalculations={true}
-                      />
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Iconify icon="eva:layers-outline" />}
+                    onClick={() =>
+                      router.push({
+                        pathname: '/dashboard/tiffin/combined-invoice',
+                        query: {
+                          customerId: invoice?.customer_id,
+                          customerName: invoice?.customer_name,
+                          month: invoice?.billing_month,
+                        },
+                      })
                     }
-                    fileName={generateFileName('store')}
-                    style={{ textDecoration: 'none' }}
                   >
-                    {({ loading: pdfLoading }) => (
-                      <Button
-                        variant="contained"
-                        startIcon={<Iconify icon="eva:download-fill" />}
-                        disabled={pdfLoading}
-                        color="primary"
-                      >
-                        {pdfLoading ? 'Generating...' : 'Store Use PDF'}
-                      </Button>
-                    )}
-                  </PDFDownloadLink>
-                  <PDFDownloadLink
-                    document={
-                      <OrderInvoicePDF
-                        invoiceData={invoice}
-                        companyName={companyName}
-                        eTransferEmail={customInteracEmail || eTransferEmail}
-                        companyLogo={logoDataUrl}
-                        showCalculations={false}
-                      />
-                    }
-                    fileName={generateFileName('customer')}
-                    style={{ textDecoration: 'none' }}
-                  >
-                    {({ loading: pdfLoading }) => (
-                      <Button
-                        variant="outlined"
-                        startIcon={<Iconify icon="eva:download-fill" />}
-                        disabled={pdfLoading}
-                        color="primary"
-                      >
-                        {pdfLoading ? 'Generating...' : 'Customer Use PDF'}
-                      </Button>
-                    )}
-                  </PDFDownloadLink>
-                  {/* Action buttons based on status */}
+                    View Combined Invoice
+                  </Button>
+                  {(invoice.billing.status === 'finalized' || invoice.billing.status === 'approved') && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<Iconify icon="solar:document-add-bold" />}
+                      onClick={() =>
+                        router.push({
+                          pathname: '/dashboard/tiffin/generate-invoice',
+                          query: {
+                            customerId: invoice?.customer_id,
+                            customerName: invoice?.customer_name,
+                            month: invoice?.billing_month,
+                          },
+                        })
+                      }
+                      disabled={actionLoading}
+                    >
+                      Generate Invoice
+                    </Button>
+                  )}
+                </Stack>
+              )}
+
+              {/* Row 3: Approve, Reject */}
+              {currentTab === 'invoice-view' && invoice && (invoice.billing.status === 'finalized' || invoice.billing.status === 'approved') && (
+                <Stack direction="row" spacing={1}>
                   {invoice.billing.status === 'finalized' && (
                     <Button
                       variant="contained"
@@ -464,37 +498,15 @@ export default function OrderInvoiceDetailsPage() {
                       Approve
                     </Button>
                   )}
-                  {(invoice.billing.status === 'finalized' || invoice.billing.status === 'approved') && (
-                    <>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<Iconify icon="solar:document-add-bold" />}
-                        onClick={() =>
-                          router.push({
-                            pathname: '/dashboard/tiffin/generate-invoice',
-                            query: {
-                              customerId: invoice?.customer_id,
-                              customerName: invoice?.customer_name,
-                              month: invoice?.billing_month,
-                            },
-                          })
-                        }
-                        disabled={actionLoading}
-                      >
-                        Generate Invoice
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        startIcon={<Iconify icon="eva:close-circle-outline" />}
-                        onClick={handleReject}
-                        disabled={actionLoading}
-                      >
-                        Reject
-                      </Button>
-                    </>
-                  )}
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<Iconify icon="eva:close-circle-outline" />}
+                    onClick={handleReject}
+                    disabled={actionLoading}
+                  >
+                    Reject
+                  </Button>
                 </Stack>
               )}
             </Stack>
