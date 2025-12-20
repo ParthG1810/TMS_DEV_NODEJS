@@ -398,12 +398,12 @@ export default function OrderInvoicePDF({
                 textStyle.push(styles.extraText);
               }
 
-              const statusText = status === 'T' ? '✓' : status === 'A' ? '✗' : status === 'E' ? '+' : '';
+              const statusText = status === 'T' ? '✓' : status === 'A' ? '✗' : status === 'E' ? '+' : null;
 
               return (
                 <View key={day} style={cellStyle}>
                   <Text style={styles.calendarDayNumber}>{day}</Text>
-                  {statusText && <Text style={textStyle}>{statusText}</Text>}
+                  {statusText !== null && <Text style={textStyle}>{statusText}</Text>}
                 </View>
               );
             })}
