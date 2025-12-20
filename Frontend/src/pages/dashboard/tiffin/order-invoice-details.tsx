@@ -241,6 +241,8 @@ export default function OrderInvoiceDetailsPage() {
       if (response.data.success) {
         enqueueSnackbar('Order rejected and sent back for recalculation', { variant: 'success' });
         fetchInvoiceDetails();
+        // Trigger notification refresh to remove the notification
+        window.dispatchEvent(new CustomEvent('refresh-notifications'));
       } else {
         enqueueSnackbar(response.data.error || 'Failed to reject order', { variant: 'error' });
       }
