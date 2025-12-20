@@ -199,6 +199,17 @@ async function handleUpdate(
       `UPDATE customer_orders SET payment_status = 'calculating' WHERE id = ?`,
       [currentBilling.order_id]
     );
+
+    // Delete any notifications related to this order billing
+    try {
+      await query(
+        `DELETE FROM payment_notifications
+         WHERE order_billing_id = ? AND notification_type IN ('billing_pending_approval', 'order_approved')`,
+        [id]
+      );
+    } catch (notificationError) {
+      console.error('Error deleting notifications on reject:', notificationError);
+    }
   } else if (status === 'finalized') {
     // Finalized - set order to pending
     await query(
