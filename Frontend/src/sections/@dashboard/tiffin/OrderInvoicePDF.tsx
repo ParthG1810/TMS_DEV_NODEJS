@@ -351,18 +351,18 @@ export default function OrderInvoicePDF({
         <View style={styles.infoSection}>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Bill To</Text>
-            <Text style={styles.infoValue}>{invoiceData.customer_name}</Text>
+            <Text style={styles.infoValue}>{invoiceData.customer_name || 'N/A'}</Text>
             <Text style={styles.infoText}>{invoiceData.customer_phone || 'No phone'}</Text>
-            <Text style={styles.infoText}>{invoiceData.customer_address}</Text>
+            <Text style={styles.infoText}>{invoiceData.customer_address || 'No address'}</Text>
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Order Details</Text>
-            <Text style={styles.infoValue}>{invoiceData.meal_plan_name}</Text>
+            <Text style={styles.infoValue}>{invoiceData.meal_plan_name || 'N/A'}</Text>
             <Text style={styles.infoText}>
               Period: {monthName} {year}
             </Text>
             <Text style={styles.infoText}>
-              Days: {invoiceData.selected_days.join(', ')}
+              Days: {invoiceData.selected_days && invoiceData.selected_days.length > 0 ? invoiceData.selected_days.join(', ') : 'All days'}
             </Text>
           </View>
         </View>
@@ -439,7 +439,7 @@ export default function OrderInvoicePDF({
               </Text>
               <Text style={styles.calculationRow}>├─ Order Price: {formatCurrency(invoiceData.meal_plan_price)}</Text>
               <Text style={styles.calculationRow}>
-                ├─ Total {invoiceData.selected_days.join('-')} days in {monthName}: {billing.total_plan_days} days
+                ├─ Total {invoiceData.selected_days && invoiceData.selected_days.length > 0 ? invoiceData.selected_days.join('-') : 'all'} days in {monthName}: {billing.total_plan_days} days
               </Text>
               <Text style={styles.calculationRow}>
                 ├─ Per-Tiffin Price: {formatCurrency(invoiceData.meal_plan_price)} ÷ {billing.total_plan_days} ={' '}
