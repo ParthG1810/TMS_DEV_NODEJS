@@ -125,6 +125,52 @@ export default async function handler(
 
     console.log(`[Finalize] Updated order payment_status to 'pending' for order_id=${orderIdNum} and its child orders`);
 
+    // Create notification for pending approval
+    try {
+      // Get customer details for notification
+      const customerDetails = await query<any[]>(
+        `SELECT c.name, c.id as customer_id, ob.billing_month, ob.total_amount, ob.id as order_billing_id
+         FROM order_billing ob
+         INNER JOIN customers c ON ob.customer_id = c.id
+         WHERE ob.order_id = ? AND ob.billing_month = ?`,
+        [orderIdNum, billing_month]
+      );
+
+      if (customerDetails.length > 0) {
+        const customer = customerDetails[0];
+
+        // Delete any existing pending approval notifications for this order billing
+        await query(
+          `DELETE FROM payment_notifications
+           WHERE order_billing_id = ? AND notification_type = 'billing_pending_approval'`,
+          [customer.order_billing_id]
+        );
+
+        // Create new pending approval notification
+        await query(
+          `INSERT INTO payment_notifications (
+            notification_type, order_billing_id, customer_id, billing_month,
+            title, message, priority, action_url
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            'billing_pending_approval',
+            customer.order_billing_id,
+            customer.customer_id,
+            customer.billing_month,
+            `Billing Finalized - ${customer.name}`,
+            `Order billing for ${customer.name} (${customer.billing_month}) has been finalized. Total amount: CAD $${Number(customer.total_amount).toFixed(2)}. Pending approval.`,
+            'high',
+            `/dashboard/tiffin/order-invoice-details?orderId=${orderIdNum}&month=${customer.billing_month}`,
+          ]
+        );
+        console.log(`[Finalize] Created pending approval notification for order_billing_id=${customer.order_billing_id}`);
+      }
+    } catch (notificationError) {
+      // Log but don't fail the request if notification creation fails
+      console.error('Error creating pending approval notification:', notificationError);
+    }
+
     // Check if all orders for this customer are now finalized
     const customerOrders = await query<any[]>(
       `SELECT co.id as order_id, ob.status

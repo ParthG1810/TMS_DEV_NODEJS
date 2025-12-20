@@ -12,6 +12,7 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableHead,
   TableRow,
   Paper,
   CircularProgress,
@@ -284,62 +285,58 @@ export default function GenerateInvoicePage() {
             </Card>
 
             {/* Order Details */}
-            <Card sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Order Details
-              </Typography>
-              <TableContainer component={Paper} variant="outlined">
+            <Card>
+              <Box sx={{ p: 3, pb: 2 }}>
+                <Typography variant="h6">Order Details</Typography>
+              </Box>
+              <TableContainer>
                 <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Meal Plan</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Period</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Plan Days</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Delivered</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Absent</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Extra</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Amount</TableCell>
+                    </TableRow>
+                  </TableHead>
                   <TableBody>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 600, width: 200 }}>Meal Plan</TableCell>
                       <TableCell>
-                        <Typography variant="body1" fontWeight={600}>
+                        <Typography variant="body2" fontWeight={600}>
                           {orderData.meal_plan_name}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Plan: {fCurrency(orderData.order_price)}
                         </Typography>
                       </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Period</TableCell>
-                      <TableCell>
-                        {formatDate(orderData.start_date)} - {formatDate(orderData.end_date)}
+                      <TableCell align="center">
+                        <Typography variant="body2">
+                          {formatDate(orderData.start_date)} - {formatDate(orderData.end_date)}
+                        </Typography>
                       </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Plan Days</TableCell>
-                      <TableCell>{orderData.total_plan_days}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Delivered</TableCell>
-                      <TableCell>
-                        <Typography color="success.main" fontWeight={600}>
+                      <TableCell align="center">
+                        <Typography variant="body2">{orderData.total_plan_days}</Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="body2" fontWeight={600} color="success.main">
                           {orderData.total_delivered}
                         </Typography>
                       </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Absent</TableCell>
-                      <TableCell>
-                        <Typography color="error.main" fontWeight={600}>
+                      <TableCell align="center">
+                        <Typography variant="body2" fontWeight={600} color="error.main">
                           {orderData.total_absent}
                         </Typography>
                       </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Extra</TableCell>
-                      <TableCell>
-                        <Typography color="info.main" fontWeight={600}>
+                      <TableCell align="center">
+                        <Typography variant="body2" fontWeight={600} color="info.main">
                           {orderData.total_extra}
                         </Typography>
                       </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
-                      <TableCell>
-                        <Typography variant="h6" fontWeight={700}>
+                      <TableCell align="right">
+                        <Typography variant="body2" fontWeight={700}>
                           {fCurrency(orderData.total_amount)}
                         </Typography>
                         {orderData.extra_amount > 0 && (
@@ -347,23 +344,6 @@ export default function GenerateInvoicePage() {
                             (Base: {fCurrency(orderData.base_amount)} + Extra: {fCurrency(orderData.extra_amount)})
                           </Typography>
                         )}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                      <TableCell>
-                        <Typography
-                          sx={{
-                            textTransform: 'capitalize',
-                            color:
-                              orderData.status === 'finalized' || orderData.status === 'approved'
-                                ? 'success.main'
-                                : 'warning.main',
-                          }}
-                          fontWeight={600}
-                        >
-                          {orderData.status}
-                        </Typography>
                       </TableCell>
                     </TableRow>
                   </TableBody>
