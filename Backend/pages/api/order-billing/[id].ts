@@ -226,17 +226,17 @@ async function handleUpdate(
       if (customerDetails.length > 0) {
         const customer = customerDetails[0];
 
-        // Delete any existing pending approval notifications for this billing
+        // Delete any existing pending approval notifications for this order billing
         await query(
           `DELETE FROM payment_notifications
-           WHERE billing_id = ? AND notification_type IN ('billing_pending_approval', 'order_approved')`,
+           WHERE order_billing_id = ? AND notification_type IN ('billing_pending_approval', 'order_approved')`,
           [id]
         );
 
-        // Create new approval notification
+        // Create new approval notification (using order_billing_id, not billing_id)
         await query(
           `INSERT INTO payment_notifications (
-            notification_type, billing_id, customer_id, billing_month,
+            notification_type, order_billing_id, customer_id, billing_month,
             title, message, priority, action_url
           )
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
