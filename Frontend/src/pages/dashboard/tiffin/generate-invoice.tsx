@@ -8,19 +8,15 @@ import {
   Button,
   Typography,
   Box,
-  Checkbox,
   Table,
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
   TableRow,
   Paper,
-  Chip,
   CircularProgress,
   Alert,
   TextField,
-  Divider,
   Stack,
   Grid,
 } from '@mui/material';
@@ -36,8 +32,6 @@ import { useSnackbar } from '../../../components/snackbar';
 // utils
 import axios from '../../../utils/axios';
 import { fCurrency } from '../../../utils/formatNumber';
-// paths
-import { PATH_DASHBOARD } from '../../../routes/paths';
 
 // ----------------------------------------------------------------------
 
@@ -47,52 +41,27 @@ GenerateInvoicePage.getLayout = (page: React.ReactElement) => (
 
 // ----------------------------------------------------------------------
 
-interface AvailableOrder {
+interface OrderBillingData {
   id: number;
   order_id: number;
   billing_month: string;
   total_delivered: number;
   total_absent: number;
   total_extra: number;
+  total_plan_days: number;
+  base_amount: number;
+  extra_amount: number;
   total_amount: number;
   status: string;
   finalized_at: string | null;
   meal_plan_name: string;
   order_price: number;
-}
-
-interface InvoicedOrder extends AvailableOrder {
-  invoice_id: number;
-  invoice_number: string;
-}
-
-interface NotReadyOrder {
-  id: number;
-  order_id: number;
-  meal_plan_name: string;
-  billing_month: string;
-  total_amount: number;
-  status: string;
-}
-
-interface AvailableForInvoiceData {
-  customer: {
-    id: number;
-    name: string;
-    phone: string;
-    address: string;
-  };
-  billing_month: string;
-  available_orders: AvailableOrder[];
-  already_invoiced_orders: InvoicedOrder[];
-  not_ready_orders: NotReadyOrder[];
-  summary: {
-    total_orders: number;
-    available_for_invoice: number;
-    already_invoiced: number;
-    not_ready: number;
-    available_total_amount: number;
-  };
+  start_date: string;
+  end_date: string;
+  customer_id: number;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
 }
 
 // ----------------------------------------------------------------------
@@ -103,75 +72,79 @@ export default function GenerateInvoicePage() {
   const { themeStretch } = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
 
-  const { customerId, month, customerName } = router.query;
+  const { orderId, month } = router.query;
 
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [data, setData] = useState<AvailableForInvoiceData | null>(null);
-  const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
+  const [orderData, setOrderData] = useState<OrderBillingData | null>(null);
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
 
-  // Fetch available orders when page loads
+  // Fetch order billing data when page loads
   useEffect(() => {
-    if (customerId && month) {
-      fetchAvailableOrders();
+    if (orderId && month) {
+      fetchOrderBilling();
     }
-  }, [customerId, month]);
+  }, [orderId, month]);
 
-  const fetchAvailableOrders = async () => {
+  const fetchOrderBilling = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/order-billing/available-for-invoice', {
+      const response = await axios.get('/api/order-billing/order-invoice', {
         params: {
-          customer_id: customerId,
+          order_id: orderId,
           billing_month: month,
         },
       });
 
       if (response.data.success) {
-        setData(response.data.data);
-        // Pre-select all available orders
-        setSelectedOrderIds(response.data.data.available_orders.map((o: AvailableOrder) => o.id));
+        const data = response.data.data;
+        setOrderData({
+          id: data.billing?.id || 0,
+          order_id: data.order_id,
+          billing_month: data.billing_month,
+          total_delivered: data.billing?.total_delivered || 0,
+          total_absent: data.billing?.total_absent || 0,
+          total_extra: data.billing?.total_extra || 0,
+          total_plan_days: data.billing?.total_plan_days || 0,
+          base_amount: data.billing?.base_amount || 0,
+          extra_amount: data.billing?.extra_amount || 0,
+          total_amount: data.billing?.total_amount || 0,
+          status: data.billing?.status || 'calculating',
+          finalized_at: data.billing?.finalized_at || null,
+          meal_plan_name: data.meal_plan_name,
+          order_price: data.meal_plan_price,
+          start_date: data.start_date,
+          end_date: data.end_date,
+          customer_id: data.customer_id,
+          customer_name: data.customer_name,
+          customer_phone: data.customer_phone,
+          customer_address: data.customer_address,
+        });
       } else {
-        enqueueSnackbar(response.data.error || 'Failed to load available orders', {
+        enqueueSnackbar(response.data.error || 'Failed to load order data', {
           variant: 'error',
         });
       }
     } catch (error: any) {
-      console.error('Error fetching available orders:', error);
-      enqueueSnackbar(error.message || 'Failed to load available orders', { variant: 'error' });
+      console.error('Error fetching order billing:', error);
+      enqueueSnackbar(error.message || 'Failed to load order data', { variant: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleOrder = (orderId: number) => {
-    setSelectedOrderIds((prev) =>
-      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
-    );
-  };
-
-  const handleToggleAll = () => {
-    if (!data) return;
-    if (selectedOrderIds.length === data.available_orders.length) {
-      setSelectedOrderIds([]);
-    } else {
-      setSelectedOrderIds(data.available_orders.map((o) => o.id));
-    }
-  };
-
   const handleGenerateInvoice = async () => {
-    if (selectedOrderIds.length === 0) {
-      enqueueSnackbar('Please select at least one order', { variant: 'warning' });
+    if (!orderData || !orderData.id) {
+      enqueueSnackbar('No billing data available', { variant: 'warning' });
       return;
     }
 
     try {
       setGenerating(true);
       const response = await axios.post('/api/invoices/generate', {
-        customer_id: customerId,
-        order_billing_ids: selectedOrderIds,
+        customer_id: orderData.customer_id,
+        order_billing_ids: [orderData.id],
         due_date: dueDate ? dueDate.toISOString().split('T')[0] : null,
         notes: notes || null,
       });
@@ -181,7 +154,6 @@ export default function GenerateInvoicePage() {
           `Invoice ${response.data.data.invoice_number} generated successfully!`,
           { variant: 'success' }
         );
-        // Navigate to invoices list or back to previous page
         router.push('/dashboard/tiffin/invoices');
       } else {
         enqueueSnackbar(response.data.error || 'Failed to generate invoice', {
@@ -200,22 +172,24 @@ export default function GenerateInvoicePage() {
     router.back();
   };
 
-  const selectedTotal = data
-    ? data.available_orders
-        .filter((o) => selectedOrderIds.includes(o.id))
-        .reduce((sum, o) => sum + o.total_amount, 0)
-    : 0;
-
   const formatMonth = (monthStr: string) => {
     const [year, m] = monthStr.split('-');
     const date = new Date(parseInt(year), parseInt(m) - 1);
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  };
+
   const getMonthDisplay = () => {
     if (!month || typeof month !== 'string') return '';
     return formatMonth(month);
   };
+
+  const canGenerateInvoice = orderData && (orderData.status === 'finalized' || orderData.status === 'approved');
 
   return (
     <>
@@ -249,9 +223,9 @@ export default function GenerateInvoicePage() {
               <CircularProgress />
             </Box>
           </Card>
-        ) : !data ? (
+        ) : !orderData ? (
           <Card sx={{ p: 5 }}>
-            <Alert severity="error">Failed to load invoice data</Alert>
+            <Alert severity="error">Failed to load order data</Alert>
           </Card>
         ) : (
           <Stack spacing={3}>
@@ -263,16 +237,16 @@ export default function GenerateInvoicePage() {
                   <Stack>
                     <Typography variant="h4">Generate Invoice</Typography>
                     <Typography variant="body1" color="text.secondary">
-                      {data.customer.name} - {getMonthDisplay()}
+                      {orderData.customer_name} - {getMonthDisplay()}
                     </Typography>
                   </Stack>
                 </Stack>
                 <Stack alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
                   <Typography variant="caption" color="text.secondary">
-                    Selected Total
+                    Invoice Amount
                   </Typography>
                   <Typography variant="h3" color="primary.main">
-                    {fCurrency(selectedTotal)}
+                    {fCurrency(orderData.total_amount)}
                   </Typography>
                 </Stack>
               </Stack>
@@ -288,221 +262,152 @@ export default function GenerateInvoicePage() {
                   <Typography variant="caption" color="text.secondary">
                     Customer Name
                   </Typography>
-                  <Typography variant="subtitle1">{data.customer.name}</Typography>
+                  <Typography variant="subtitle1">{orderData.customer_name}</Typography>
                 </Stack>
-                {data.customer.phone && (
+                {orderData.customer_phone && (
                   <Stack>
                     <Typography variant="caption" color="text.secondary">
                       Phone
                     </Typography>
-                    <Typography variant="body1">{data.customer.phone}</Typography>
+                    <Typography variant="body1">{orderData.customer_phone}</Typography>
                   </Stack>
                 )}
-                {data.customer.address && (
+                {orderData.customer_address && (
                   <Stack>
                     <Typography variant="caption" color="text.secondary">
                       Address
                     </Typography>
-                    <Typography variant="body1">{data.customer.address}</Typography>
+                    <Typography variant="body1">{orderData.customer_address}</Typography>
                   </Stack>
                 )}
               </Stack>
             </Card>
 
-            {/* Available Orders */}
-            {data.available_orders.length > 0 ? (
-              <Card>
-                <Box sx={{ p: 3, pb: 2 }}>
-                  <Typography variant="h6">
-                    Select Orders to Include in Invoice
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedOrderIds.length} of {data.available_orders.length} orders selected
-                  </Typography>
-                </Box>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            checked={selectedOrderIds.length === data.available_orders.length}
-                            indeterminate={
-                              selectedOrderIds.length > 0 &&
-                              selectedOrderIds.length < data.available_orders.length
-                            }
-                            onChange={handleToggleAll}
-                          />
-                        </TableCell>
-                        <TableCell>Order / Meal Plan</TableCell>
-                        <TableCell align="center">Delivered</TableCell>
-                        <TableCell align="center">Absent</TableCell>
-                        <TableCell align="center">Extra</TableCell>
-                        <TableCell align="right">Amount</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {data.available_orders.map((order) => (
-                        <TableRow
-                          key={order.id}
-                          hover
-                          onClick={() => handleToggleOrder(order.id)}
-                          sx={{ cursor: 'pointer' }}
+            {/* Order Details */}
+            <Card sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Order Details
+              </Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, width: 200 }}>Meal Plan</TableCell>
+                      <TableCell>
+                        <Typography variant="body1" fontWeight={600}>
+                          {orderData.meal_plan_name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Plan: {fCurrency(orderData.order_price)}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Period</TableCell>
+                      <TableCell>
+                        {formatDate(orderData.start_date)} - {formatDate(orderData.end_date)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Plan Days</TableCell>
+                      <TableCell>{orderData.total_plan_days}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Delivered</TableCell>
+                      <TableCell>
+                        <Typography color="success.main" fontWeight={600}>
+                          {orderData.total_delivered}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Absent</TableCell>
+                      <TableCell>
+                        <Typography color="error.main" fontWeight={600}>
+                          {orderData.total_absent}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Extra</TableCell>
+                      <TableCell>
+                        <Typography color="info.main" fontWeight={600}>
+                          {orderData.total_extra}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
+                      <TableCell>
+                        <Typography variant="h6" fontWeight={700}>
+                          {fCurrency(orderData.total_amount)}
+                        </Typography>
+                        {orderData.extra_amount > 0 && (
+                          <Typography variant="caption" color="text.secondary">
+                            (Base: {fCurrency(orderData.base_amount)} + Extra: {fCurrency(orderData.extra_amount)})
+                          </Typography>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                      <TableCell>
+                        <Typography
+                          sx={{
+                            textTransform: 'capitalize',
+                            color:
+                              orderData.status === 'finalized' || orderData.status === 'approved'
+                                ? 'success.main'
+                                : 'warning.main',
+                          }}
+                          fontWeight={600}
                         >
-                          <TableCell padding="checkbox">
-                            <Checkbox checked={selectedOrderIds.includes(order.id)} />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {order.meal_plan_name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Order #{order.order_id}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={order.total_delivered}
-                              size="small"
-                              sx={{
-                                bgcolor: alpha(theme.palette.success.main, 0.1),
-                                color: theme.palette.success.dark,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={order.total_absent}
-                              size="small"
-                              sx={{
-                                bgcolor: alpha(theme.palette.error.main, 0.1),
-                                color: theme.palette.error.dark,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={order.total_extra}
-                              size="small"
-                              sx={{
-                                bgcolor: alpha(theme.palette.info.main, 0.1),
-                                color: theme.palette.info.dark,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2" fontWeight="bold">
-                              {fCurrency(order.total_amount)}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Card>
-            ) : (
-              <Alert severity="info">
-                No orders available for invoice generation. Orders must be finalized first.
+                          {orderData.status}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Card>
+
+            {/* Status Warning */}
+            {!canGenerateInvoice && (
+              <Alert severity="warning">
+                This order must be finalized or approved before generating an invoice. Current status: {orderData.status}
               </Alert>
             )}
 
-            {/* Already Invoiced Orders */}
-            {data.already_invoiced_orders.length > 0 && (
-              <Card sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom color="text.secondary">
-                  Already Invoiced ({data.already_invoiced_orders.length})
-                </Typography>
-                <Paper
-                  variant="outlined"
-                  sx={{ p: 2, bgcolor: alpha(theme.palette.warning.main, 0.05) }}
-                >
-                  <Stack spacing={1}>
-                    {data.already_invoiced_orders.map((order) => (
-                      <Stack
-                        key={order.id}
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="center"
-                      >
-                        <Typography variant="body2">
-                          {order.meal_plan_name} - {fCurrency(order.total_amount)}
-                        </Typography>
-                        <Chip
-                          label={order.invoice_number}
-                          size="small"
-                          color="warning"
-                          variant="outlined"
-                        />
-                      </Stack>
-                    ))}
-                  </Stack>
-                </Paper>
-              </Card>
-            )}
-
-            {/* Not Ready Orders */}
-            {data.not_ready_orders.length > 0 && (
-              <Card sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom color="text.secondary">
-                  Not Ready ({data.not_ready_orders.length})
-                </Typography>
-                <Paper
-                  variant="outlined"
-                  sx={{ p: 2, bgcolor: alpha(theme.palette.grey[500], 0.05) }}
-                >
-                  <Stack spacing={1}>
-                    {data.not_ready_orders.map((order, index) => (
-                      <Stack
-                        key={`${order.order_id}-${index}`}
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="center"
-                      >
-                        <Typography variant="body2" color="text.secondary">
-                          {order.meal_plan_name}
-                        </Typography>
-                        <Chip
-                          label={order.status === 'no_billing' ? 'No Billing' : 'Calculating'}
-                          size="small"
-                          color="default"
-                          variant="outlined"
-                        />
-                      </Stack>
-                    ))}
-                  </Stack>
-                </Paper>
-              </Card>
-            )}
-
             {/* Invoice Options */}
-            <Card sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Invoice Options
-              </Typography>
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <DatePicker
-                    label="Due Date (Optional)"
-                    value={dueDate}
-                    onChange={(newValue) => setDueDate(newValue)}
-                    renderInput={(params) => <TextField {...params} fullWidth />}
-                  />
+            {canGenerateInvoice && (
+              <Card sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Invoice Options
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <DatePicker
+                      label="Due Date (Optional)"
+                      value={dueDate}
+                      onChange={(newValue) => setDueDate(newValue)}
+                      renderInput={(params) => <TextField {...params} fullWidth />}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Notes (Optional)"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      fullWidth
+                      multiline
+                      rows={2}
+                    />
+                  </Grid>
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    label="Notes (Optional)"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    fullWidth
-                    multiline
-                    rows={2}
-                  />
-                </Grid>
-              </Grid>
-            </Card>
+              </Card>
+            )}
 
-            {/* Summary and Action */}
+            {/* Action Buttons */}
             <Card sx={{ p: 3 }}>
               <Stack
                 direction={{ xs: 'column', md: 'row' }}
@@ -525,11 +430,10 @@ export default function GenerateInvoicePage() {
                   >
                     <Box>
                       <Typography variant="body1" color="text.secondary">
-                        Selected Orders: {selectedOrderIds.length}
+                        Invoice Type: <strong>Individual Order</strong>
                       </Typography>
                       <Typography variant="body1" color="text.secondary">
-                        Invoice Type:{' '}
-                        <strong>{selectedOrderIds.length === 1 ? 'Individual' : 'Combined'}</strong>
+                        Order: {orderData.meal_plan_name}
                       </Typography>
                     </Box>
                     <Box textAlign="right">
@@ -537,7 +441,7 @@ export default function GenerateInvoicePage() {
                         Total Amount
                       </Typography>
                       <Typography variant="h4" color="primary.main" fontWeight="bold">
-                        {fCurrency(selectedTotal)}
+                        {fCurrency(orderData.total_amount)}
                       </Typography>
                     </Box>
                   </Stack>
@@ -555,7 +459,7 @@ export default function GenerateInvoicePage() {
                     variant="contained"
                     size="large"
                     onClick={handleGenerateInvoice}
-                    disabled={loading || generating || selectedOrderIds.length === 0}
+                    disabled={loading || generating || !canGenerateInvoice}
                     startIcon={
                       generating ? (
                         <CircularProgress size={20} color="inherit" />
