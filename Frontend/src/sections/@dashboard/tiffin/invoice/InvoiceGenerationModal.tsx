@@ -398,9 +398,7 @@ export default function InvoiceGenerationModal({
                 label="Due Date (Optional)"
                 value={dueDate}
                 onChange={(newValue) => setDueDate(newValue)}
-                slotProps={{
-                  textField: { size: 'small', fullWidth: true },
-                }}
+                renderInput={(params) => <TextField {...params} size="small" fullWidth />}
               />
               <TextField
                 label="Notes (Optional)"
