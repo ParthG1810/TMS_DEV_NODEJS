@@ -212,6 +212,8 @@ export default function OrderInvoiceDetailsPage() {
       if (response.data.success) {
         enqueueSnackbar('Order approved successfully', { variant: 'success' });
         fetchInvoiceDetails();
+        // Trigger notification refresh
+        window.dispatchEvent(new CustomEvent('refresh-notifications'));
       } else {
         enqueueSnackbar(response.data.error || 'Failed to approve order', { variant: 'error' });
       }
