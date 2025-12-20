@@ -20,8 +20,12 @@ import {
   CircularProgress,
   Alert,
   Button,
+  Checkbox,
+  TextField,
+  Grid,
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled, useTheme, alpha } from '@mui/material/styles';
+import { DatePicker } from '@mui/x-date-pickers';
 // layouts
 import DashboardLayout from '../../../layouts/dashboard';
 // components
@@ -31,8 +35,7 @@ import Iconify from '../../../components/iconify';
 import { useSnackbar } from '../../../components/snackbar';
 // utils
 import axios from '../../../utils/axios';
-// paths
-import { PATH_DASHBOARD } from '../../../routes/paths';
+import { fCurrency } from '../../../utils/formatNumber';
 
 // ----------------------------------------------------------------------
 
@@ -100,6 +103,7 @@ interface CombinedInvoice {
 // ----------------------------------------------------------------------
 
 export default function CombinedInvoicePage() {
+  const theme = useTheme();
   const { themeStretch } = useSettingsContext();
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
@@ -109,6 +113,12 @@ export default function CombinedInvoicePage() {
   const [loading, setLoading] = useState(true);
   const [invoice, setInvoice] = useState<CombinedInvoice | null>(null);
   const [approving, setApproving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  // Selection state
+  const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [notes, setNotes] = useState('');
 
   // Fetch combined invoice data
   useEffect(() => {
@@ -129,6 +139,11 @@ export default function CombinedInvoicePage() {
 
       if (response.data.success) {
         setInvoice(response.data.data);
+        // Pre-select all finalized/approved orders
+        const selectableOrders = response.data.data.orders.filter(
+          (o: OrderBillingDetail) => o.status === 'finalized' || o.status === 'approved'
+        );
+        setSelectedOrderIds(selectableOrders.map((o: OrderBillingDetail) => o.id));
       } else {
         enqueueSnackbar(response.data.error || 'Failed to load invoice', { variant: 'error' });
       }
@@ -145,22 +160,17 @@ export default function CombinedInvoicePage() {
 
     setApproving(true);
     try {
-      // Update monthly_billing status to 'paid' or 'finalized'
-      // First, create or update the monthly_billing record
       const response = await axios.post('/api/monthly-billing', {
         customer_id: customerId,
         billing_month: month,
       });
 
       if (response.data.success && response.data.data?.id) {
-        // Update the status to finalized
         await axios.put(`/api/monthly-billing/${response.data.data.id}`, {
           status: 'finalized',
         });
 
         enqueueSnackbar('Combined invoice approved successfully!', { variant: 'success' });
-
-        // Refresh the invoice data
         fetchInvoice();
       } else {
         enqueueSnackbar('Failed to approve invoice', { variant: 'error' });
@@ -170,6 +180,62 @@ export default function CombinedInvoicePage() {
       enqueueSnackbar(error.response?.data?.error || 'Failed to approve invoice', { variant: 'error' });
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleToggleOrder = (orderId: number) => {
+    const order = invoice?.orders.find((o) => o.id === orderId);
+    if (!order || (order.status !== 'finalized' && order.status !== 'approved')) {
+      return; // Can only select finalized/approved orders
+    }
+    setSelectedOrderIds((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
+    );
+  };
+
+  const handleToggleAll = () => {
+    if (!invoice) return;
+    const selectableOrders = invoice.orders.filter(
+      (o) => o.status === 'finalized' || o.status === 'approved'
+    );
+    if (selectedOrderIds.length === selectableOrders.length) {
+      setSelectedOrderIds([]);
+    } else {
+      setSelectedOrderIds(selectableOrders.map((o) => o.id));
+    }
+  };
+
+  const handleGenerateInvoice = async () => {
+    if (selectedOrderIds.length === 0) {
+      enqueueSnackbar('Please select at least one order', { variant: 'warning' });
+      return;
+    }
+
+    try {
+      setGenerating(true);
+      const response = await axios.post('/api/invoices/generate', {
+        customer_id: customerId,
+        order_billing_ids: selectedOrderIds,
+        due_date: dueDate ? dueDate.toISOString().split('T')[0] : null,
+        notes: notes || null,
+      });
+
+      if (response.data.success) {
+        enqueueSnackbar(
+          `Invoice ${response.data.data.invoice_number} generated successfully!`,
+          { variant: 'success' }
+        );
+        router.push('/dashboard/tiffin/invoices');
+      } else {
+        enqueueSnackbar(response.data.error || 'Failed to generate invoice', {
+          variant: 'error',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error generating invoice:', error);
+      enqueueSnackbar(error.message || 'Failed to generate invoice', { variant: 'error' });
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -193,10 +259,6 @@ export default function CombinedInvoicePage() {
     return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
   };
 
-  const formatCurrency = (amount: number) => {
-    return `CAD $${amount.toFixed(2)}`;
-  };
-
   const getStatusColor = (status: string): 'default' | 'warning' | 'success' | 'info' | 'primary' => {
     switch (status) {
       case 'calculating':
@@ -212,13 +274,27 @@ export default function CombinedInvoicePage() {
     }
   };
 
-  // Parse billing month for display
+  const isOrderSelectable = (order: OrderBillingDetail) => {
+    return order.status === 'finalized' || order.status === 'approved';
+  };
+
   const getMonthDisplay = () => {
     if (!month || typeof month !== 'string') return '';
     const [year, m] = month.split('-');
     const date = new Date(parseInt(year), parseInt(m) - 1, 1);
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
+
+  // Calculate selected total
+  const selectedTotal = invoice
+    ? invoice.orders
+        .filter((o) => selectedOrderIds.includes(o.id))
+        .reduce((sum, o) => sum + o.total_amount, 0)
+    : 0;
+
+  const selectableOrdersCount = invoice
+    ? invoice.orders.filter((o) => o.status === 'finalized' || o.status === 'approved').length
+    : 0;
 
   return (
     <>
@@ -269,10 +345,10 @@ export default function CombinedInvoicePage() {
                 </Stack>
                 <Stack alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
                   <Typography variant="caption" color="text.secondary">
-                    Grand Total
+                    Selected Total
                   </Typography>
                   <Typography variant="h3" color="primary.main">
-                    {formatCurrency(invoice.summary.grand_total_amount)}
+                    {fCurrency(selectedTotal)}
                   </Typography>
                 </Stack>
               </Stack>
@@ -321,56 +397,55 @@ export default function CombinedInvoicePage() {
               }
               action={
                 invoice.can_approve && (
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      color="inherit"
-                      size="small"
-                      variant="outlined"
-                      onClick={handleApprove}
-                      disabled={approving}
-                      startIcon={
-                        approving ? (
-                          <CircularProgress size={16} color="inherit" />
-                        ) : (
-                          <Iconify icon="eva:checkmark-circle-2-fill" />
-                        )
-                      }
-                    >
-                      {approving ? 'Approving...' : 'Approve Invoice'}
-                    </Button>
-                    <Button
-                      color="primary"
-                      size="small"
-                      variant="contained"
-                      onClick={() =>
-                        router.push({
-                          pathname: '/dashboard/tiffin/generate-invoice',
-                          query: {
-                            customerId: invoice?.customer_id,
-                            customerName: invoice?.customer_name,
-                            month: invoice?.billing_month,
-                          },
-                        })
-                      }
-                      startIcon={<Iconify icon="solar:document-add-bold" />}
-                    >
-                      Generate Invoice
-                    </Button>
-                  </Stack>
+                  <Button
+                    color="inherit"
+                    size="small"
+                    variant="outlined"
+                    onClick={handleApprove}
+                    disabled={approving}
+                    startIcon={
+                      approving ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : (
+                        <Iconify icon="eva:checkmark-circle-2-fill" />
+                      )
+                    }
+                  >
+                    {approving ? 'Approving...' : 'Approve All'}
+                  </Button>
                 )
               }
             >
               {invoice.can_approve
-                ? 'All orders are finalized. You can approve this combined invoice.'
-                : `${invoice.summary.finalized_orders} of ${invoice.summary.total_orders} orders finalized. Please finalize all orders before approving.`}
+                ? 'All orders are finalized. Select orders below to generate a combined invoice.'
+                : `${invoice.summary.finalized_orders} of ${invoice.summary.total_orders} orders finalized. Please finalize all orders before generating invoice.`}
             </Alert>
 
-            {/* Orders Table */}
+            {/* Orders Table with Selection */}
             <Card>
+              <Box sx={{ p: 3, pb: 2 }}>
+                <Typography variant="h6">
+                  Select Orders to Include in Invoice
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedOrderIds.length} of {selectableOrdersCount} available orders selected
+                </Typography>
+              </Box>
               <TableContainer>
                 <Table>
                   <TableHead>
                     <TableRow>
+                      <StyledHeaderCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedOrderIds.length === selectableOrdersCount && selectableOrdersCount > 0}
+                          indeterminate={
+                            selectedOrderIds.length > 0 &&
+                            selectedOrderIds.length < selectableOrdersCount
+                          }
+                          onChange={handleToggleAll}
+                          disabled={selectableOrdersCount === 0}
+                        />
+                      </StyledHeaderCell>
                       <StyledHeaderCell>Meal Plan</StyledHeaderCell>
                       <StyledHeaderCell align="center">Period</StyledHeaderCell>
                       <StyledHeaderCell align="center">Plan Days</StyledHeaderCell>
@@ -383,93 +458,120 @@ export default function CombinedInvoicePage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {invoice.orders.map((order, index) => (
-                      <TableRow key={order.order_id || index} hover>
-                        <StyledTableCell>
-                          <Stack>
-                            <Typography variant="body2" fontWeight={600}>
-                              {order.meal_plan_name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Plan: {formatCurrency(order.order_price)}
-                            </Typography>
-                          </Stack>
-                        </StyledTableCell>
-                        <StyledTableCell align="center">
-                          <Typography variant="caption">
-                            {formatDate(order.start_date)} - {formatDate(order.end_date)}
-                          </Typography>
-                        </StyledTableCell>
-                        <StyledTableCell align="center">{order.total_plan_days}</StyledTableCell>
-                        <StyledTableCell align="center">
-                          <Typography color="success.main" fontWeight={600}>
-                            {order.total_delivered}
-                          </Typography>
-                        </StyledTableCell>
-                        <StyledTableCell align="center">
-                          <Typography color="error.main" fontWeight={600}>
-                            {order.total_absent}
-                          </Typography>
-                        </StyledTableCell>
-                        <StyledTableCell align="center">
-                          <Typography color="info.main" fontWeight={600}>
-                            {order.total_extra}
-                          </Typography>
-                        </StyledTableCell>
-                        <StyledTableCell align="right">
-                          <Stack alignItems="flex-end">
-                            <Typography fontWeight={700}>{formatCurrency(order.total_amount)}</Typography>
-                            {order.extra_amount > 0 && (
-                              <Typography variant="caption" color="text.secondary">
-                                (Base: {formatCurrency(order.base_amount)} + Extra: {formatCurrency(order.extra_amount)})
+                    {invoice.orders.map((order, index) => {
+                      const selectable = isOrderSelectable(order);
+                      return (
+                        <TableRow
+                          key={order.order_id || index}
+                          hover
+                          onClick={() => selectable && handleToggleOrder(order.id)}
+                          sx={{
+                            cursor: selectable ? 'pointer' : 'default',
+                            opacity: selectable ? 1 : 0.6,
+                          }}
+                        >
+                          <StyledTableCell padding="checkbox">
+                            <Checkbox
+                              checked={selectedOrderIds.includes(order.id)}
+                              disabled={!selectable}
+                            />
+                          </StyledTableCell>
+                          <StyledTableCell>
+                            <Stack>
+                              <Typography variant="body2" fontWeight={600}>
+                                {order.meal_plan_name}
                               </Typography>
-                            )}
-                          </Stack>
-                        </StyledTableCell>
-                        <StyledTableCell align="center">
-                          <Chip
-                            label={order.status}
-                            color={getStatusColor(order.status)}
-                            size="small"
-                            sx={{ textTransform: 'capitalize' }}
-                          />
-                        </StyledTableCell>
-                        <StyledTableCell align="center">
-                          <Button
-                            size="small"
-                            variant="text"
-                            onClick={() => handleViewOrderInvoice(order)}
-                            startIcon={<Iconify icon="eva:file-text-outline" width={16} />}
-                          >
-                            View
-                          </Button>
-                        </StyledTableCell>
-                      </TableRow>
-                    ))}
+                              <Typography variant="caption" color="text.secondary">
+                                Plan: {fCurrency(order.order_price)}
+                              </Typography>
+                            </Stack>
+                          </StyledTableCell>
+                          <StyledTableCell align="center">
+                            <Typography variant="caption">
+                              {formatDate(order.start_date)} - {formatDate(order.end_date)}
+                            </Typography>
+                          </StyledTableCell>
+                          <StyledTableCell align="center">{order.total_plan_days}</StyledTableCell>
+                          <StyledTableCell align="center">
+                            <Typography color="success.main" fontWeight={600}>
+                              {order.total_delivered}
+                            </Typography>
+                          </StyledTableCell>
+                          <StyledTableCell align="center">
+                            <Typography color="error.main" fontWeight={600}>
+                              {order.total_absent}
+                            </Typography>
+                          </StyledTableCell>
+                          <StyledTableCell align="center">
+                            <Typography color="info.main" fontWeight={600}>
+                              {order.total_extra}
+                            </Typography>
+                          </StyledTableCell>
+                          <StyledTableCell align="right">
+                            <Stack alignItems="flex-end">
+                              <Typography fontWeight={700}>{fCurrency(order.total_amount)}</Typography>
+                              {order.extra_amount > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  (Base: {fCurrency(order.base_amount)} + Extra: {fCurrency(order.extra_amount)})
+                                </Typography>
+                              )}
+                            </Stack>
+                          </StyledTableCell>
+                          <StyledTableCell align="center">
+                            <Chip
+                              label={order.status}
+                              color={getStatusColor(order.status)}
+                              size="small"
+                              sx={{ textTransform: 'capitalize' }}
+                            />
+                          </StyledTableCell>
+                          <StyledTableCell align="center">
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewOrderInvoice(order);
+                              }}
+                              startIcon={<Iconify icon="eva:file-text-outline" width={16} />}
+                            >
+                              View
+                            </Button>
+                          </StyledTableCell>
+                        </TableRow>
+                      );
+                    })}
 
                     {/* Summary Row */}
                     <TableRow sx={{ bgcolor: 'action.hover' }}>
+                      <StyledTableCell />
                       <StyledTableCell colSpan={3}>
-                        <Typography fontWeight={700}>GRAND TOTAL</Typography>
+                        <Typography fontWeight={700}>SELECTED TOTAL</Typography>
                       </StyledTableCell>
                       <StyledTableCell align="center">
                         <Typography fontWeight={700} color="success.main">
-                          {invoice.summary.grand_total_delivered}
+                          {invoice.orders
+                            .filter((o) => selectedOrderIds.includes(o.id))
+                            .reduce((sum, o) => sum + o.total_delivered, 0)}
                         </Typography>
                       </StyledTableCell>
                       <StyledTableCell align="center">
                         <Typography fontWeight={700} color="error.main">
-                          {invoice.summary.grand_total_absent}
+                          {invoice.orders
+                            .filter((o) => selectedOrderIds.includes(o.id))
+                            .reduce((sum, o) => sum + o.total_absent, 0)}
                         </Typography>
                       </StyledTableCell>
                       <StyledTableCell align="center">
                         <Typography fontWeight={700} color="info.main">
-                          {invoice.summary.grand_total_extra}
+                          {invoice.orders
+                            .filter((o) => selectedOrderIds.includes(o.id))
+                            .reduce((sum, o) => sum + o.total_extra, 0)}
                         </Typography>
                       </StyledTableCell>
                       <StyledTableCell align="right">
                         <Typography variant="h6" color="primary.main">
-                          {formatCurrency(invoice.summary.grand_total_amount)}
+                          {fCurrency(selectedTotal)}
                         </Typography>
                       </StyledTableCell>
                       <StyledTableCell colSpan={2} />
@@ -479,24 +581,100 @@ export default function CombinedInvoicePage() {
               </TableContainer>
             </Card>
 
-            {/* Order Details */}
+            {/* Invoice Options */}
+            {selectedOrderIds.length > 0 && (
+              <Card sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Invoice Options
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <DatePicker
+                      label="Due Date (Optional)"
+                      value={dueDate}
+                      onChange={(newValue) => setDueDate(newValue)}
+                      renderInput={(params) => <TextField {...params} fullWidth />}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Notes (Optional)"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      fullWidth
+                      multiline
+                      rows={2}
+                    />
+                  </Grid>
+                </Grid>
+              </Card>
+            )}
+
+            {/* Generate Invoice Button */}
             <Card sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Order Details
-              </Typography>
-              <Stack spacing={1}>
-                {invoice.orders.map((order, index) => (
-                  <Stack key={order.order_id || index} direction="row" spacing={1} alignItems="center">
-                    <Typography variant="body2" fontWeight={600} sx={{ minWidth: 200 }}>
-                      {order.meal_plan_name}:
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {order.selected_days && order.selected_days.length > 0
-                        ? order.selected_days.join(', ')
-                        : 'All days'}
-                    </Typography>
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                justifyContent="space-between"
+                alignItems={{ xs: 'stretch', md: 'center' }}
+                spacing={3}
+              >
+                <Paper
+                  sx={{
+                    p: 3,
+                    flex: 1,
+                    bgcolor: alpha(theme.palette.primary.main, 0.05),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Box>
+                      <Typography variant="body1" color="text.secondary">
+                        Selected Orders: {selectedOrderIds.length}
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary">
+                        Invoice Type:{' '}
+                        <strong>{selectedOrderIds.length === 1 ? 'Individual' : 'Combined'}</strong>
+                      </Typography>
+                    </Box>
+                    <Box textAlign="right">
+                      <Typography variant="caption" color="text.secondary">
+                        Total Amount
+                      </Typography>
+                      <Typography variant="h4" color="primary.main" fontWeight="bold">
+                        {fCurrency(selectedTotal)}
+                      </Typography>
+                    </Box>
                   </Stack>
-                ))}
+                </Paper>
+
+                <Stack direction="row" spacing={2}>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={handleBack}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={handleGenerateInvoice}
+                    disabled={loading || generating || selectedOrderIds.length === 0}
+                    startIcon={
+                      generating ? (
+                        <CircularProgress size={20} color="inherit" />
+                      ) : (
+                        <Iconify icon="solar:document-add-bold" />
+                      )
+                    }
+                  >
+                    {generating ? 'Generating...' : 'Generate Combined Invoice'}
+                  </Button>
+                </Stack>
               </Stack>
             </Card>
 
@@ -533,7 +711,7 @@ export default function CombinedInvoicePage() {
                 </Stack>
                 <Stack flex={1} alignItems="center">
                   <Typography variant="h4" color="primary.main">
-                    {formatCurrency(invoice.summary.grand_total_amount)}
+                    {fCurrency(invoice.summary.grand_total_amount)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Grand Total
