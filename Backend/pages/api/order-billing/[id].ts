@@ -199,12 +199,63 @@ async function handleUpdate(
       `UPDATE customer_orders SET payment_status = 'calculating' WHERE id = ?`,
       [currentBilling.order_id]
     );
-  } else if (status === 'finalized' || status === 'approved') {
-    // Finalized or Approved - set order to pending
+  } else if (status === 'finalized') {
+    // Finalized - set order to pending
     await query(
       `UPDATE customer_orders SET payment_status = 'pending' WHERE id = ?`,
       [currentBilling.order_id]
     );
+  } else if (status === 'approved') {
+    // Approved - set order to approved
+    await query(
+      `UPDATE customer_orders SET payment_status = 'approved' WHERE id = ?`,
+      [currentBilling.order_id]
+    );
+
+    // Create notification for approval
+    try {
+      // Get customer details for notification
+      const customerDetails = await query<any[]>(
+        `SELECT c.name, c.id as customer_id, ob.billing_month, ob.total_amount
+         FROM order_billing ob
+         INNER JOIN customers c ON ob.customer_id = c.id
+         WHERE ob.id = ?`,
+        [id]
+      );
+
+      if (customerDetails.length > 0) {
+        const customer = customerDetails[0];
+
+        // Delete any existing pending approval notifications for this billing
+        await query(
+          `DELETE FROM payment_notifications
+           WHERE billing_id = ? AND notification_type IN ('billing_pending_approval', 'order_approved')`,
+          [id]
+        );
+
+        // Create new approval notification
+        await query(
+          `INSERT INTO payment_notifications (
+            notification_type, billing_id, customer_id, billing_month,
+            title, message, priority, action_url
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            'order_approved',
+            id,
+            customer.customer_id,
+            customer.billing_month,
+            `Order Approved - ${customer.name}`,
+            `Order billing for ${customer.name} (${customer.billing_month}) has been approved. Total amount: CAD $${Number(customer.total_amount).toFixed(2)}. Ready for invoice generation.`,
+            'medium',
+            `/dashboard/tiffin/order-invoice-details?orderId=${currentBilling.order_id}&month=${customer.billing_month}`,
+          ]
+        );
+      }
+    } catch (notificationError) {
+      // Log but don't fail the request if notification creation fails
+      console.error('Error creating approval notification:', notificationError);
+    }
   }
 
   // Fetch updated record
