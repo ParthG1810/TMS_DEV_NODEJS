@@ -7,7 +7,7 @@ interface SourcePayment {
   id: number;
   payment_date: string;
   amount: number;
-  payment_method: string;
+  payment_type: string;
   reference_number: string | null;
 }
 
@@ -101,7 +101,7 @@ async function handleGet(
 
     // Get source payment details
     const sourcePayments = await query<SourcePayment[]>(`
-      SELECT id, payment_date, amount, payment_method, reference_number
+      SELECT id, payment_date, amount, payment_type, reference_number
       FROM payment_records
       WHERE id = ?
     `, [credit.payment_record_id]);
