@@ -65,7 +65,7 @@ interface PaymentRecord {
   payment_record_id: number;
   amount_applied: number;
   applied_at: string;
-  applied_by: string | null;
+  sender_name: string | null;
   payment_type: string;
   payment_source: string | null;
   reference_number: string | null;
@@ -521,44 +521,6 @@ export default function InvoiceDetailPage() {
                   </Typography>
                 </Box>
               </Stack>
-
-              {/* Payment History */}
-              {invoice.payments.length > 0 && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Payment History
-                  </Typography>
-                  <Stack spacing={1}>
-                    {invoice.payments.map((payment) => (
-                      <Paper
-                        key={payment.id}
-                        variant="outlined"
-                        sx={{ p: 1.5 }}
-                      >
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
-                        >
-                          <Box>
-                            <Typography variant="body2" fontWeight="medium">
-                              {fCurrency(payment.amount_applied)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {fDateTime(payment.applied_at)}
-                            </Typography>
-                          </Box>
-                          <Chip
-                            label={payment.payment_source ? `${payment.payment_type} (${payment.payment_source})` : payment.payment_type}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
-                </Box>
-              )}
             </Card>
           </Grid>
         </Grid>
@@ -581,7 +543,7 @@ export default function InvoiceDetailPage() {
                     <TableCell>Payment Type</TableCell>
                     <TableCell>Reference</TableCell>
                     <TableCell align="right">Amount</TableCell>
-                    <TableCell>Applied By</TableCell>
+                    <TableCell>Sender Name</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -631,8 +593,8 @@ export default function InvoiceDetailPage() {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {payment.applied_by || '-'}
+                        <Typography variant="body2">
+                          {payment.sender_name || '-'}
                         </Typography>
                       </TableCell>
                     </TableRow>
