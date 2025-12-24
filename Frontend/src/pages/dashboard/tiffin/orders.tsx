@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
+import sumBy from 'lodash/sumBy';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 // @mui
+import { useTheme } from '@mui/material/styles';
 import {
   Card,
   Table,
@@ -14,7 +16,8 @@ import {
   Tabs,
   Tab,
   Box,
-  alpha,
+  Stack,
+  Divider,
 } from '@mui/material';
 // routes
 import { PATH_DASHBOARD } from '../../../routes/paths';
@@ -29,6 +32,7 @@ import Scrollbar from '../../../components/scrollbar';
 import ConfirmDialog from '../../../components/confirm-dialog';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import { useSnackbar } from '../../../components/snackbar';
+import Label from '../../../components/label';
 import {
   useTable,
   getComparator,
@@ -40,7 +44,7 @@ import {
   TablePaginationCustom,
 } from '../../../components/table';
 // sections
-import { OrderTableRow, OrderTableToolbar } from '../../../sections/@dashboard/tiffin/order/list';
+import { OrderTableRow, OrderTableToolbar, OrderAnalytic } from '../../../sections/@dashboard/tiffin/order/list';
 import DashboardLayout from '../../../layouts/dashboard';
 import axios from '../../../utils/axios';
 
@@ -56,20 +60,13 @@ const TABLE_HEAD = [
   { id: '' },
 ];
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'calculating', label: 'Calculating' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'finalized', label: 'Finalized' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'partial_paid', label: 'Partial Paid' },
-];
-
 // ----------------------------------------------------------------------
 
 OrdersPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page}</DashboardLayout>;
 
 export default function OrdersPage() {
+  const theme = useTheme();
+
   const {
     dense,
     page,
@@ -135,6 +132,31 @@ export default function OrdersPage() {
       return orderStatus === status;
     }).length;
   };
+
+  const getTotalPriceByStatus = (status: string) => {
+    if (status === 'all') return sumBy(tableData, (order) => Number(order.price) || 0);
+    return sumBy(
+      tableData.filter((order) => {
+        const orderStatus = order.payment_status || 'calculating';
+        return orderStatus === status;
+      }),
+      (order) => Number(order.price) || 0
+    );
+  };
+
+  const getPercentByStatus = (status: string) => {
+    if (tableData.length === 0) return 0;
+    return (getStatusCount(status) / tableData.length) * 100;
+  };
+
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: tableData.length },
+    { value: 'calculating', label: 'Calculating', color: 'default', count: getStatusCount('calculating') },
+    { value: 'pending', label: 'Pending', color: 'warning', count: getStatusCount('pending') },
+    { value: 'finalized', label: 'Finalized', color: 'info', count: getStatusCount('finalized') },
+    { value: 'paid', label: 'Paid', color: 'success', count: getStatusCount('paid') },
+    { value: 'partial_paid', label: 'Partial Paid', color: 'secondary', count: getStatusCount('partial_paid') },
+  ] as const;
 
   const handleOpenConfirm = () => setOpenConfirm(true);
   const handleCloseConfirm = () => setOpenConfirm(false);
@@ -557,46 +579,96 @@ export default function OrdersPage() {
           }
         />
 
+        {/* Analytics Cards */}
+        <Card sx={{ mb: 5 }}>
+          <Scrollbar>
+            <Stack
+              direction="row"
+              divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+              sx={{ py: 2 }}
+            >
+              <OrderAnalytic
+                title="Total"
+                total={tableData.length}
+                percent={100}
+                price={getTotalPriceByStatus('all')}
+                icon="ic:round-receipt"
+                color={theme.palette.info.main}
+              />
+
+              <OrderAnalytic
+                title="Calculating"
+                total={getStatusCount('calculating')}
+                percent={getPercentByStatus('calculating')}
+                price={getTotalPriceByStatus('calculating')}
+                icon="eva:refresh-outline"
+                color={theme.palette.text.secondary}
+              />
+
+              <OrderAnalytic
+                title="Pending"
+                total={getStatusCount('pending')}
+                percent={getPercentByStatus('pending')}
+                price={getTotalPriceByStatus('pending')}
+                icon="eva:clock-fill"
+                color={theme.palette.warning.main}
+              />
+
+              <OrderAnalytic
+                title="Finalized"
+                total={getStatusCount('finalized')}
+                percent={getPercentByStatus('finalized')}
+                price={getTotalPriceByStatus('finalized')}
+                icon="eva:checkmark-circle-2-fill"
+                color={theme.palette.info.main}
+              />
+
+              <OrderAnalytic
+                title="Paid"
+                total={getStatusCount('paid')}
+                percent={getPercentByStatus('paid')}
+                price={getTotalPriceByStatus('paid')}
+                icon="eva:checkmark-circle-2-fill"
+                color={theme.palette.success.main}
+              />
+
+              <OrderAnalytic
+                title="Partial Paid"
+                total={getStatusCount('partial_paid')}
+                percent={getPercentByStatus('partial_paid')}
+                price={getTotalPriceByStatus('partial_paid')}
+                icon="eva:checkmark-outline"
+                color={theme.palette.secondary.main}
+              />
+            </Stack>
+          </Scrollbar>
+        </Card>
+
         <Card>
           {/* Status Tabs */}
           <Tabs
             value={filterStatus}
             onChange={handleFilterStatus}
             sx={{
-              px: 2.5,
-              pt: 2,
+              px: 2,
               bgcolor: 'background.neutral',
-              borderBottom: (theme) => `solid 1px ${alpha(theme.palette.grey[500], 0.24)}`,
             }}
           >
-            {STATUS_OPTIONS.map((tab) => (
+            {TABS.map((tab) => (
               <Tab
                 key={tab.value}
                 value={tab.value}
                 label={tab.label}
                 icon={
-                  <Box
-                    sx={{
-                      minWidth: 20,
-                      height: 20,
-                      borderRadius: '6px',
-                      bgcolor: filterStatus === tab.value ? 'primary.main' : 'grey.400',
-                      color: 'common.white',
-                      fontSize: 11,
-                      fontWeight: 'bold',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      ml: 1,
-                    }}
-                  >
-                    {getStatusCount(tab.value)}
-                  </Box>
+                  <Label color={tab.color} sx={{ mr: 1 }}>
+                    {tab.count}
+                  </Label>
                 }
-                iconPosition="end"
               />
             ))}
           </Tabs>
+
+          <Divider />
 
           <OrderTableToolbar
             isFiltered={isFiltered}
