@@ -135,6 +135,21 @@ export default function NotificationsPopover() {
     }
   };
 
+  const handleClearAll = async () => {
+    try {
+      // Dismiss all notifications
+      for (const notification of notifications) {
+        await axios.delete(`/api/payment-notifications/${notification.id}`);
+      }
+      // Clear local state
+      setNotifications([]);
+      enqueueSnackbar('All notifications cleared', { variant: 'success' });
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      enqueueSnackbar('Failed to clear notifications', { variant: 'error' });
+    }
+  };
+
   const handleNotificationClick = async (notification: PaymentNotification) => {
     try {
       // Mark as read
@@ -255,9 +270,24 @@ export default function NotificationsPopover() {
         <Divider sx={{ borderStyle: 'dashed' }} />
 
         <Box sx={{ p: 1 }}>
-          <Button fullWidth disableRipple>
-            View All
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              fullWidth
+              color="inherit"
+              onClick={handleClosePopover}
+            >
+              Close
+            </Button>
+            {notifications.length > 0 && (
+              <Button
+                fullWidth
+                color="error"
+                onClick={handleClearAll}
+              >
+                Clear All
+              </Button>
+            )}
+          </Stack>
         </Box>
       </MenuPopover>
     </>
