@@ -71,7 +71,7 @@ interface OrderBillingDetail {
   base_amount: number;
   extra_amount: number;
   total_amount: number;
-  status: 'calculating' | 'finalized' | 'approved' | 'invoiced';
+  status: 'calculating' | 'finalized' | 'approved' | 'invoiced' | 'paid' | 'partial_paid';
   finalized_at: string | null;
   finalized_by: string | null;
   meal_plan_name: string;
@@ -417,8 +417,8 @@ export default function CombinedInvoicePage() {
               }
             >
               {invoice.can_approve
-                ? 'All orders are finalized. Select orders below to generate a combined invoice.'
-                : `${invoice.summary.finalized_orders} of ${invoice.summary.total_orders} orders finalized. Please finalize all orders before generating invoice.`}
+                ? 'All orders are ready. Select orders below to generate a combined invoice.'
+                : `${invoice.summary.finalized_orders} of ${invoice.summary.total_orders} orders ready. Please finalize all orders before generating invoice.`}
             </Alert>
 
             {/* Orders Table with Selection */}
