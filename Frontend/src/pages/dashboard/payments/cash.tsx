@@ -324,9 +324,7 @@ export default function CashPaymentPage() {
                   label="Payment Date *"
                   value={paymentDate}
                   onChange={(newValue) => setPaymentDate(newValue)}
-                  slotProps={{
-                    textField: { fullWidth: true },
-                  }}
+                  renderInput={(params) => <TextField {...params} fullWidth />}
                 />
 
                 <TextField
