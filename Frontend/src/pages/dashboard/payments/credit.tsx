@@ -64,6 +64,39 @@ interface CustomerCredit {
   payment_date: string;
 }
 
+interface SourcePayment {
+  id: number;
+  payment_date: string;
+  amount: number;
+  payment_method: string;
+  reference_number: string | null;
+}
+
+interface CreditUsage {
+  id: number;
+  billing_id: number;
+  invoice_number: string | null;
+  billing_month: string;
+  amount_used: number;
+  used_at: string;
+}
+
+interface CreditRefund {
+  id: number;
+  refund_amount: number;
+  refund_method: string;
+  refund_date: string;
+  reference_number: string | null;
+  status: string;
+  created_at: string;
+}
+
+interface CreditHistory extends CustomerCredit {
+  source_payment: SourcePayment | null;
+  usage_history: CreditUsage[];
+  refund_history: CreditRefund[];
+}
+
 const TABLE_HEAD = [
   { id: 'created_at', label: 'Date Created', align: 'left' },
   { id: 'customer_name', label: 'Customer', align: 'left' },
@@ -121,6 +154,11 @@ export default function CustomerCreditPage() {
   const [refundReason, setRefundReason] = useState('');
   const [refundDate, setRefundDate] = useState<Date | null>(new Date());
   const [submitting, setSubmitting] = useState(false);
+
+  // History dialog state
+  const [openHistory, setOpenHistory] = useState(false);
+  const [creditHistory, setCreditHistory] = useState<CreditHistory | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const fetchCredits = useCallback(async () => {
     try {
@@ -203,6 +241,43 @@ export default function CustomerCreditPage() {
       enqueueSnackbar(error.message || 'Failed to create refund request', { variant: 'error' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleOpenHistory = async (credit: CustomerCredit) => {
+    try {
+      setLoadingHistory(true);
+      setOpenHistory(true);
+      const response = await axios.get(`/api/customer-credit/${credit.id}`);
+      if (response.data.success) {
+        setCreditHistory(response.data.data);
+      } else {
+        throw new Error(response.data.error);
+      }
+    } catch (error: any) {
+      console.error('Error fetching credit history:', error);
+      enqueueSnackbar('Failed to fetch credit history', { variant: 'error' });
+      setOpenHistory(false);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleCloseHistory = () => {
+    setOpenHistory(false);
+    setCreditHistory(null);
+  };
+
+  const getRefundStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Label color="warning">Pending</Label>;
+      case 'completed':
+        return <Label color="success">Completed</Label>;
+      case 'cancelled':
+        return <Label color="error">Cancelled</Label>;
+      default:
+        return <Label>{status}</Label>;
     }
   };
 
@@ -332,17 +407,28 @@ export default function CustomerCreditPage() {
                           </TableCell>
                           <TableCell align="center">{getStatusLabel(row.status)}</TableCell>
                           <TableCell align="right">
-                            {row.status === 'available' && row.current_balance > 0 && (
-                              <Tooltip title="Process Refund">
+                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                              <Tooltip title="View History">
                                 <IconButton
                                   size="small"
-                                  color="primary"
-                                  onClick={() => handleOpenRefund(row)}
+                                  color="info"
+                                  onClick={() => handleOpenHistory(row)}
                                 >
-                                  <Iconify icon="mdi:cash-refund" />
+                                  <Iconify icon="eva:clock-outline" />
                                 </IconButton>
                               </Tooltip>
-                            )}
+                              {row.status === 'available' && row.current_balance > 0 && (
+                                <Tooltip title="Process Refund">
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => handleOpenRefund(row)}
+                                  >
+                                    <Iconify icon="mdi:cash-refund" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </Stack>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -446,6 +532,162 @@ export default function CustomerCreditPage() {
           >
             {submitting ? 'Processing...' : 'Create Refund Request'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Credit History Dialog */}
+      <Dialog open={openHistory} onClose={handleCloseHistory} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Iconify icon="eva:clock-outline" width={24} />
+            <Typography variant="h6">Credit History</Typography>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          {loadingHistory ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
+              <CircularProgress />
+            </Box>
+          ) : creditHistory && (
+            <Box sx={{ pt: 2 }}>
+              {/* Credit Summary */}
+              <Card sx={{ p: 2, mb: 3, bgcolor: 'background.neutral' }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">Customer</Typography>
+                    <Typography variant="body1">{creditHistory.customer_name}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="subtitle2" color="text.secondary">Original Amount</Typography>
+                    <Typography variant="body1">{fCurrency(creditHistory.original_amount)}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="subtitle2" color="text.secondary">Current Balance</Typography>
+                    <Typography variant="body1" color={creditHistory.current_balance > 0 ? 'success.main' : 'text.secondary'}>
+                      {fCurrency(creditHistory.current_balance)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                    {getStatusLabel(creditHistory.status)}
+                  </Grid>
+                  <Grid item xs={6} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">Created</Typography>
+                    <Typography variant="body2">{fDateTime(creditHistory.created_at)}</Typography>
+                  </Grid>
+                </Grid>
+              </Card>
+
+              {/* Source Payment */}
+              {creditHistory.source_payment && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                    <Iconify icon="eva:credit-card-fill" width={20} sx={{ mr: 1, verticalAlign: 'middle' }} />
+                    Source Payment
+                  </Typography>
+                  <Card variant="outlined" sx={{ p: 2 }}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">Payment Date</Typography>
+                        <Typography variant="body2">{fDate(creditHistory.source_payment.payment_date)}</Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">Amount</Typography>
+                        <Typography variant="body2">{fCurrency(creditHistory.source_payment.amount)}</Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">Method</Typography>
+                        <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
+                          {creditHistory.source_payment.payment_method}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">Reference</Typography>
+                        <Typography variant="body2">
+                          {creditHistory.source_payment.reference_number || '-'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Card>
+                </Box>
+              )}
+
+              {/* Usage History */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                  <Iconify icon="eva:shopping-cart-fill" width={20} sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Credit Usage ({creditHistory.usage_history.length})
+                </Typography>
+                {creditHistory.usage_history.length === 0 ? (
+                  <Alert severity="info" sx={{ mt: 1 }}>No credit usage recorded</Alert>
+                ) : (
+                  <TableContainer component={Card} variant="outlined">
+                    <Table size="small">
+                      <TableHeadCustom
+                        headLabel={[
+                          { id: 'date', label: 'Date', align: 'left' },
+                          { id: 'invoice', label: 'Invoice', align: 'left' },
+                          { id: 'billing_month', label: 'Billing Month', align: 'left' },
+                          { id: 'amount', label: 'Amount Used', align: 'right' },
+                        ]}
+                      />
+                      <TableBody>
+                        {creditHistory.usage_history.map((usage) => (
+                          <TableRow key={usage.id}>
+                            <TableCell>{fDateTime(usage.used_at)}</TableCell>
+                            <TableCell>{usage.invoice_number || `#${usage.billing_id}`}</TableCell>
+                            <TableCell>{usage.billing_month}</TableCell>
+                            <TableCell align="right">
+                              <Typography color="error.main">{fCurrency(usage.amount_used)}</Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+
+              {/* Refund History */}
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                  <Iconify icon="mdi:cash-refund" width={20} sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Refunds ({creditHistory.refund_history.length})
+                </Typography>
+                {creditHistory.refund_history.length === 0 ? (
+                  <Alert severity="info" sx={{ mt: 1 }}>No refunds recorded</Alert>
+                ) : (
+                  <TableContainer component={Card} variant="outlined">
+                    <Table size="small">
+                      <TableHeadCustom
+                        headLabel={[
+                          { id: 'date', label: 'Date', align: 'left' },
+                          { id: 'amount', label: 'Amount', align: 'right' },
+                          { id: 'method', label: 'Method', align: 'left' },
+                          { id: 'reference', label: 'Reference', align: 'left' },
+                          { id: 'status', label: 'Status', align: 'center' },
+                        ]}
+                      />
+                      <TableBody>
+                        {creditHistory.refund_history.map((refund) => (
+                          <TableRow key={refund.id}>
+                            <TableCell>{fDate(refund.refund_date)}</TableCell>
+                            <TableCell align="right">{fCurrency(refund.refund_amount)}</TableCell>
+                            <TableCell sx={{ textTransform: 'capitalize' }}>{refund.refund_method}</TableCell>
+                            <TableCell>{refund.reference_number || '-'}</TableCell>
+                            <TableCell align="center">{getRefundStatusLabel(refund.status)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseHistory}>Close</Button>
         </DialogActions>
       </Dialog>
     </>
