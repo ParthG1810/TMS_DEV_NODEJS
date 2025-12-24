@@ -147,8 +147,8 @@ async function handleUpdate(
       await connection.query(`
         INSERT INTO payment_notifications (
           customer_id, notification_type, title, message,
-          priority, auto_delete_on_action
-        ) VALUES (?, 'refund_completed', ?, ?, 'low', 0)
+          priority
+        ) VALUES (?, 'refund_completed', ?, ?, 'low')
       `, [
         refund.customer_id,
         `Refund Processed: $${refund.refund_amount.toFixed(2)}`,
