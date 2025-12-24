@@ -92,8 +92,7 @@ export default async function handler(
     const [billings]: any = await connection.query(`
       SELECT id, customer_id, total_amount,
              COALESCE(amount_paid, 0) as amount_paid,
-             COALESCE(credit_applied, 0) as credit_applied,
-             (total_amount - COALESCE(amount_paid, 0) - COALESCE(credit_applied, 0)) as balance_due,
+             balance_due,
              payment_status as status
       FROM invoices
       WHERE id IN (${placeholders})
@@ -149,8 +148,8 @@ export default async function handler(
       await connection.query(`
         UPDATE invoices SET
           amount_paid = COALESCE(amount_paid, 0) + ?,
-          balance_due = total_amount - COALESCE(amount_paid, 0) - ? - COALESCE(credit_applied, 0),
-          payment_status = IF((total_amount - COALESCE(amount_paid, 0) - ? - COALESCE(credit_applied, 0)) <= 0, 'paid', 'partial'),
+          balance_due = balance_due - ?,
+          payment_status = IF((balance_due - ?) <= 0, 'paid', 'partial'),
           updated_at = NOW()
         WHERE id = ?
       `, [allocateAmount, allocateAmount, allocateAmount, billingId]);
