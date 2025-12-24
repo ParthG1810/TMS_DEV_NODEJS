@@ -278,6 +278,44 @@ export default async function handler(
       })),
     };
 
+    // Delete any pending approval notifications for the invoiced order billings
+    try {
+      const billingPlaceholders = order_billing_ids.map(() => '?').join(', ');
+      await query(
+        `DELETE FROM payment_notifications
+         WHERE order_billing_id IN (${billingPlaceholders})
+         AND notification_type IN ('billing_pending_approval', 'order_approved')`,
+        order_billing_ids
+      );
+      console.log(`[Invoice Generate] Removed notifications for order_billing_ids: ${order_billing_ids.join(', ')}`);
+    } catch (notificationError) {
+      // Log but don't fail the request if notification deletion fails
+      console.error('Error deleting notifications on invoice generation:', notificationError);
+    }
+
+    // Create a notification for the generated invoice
+    try {
+      const billingMonth = orderBillings[0].billing_month;
+      await query(
+        `INSERT INTO payment_notifications (
+          notification_type, customer_id, billing_month,
+          title, message, priority, action_url
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          'invoice_generated',
+          customerIdNum,
+          billingMonth,
+          `Invoice Generated - ${customer.name}`,
+          `Invoice ${invoiceNumber} has been generated for ${customer.name}. Total: CAD $${totalAmount.toFixed(2)}`,
+          'low',
+          `/dashboard/tiffin/invoices`,
+        ]
+      );
+    } catch (notificationError) {
+      console.error('Error creating invoice notification:', notificationError);
+    }
+
     console.log(`[Invoice Generate] Created invoice ${invoiceNumber} for customer ${customerIdNum} with ${orderBillings.length} order(s), total: ${totalAmount}`);
 
     return res.status(201).json({
