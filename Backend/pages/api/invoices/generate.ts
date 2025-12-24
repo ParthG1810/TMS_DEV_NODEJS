@@ -159,21 +159,27 @@ export default async function handler(
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
 
-    // Get the first order_id for the invoice number
+    // Get the first order_id and billing_month for the invoice number
     const firstOrderId = orderBillings[0].order_id;
+    const billingMonth = orderBillings[0].billing_month; // Format: YYYY-MM
+
+    // Convert billing_month (YYYY-MM) to Month-Year format (e.g., Dec-2025)
+    const [billingYear, billingMonthNum] = billingMonth.split('-');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthYearStr = `${monthNames[parseInt(billingMonthNum, 10) - 1]}-${billingYear}`;
 
     // Generate invoice number based on type
-    // Single: INV-C{CustomerID}-O{OrderID}-{YYYYMMDD}-{Counter}
-    // Combined: INV-C{CustomerID}-CMB-{YYYYMMDD}-{Counter}
+    // Single: INV-C{CustomerID}-O{OrderID/Month-Year}-{YYYYMMDD}-{Counter}
+    // Combined: INV-C{CustomerID}-O{OrderID/Month-Year}-CMB-{YYYYMMDD}-{Counter}
     let invoiceNumberPrefix: string;
     let invoiceNumberPattern: string;
 
     if (invoiceType === 'individual') {
-      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}-${dateStr}`;
-      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}-${dateStr}-%`;
+      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}/${monthYearStr}-${dateStr}`;
+      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}/${monthYearStr}-${dateStr}-%`;
     } else {
-      invoiceNumberPrefix = `INV-C${customer_id}-CMB-${dateStr}`;
-      invoiceNumberPattern = `INV-C${customer_id}-CMB-${dateStr}-%`;
+      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}/${monthYearStr}-CMB-${dateStr}`;
+      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}/${monthYearStr}-CMB-${dateStr}-%`;
     }
 
     // Get the next counter for this pattern
