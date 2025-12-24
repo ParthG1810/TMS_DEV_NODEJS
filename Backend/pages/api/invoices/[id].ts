@@ -46,6 +46,7 @@ interface InvoiceDetail {
 
 interface PaymentRecord {
   id: number;
+  payment_record_id: number;
   amount_applied: number;
   applied_at: string;
   applied_by: string | null;
@@ -152,20 +153,21 @@ async function handleGet(
     [id]
   );
 
-  // Get payment records
+  // Get payment records from payment_allocations (main allocation table)
   const payments = await query<any[]>(
     `SELECT
-      ip.id,
-      ip.amount_applied,
-      ip.applied_at,
-      ip.applied_by,
+      pa.id,
+      pa.payment_record_id,
+      pa.allocated_amount as amount_applied,
+      pa.created_at as applied_at,
+      pa.created_by as applied_by,
       pr.payment_type,
       pr.payment_source,
       pr.reference_number
-    FROM invoice_payments ip
-    INNER JOIN payment_records pr ON ip.payment_record_id = pr.id
-    WHERE ip.invoice_id = ?
-    ORDER BY ip.applied_at DESC`,
+    FROM payment_allocations pa
+    INNER JOIN payment_records pr ON pa.payment_record_id = pr.id
+    WHERE pa.billing_id = ?
+    ORDER BY pa.created_at DESC`,
     [id]
   );
 
