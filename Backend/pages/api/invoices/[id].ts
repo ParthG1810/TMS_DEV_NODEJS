@@ -49,7 +49,7 @@ interface PaymentRecord {
   payment_record_id: number;
   amount_applied: number;
   applied_at: string;
-  applied_by: string | null;
+  sender_name: string | null;
   payment_type: string;
   payment_source: string | null;
   reference_number: string | null;
@@ -160,12 +160,13 @@ async function handleGet(
       pa.payment_record_id,
       pa.allocated_amount as amount_applied,
       pa.created_at as applied_at,
-      pa.created_by as applied_by,
+      COALESCE(it.sender_name, pr.payer_name) as sender_name,
       pr.payment_type,
       pr.payment_source,
       pr.reference_number
     FROM payment_allocations pa
     INNER JOIN payment_records pr ON pa.payment_record_id = pr.id
+    LEFT JOIN interac_transactions it ON pr.interac_transaction_id = it.id
     WHERE pa.billing_id = ?
     ORDER BY pa.created_at DESC`,
     [id]
