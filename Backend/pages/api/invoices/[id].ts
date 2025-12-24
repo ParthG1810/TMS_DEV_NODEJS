@@ -153,12 +153,13 @@ async function handleGet(
     [id]
   );
 
-  // Get payment records from payment_allocations (main allocation table)
+  // Get payment records from payment_allocations (main allocation table) with credit usage
   const payments = await query<any[]>(
     `SELECT
       pa.id,
       pa.payment_record_id,
       pa.allocated_amount as amount_applied,
+      COALESCE(cu.credit_amount, 0) as credit_applied,
       pa.created_at as applied_at,
       COALESCE(it.sender_name, pr.payer_name) as sender_name,
       pr.payment_type,
@@ -167,6 +168,11 @@ async function handleGet(
     FROM payment_allocations pa
     INNER JOIN payment_records pr ON pa.payment_record_id = pr.id
     LEFT JOIN interac_transactions it ON pr.interac_transaction_id = it.id
+    LEFT JOIN (
+      SELECT billing_id, payment_record_id, SUM(amount_used) as credit_amount
+      FROM customer_credit_usage
+      GROUP BY billing_id, payment_record_id
+    ) cu ON cu.billing_id = pa.billing_id AND cu.payment_record_id = pa.payment_record_id
     WHERE pa.billing_id = ?
     ORDER BY pa.created_at DESC`,
     [id]
@@ -198,6 +204,7 @@ async function handleGet(
     payments: payments.map(p => ({
       ...p,
       amount_applied: Number(p.amount_applied),
+      credit_applied: Number(p.credit_applied),
     })),
   };
 
