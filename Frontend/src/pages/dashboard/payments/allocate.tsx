@@ -22,6 +22,10 @@ import {
   TableContainer,
   Paper,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
@@ -57,8 +61,10 @@ interface Transaction {
   sender_name: string;
   reference_number: string;
   amount: number;
-  confirmed_customer_id: number;
-  confirmed_customer_name: string;
+  auto_matched_customer_id?: number;
+  auto_matched_customer_name?: string;
+  confirmed_customer_id?: number;
+  confirmed_customer_name?: string;
 }
 
 interface CustomerCredit {
@@ -151,6 +157,25 @@ export default function PaymentAllocationPage() {
         setSelectedInvoices(initialAllocations);
         setTotalAllocated(total);
         setRemainingAmount(remaining_amount);
+
+        // Check for name mismatch between matched customer and invoice customer
+        const matchedCustomerName = tx.confirmed_customer_name || tx.auto_matched_customer_name;
+        if (selected_invoices.length > 0 && matchedCustomerName) {
+          const invoiceCustomerName = selected_invoices[0].customer_name;
+          // Normalize names for comparison (case-insensitive, trim whitespace)
+          const normalizedMatched = matchedCustomerName.toLowerCase().trim();
+          const normalizedInvoice = invoiceCustomerName?.toLowerCase().trim();
+
+          if (normalizedInvoice && normalizedMatched !== normalizedInvoice) {
+            // Name mismatch - redirect back to payment page
+            enqueueSnackbar(
+              `Customer name mismatch: "${matchedCustomerName}" does not match invoice customer "${invoiceCustomerName}". Please verify the customer selection.`,
+              { variant: 'error', autoHideDuration: 6000 }
+            );
+            router.push(PATH_DASHBOARD.payments.interac);
+            return;
+          }
+        }
       }
 
       // Fetch customer credit
@@ -232,6 +257,12 @@ export default function PaymentAllocationPage() {
   const handleSubmit = async () => {
     if (!transaction || selectedInvoices.size === 0) return;
 
+    const customerId = transaction.confirmed_customer_id || transaction.auto_matched_customer_id;
+    if (!customerId) {
+      enqueueSnackbar('No customer matched. Please select a customer first.', { variant: 'error' });
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -240,7 +271,7 @@ export default function PaymentAllocationPage() {
         payment_type: 'online',
         payment_source: 'interac',
         interac_transaction_id: transaction.id,
-        customer_id: transaction.confirmed_customer_id,
+        customer_id: customerId,
         amount: transaction.amount,
         payment_date: transaction.email_date,
         reference_number: transaction.reference_number,
@@ -338,7 +369,7 @@ export default function PaymentAllocationPage() {
                     Customer
                   </Typography>
                   <Typography variant="body1">
-                    {transaction.confirmed_customer_name}
+                    {transaction.confirmed_customer_name || transaction.auto_matched_customer_name}
                   </Typography>
                 </Box>
                 <Box>
