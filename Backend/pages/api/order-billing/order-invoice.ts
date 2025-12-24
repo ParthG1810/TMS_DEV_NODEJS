@@ -27,6 +27,7 @@ interface OrderInvoice {
   end_date: string;
   selected_days: string[];
   billing: {
+    id: number | null;
     total_delivered: number;
     total_absent: number;
     total_extra: number;
@@ -115,6 +116,7 @@ export default async function handler(
     const billings = await query<any[]>(
       `
         SELECT
+          id,
           total_delivered,
           total_absent,
           total_extra,
@@ -132,6 +134,7 @@ export default async function handler(
     );
 
     const billing = billings.length > 0 ? billings[0] : {
+      id: null,
       total_delivered: 0,
       total_absent: 0,
       total_extra: 0,
@@ -179,6 +182,7 @@ export default async function handler(
       end_date: order.end_date,
       selected_days: selectedDays,
       billing: {
+        id: billing.id || null,
         total_delivered: billing.total_delivered || 0,
         total_absent: billing.total_absent || 0,
         total_extra: billing.total_extra || 0,
