@@ -116,12 +116,14 @@ export default function OrderTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Tooltip title={isLocked ? `Cannot select - ${statusInfo?.tooltip}` : ''}>
-            <Checkbox
-              checked={selected}
-              onClick={onSelectRow}
-              disabled={isLocked}
-            />
+          <Tooltip title={(isPending || isLocked) ? `Cannot select - ${statusInfo?.tooltip}` : ''}>
+            <span>
+              <Checkbox
+                checked={selected}
+                onClick={onSelectRow}
+                disabled={isPending || isLocked}
+              />
+            </span>
           </Tooltip>
         </TableCell>
 
