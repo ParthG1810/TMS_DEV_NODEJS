@@ -138,6 +138,7 @@ export type IMealPlan = {
   frequency: MealFrequency;
   days: MealDays;
   price: number;
+  order_count?: number;
   created_at: Date | string;
   updated_at: Date | string;
 };
@@ -156,6 +157,7 @@ export type ICustomer = {
   name: string;
   phone?: string;
   address: string;
+  order_count?: number;
   created_at: Date | string;
   updated_at: Date | string;
 };
