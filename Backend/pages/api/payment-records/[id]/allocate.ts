@@ -175,14 +175,21 @@ export default async function handler(
       ]);
 
       // Update invoice record - use ROUND to avoid floating-point precision issues
+      // First update the balance, then set status based on actual new balance
       await connection.query(`
         UPDATE invoices SET
           amount_paid = COALESCE(amount_paid, 0) + ?,
           balance_due = ROUND(balance_due - ?, 2),
-          payment_status = IF(ROUND(balance_due - ?, 2) <= 0, 'paid', 'partial_paid'),
           updated_at = NOW()
         WHERE id = ?
-      `, [allocateAmount, allocateAmount, allocateAmount, invoiceId]);
+      `, [allocateAmount, allocateAmount, invoiceId]);
+
+      // Update status based on actual balance_due value to avoid precision issues
+      await connection.query(`
+        UPDATE invoices SET
+          payment_status = IF(balance_due <= 0.001, 'paid', 'partial_paid')
+        WHERE id = ?
+      `, [invoiceId]);
 
       allocations.push({
         billing_id: invoiceId,
@@ -268,14 +275,21 @@ export default async function handler(
         }
 
         // Update invoice with credit applied - use ROUND for precision
+        // First update the balance, then set status based on actual new balance
         await connection.query(`
           UPDATE invoices SET
             amount_paid = COALESCE(amount_paid, 0) + ?,
             balance_due = ROUND(balance_due - ?, 2),
-            payment_status = IF(ROUND(balance_due - ?, 2) <= 0, 'paid', 'partial_paid'),
             updated_at = NOW()
           WHERE id = ?
-        `, [creditForThisInvoice, creditForThisInvoice, creditForThisInvoice, allocationReq.invoice_id]);
+        `, [creditForThisInvoice, creditForThisInvoice, allocationReq.invoice_id]);
+
+        // Update status based on actual balance_due value to avoid precision issues
+        await connection.query(`
+          UPDATE invoices SET
+            payment_status = IF(balance_due <= 0.001, 'paid', 'partial_paid')
+          WHERE id = ?
+        `, [allocationReq.invoice_id]);
 
         creditApplied += creditForThisInvoice;
       }
