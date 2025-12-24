@@ -59,7 +59,15 @@ export default function MealPlanTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          <Tooltip title={hasOrders ? 'Cannot select meal plan used in orders' : ''}>
+            <span>
+              <Checkbox
+                checked={selected}
+                onClick={onSelectRow}
+                disabled={hasOrders}
+              />
+            </span>
+          </Tooltip>
         </TableCell>
 
         <TableCell>{meal_name}</TableCell>
