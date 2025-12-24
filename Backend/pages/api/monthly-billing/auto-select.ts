@@ -82,8 +82,8 @@ export default async function handler(
         i.customer_id,
         i.total_amount,
         COALESCE(i.amount_paid, 0) as amount_paid,
-        COALESCE(i.credit_applied, 0) as credit_applied,
-        (i.total_amount - COALESCE(i.amount_paid, 0) - COALESCE(i.credit_applied, 0)) as balance_due,
+        0 as credit_applied,
+        i.balance_due,
         i.payment_status as status,
         i.generated_at as billing_month,
         c.name as customer_name,
@@ -92,7 +92,7 @@ export default async function handler(
       INNER JOIN customers c ON i.customer_id = c.id
       WHERE i.customer_id = ?
       AND i.payment_status IN ('unpaid', 'partial')
-      AND (i.total_amount - COALESCE(i.amount_paid, 0) - COALESCE(i.credit_applied, 0)) > 0
+      AND i.balance_due > 0
       ORDER BY
         CASE i.payment_status
           WHEN 'partial' THEN 1
