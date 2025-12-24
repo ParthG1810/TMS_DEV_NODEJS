@@ -577,10 +577,10 @@ export default function PaymentHistoryPage() {
                     <Typography variant="subtitle2">{fCurrency(selectedPayment.total_allocated)}</Typography>
                   </Stack>
                   {/* Show credit used from allocations */}
-                  {paymentAllocations.reduce((sum, a) => sum + (a.credit_amount || 0), 0) > 0 && (
+                  {Math.round(paymentAllocations.reduce((sum, a) => sum + (a.credit_amount || 0), 0) * 100) / 100 > 0 && (
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="body2" color="text.secondary">Credit Used</Typography>
-                      <Chip size="small" label={fCurrency(paymentAllocations.reduce((sum, a) => sum + (a.credit_amount || 0), 0))} color="info" />
+                      <Chip size="small" label={fCurrency(Math.round(paymentAllocations.reduce((sum, a) => sum + (a.credit_amount || 0), 0) * 100) / 100)} color="info" />
                     </Stack>
                   )}
                   {/* Show excess amount that became customer credit */}
