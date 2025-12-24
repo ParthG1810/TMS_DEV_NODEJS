@@ -62,6 +62,7 @@ interface OrderBillingDetail {
 
 interface PaymentRecord {
   id: number;
+  payment_record_id: number;
   amount_applied: number;
   applied_at: string;
   applied_by: string | null;
@@ -561,6 +562,100 @@ export default function InvoiceDetailPage() {
             </Card>
           </Grid>
         </Grid>
+
+        {/* Payment History Section - Only show if there are payments */}
+        {invoice.payments.length > 0 && (
+          <Card sx={{ p: 3, mt: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Iconify icon="solar:history-bold" width={24} />
+                <span>Payment History</span>
+              </Stack>
+            </Typography>
+
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Payment Type</TableCell>
+                    <TableCell>Reference</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell>Applied By</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {invoice.payments.map((payment) => (
+                    <TableRow
+                      key={payment.id}
+                      hover
+                      sx={{ cursor: 'pointer' }}
+                      onClick={() => router.push(PATH_DASHBOARD.payments.history)}
+                    >
+                      <TableCell>
+                        <Typography variant="body2">{fDate(payment.applied_at)}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {fDateTime(payment.applied_at, 'HH:mm')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Iconify
+                            icon={payment.payment_type === 'online' ? 'mdi:credit-card-outline' : 'mdi:cash'}
+                            width={20}
+                          />
+                          <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
+                            {payment.payment_type === 'online' ? 'Interac e-Transfer' : payment.payment_type}
+                          </Typography>
+                        </Stack>
+                        {payment.payment_source && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {payment.payment_source}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {payment.reference_number ? (
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            {payment.reference_number}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="subtitle2" color="success.main">
+                          {fCurrency(payment.amount_applied)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {payment.applied_by || '-'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Total Row */}
+                  <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
+                    <TableCell colSpan={3}>
+                      <Typography variant="subtitle2">
+                        Total Payments ({invoice.payments.length})
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="h6" color="success.main">
+                        {fCurrency(invoice.amount_paid)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        )}
       </Container>
 
       {/* PDF Preview Dialog */}
