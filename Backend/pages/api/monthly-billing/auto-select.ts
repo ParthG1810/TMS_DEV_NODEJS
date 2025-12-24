@@ -56,8 +56,8 @@ export default async function handler(
 
     const customerId = parseInt(customer_id as string);
     const amount = parseFloat(payment_amount as string);
-    const maxInvoices = parseInt(max_invoices as string);
-    const fetchLimit = Math.max(1, Math.min(maxInvoices + 5, 20)); // Limit to max 20
+    const maxInvoices = parseInt(max_invoices as string); // Max invoices to auto-allocate (default 3)
+    const fetchLimit = 50; // Return up to 50 invoices so user can choose
 
     if (isNaN(amount) || amount <= 0) {
       return res.status(400).json({
@@ -102,21 +102,20 @@ export default async function handler(
       LIMIT ${fetchLimit}
     `, [customerId]);
 
-    // Calculate allocations - show ALL unpaid invoices, auto-allocate to oldest first
+    // Return ALL unpaid invoices so user can choose which to pay
+    // Auto-allocate payment to the first `maxInvoices` (oldest) as a suggestion
     let remainingAmount = amount;
     let selectionOrder = 1;
     const selectedInvoices: AutoSelectedInvoice[] = [];
     let totalToAllocate = 0;
 
-    // Add all invoices up to the limit, allocating payment to oldest first
+    // Add ALL invoices, but only auto-allocate to the first `maxInvoices`
     for (const invoice of invoices) {
-      if (selectedInvoices.length >= maxInvoices) {
-        break;
-      }
-
       const balanceDue = invoice.balance_due;
-      // Only allocate if there's remaining payment amount
-      const willAllocate = remainingAmount > 0 ? Math.min(remainingAmount, balanceDue) : 0;
+
+      // Only auto-allocate to first `maxInvoices` invoices (oldest first)
+      const shouldAutoAllocate = selectionOrder <= maxInvoices && remainingAmount > 0;
+      const willAllocate = shouldAutoAllocate ? Math.min(remainingAmount, balanceDue) : 0;
       const balanceAfter = balanceDue - willAllocate;
 
       selectedInvoices.push({
@@ -127,8 +126,10 @@ export default async function handler(
         will_be_paid: balanceAfter <= 0,
       });
 
-      totalToAllocate += willAllocate;
-      remainingAmount -= willAllocate;
+      if (shouldAutoAllocate) {
+        totalToAllocate += willAllocate;
+        remainingAmount -= willAllocate;
+      }
       selectionOrder++;
     }
 
