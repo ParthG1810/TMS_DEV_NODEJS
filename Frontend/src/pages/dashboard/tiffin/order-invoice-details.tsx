@@ -442,7 +442,7 @@ export default function OrderInvoiceDetailsPage() {
                 </Button>
               </Stack>
 
-              {/* Row 2: View Combined Invoice, Generate Invoice */}
+              {/* Row 2: View Combined Invoice, Generate Invoice / View Invoice */}
               {currentTab === 'invoice-view' && invoice && (
                 <Stack direction="row" spacing={1}>
                   <Button
@@ -461,24 +461,38 @@ export default function OrderInvoiceDetailsPage() {
                   >
                     View Combined Invoice
                   </Button>
-                  {(invoice.billing.status === 'finalized' || invoice.billing.status === 'approved') && (
+                  {/* Show View Invoice if invoice already generated, otherwise show Generate Invoice */}
+                  {invoice.billing.invoice_id ? (
                     <Button
                       variant="contained"
-                      color="primary"
-                      startIcon={<Iconify icon="solar:document-add-bold" />}
+                      color="info"
+                      startIcon={<Iconify icon="solar:document-bold" />}
                       onClick={() =>
-                        router.push({
-                          pathname: '/dashboard/tiffin/generate-invoice',
-                          query: {
-                            orderId: invoice?.order_id,
-                            month: invoice?.billing_month,
-                          },
-                        })
+                        router.push(`/dashboard/tiffin/invoices/${invoice.billing.invoice_id}`)
                       }
-                      disabled={actionLoading}
                     >
-                      Generate Invoice
+                      View Invoice
                     </Button>
+                  ) : (
+                    (invoice.billing.status === 'finalized' || invoice.billing.status === 'approved') && (
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<Iconify icon="solar:document-add-bold" />}
+                        onClick={() =>
+                          router.push({
+                            pathname: '/dashboard/tiffin/generate-invoice',
+                            query: {
+                              orderId: invoice?.order_id,
+                              month: invoice?.billing_month,
+                            },
+                          })
+                        }
+                        disabled={actionLoading}
+                      >
+                        Generate Invoice
+                      </Button>
+                    )
                   )}
                 </Stack>
               )}
