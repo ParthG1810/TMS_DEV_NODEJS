@@ -57,8 +57,10 @@ interface Transaction {
   sender_name: string;
   reference_number: string;
   amount: number;
-  confirmed_customer_id: number;
-  confirmed_customer_name: string;
+  auto_matched_customer_id?: number;
+  auto_matched_customer_name?: string;
+  confirmed_customer_id?: number;
+  confirmed_customer_name?: string;
 }
 
 interface CustomerCredit {
@@ -232,6 +234,12 @@ export default function PaymentAllocationPage() {
   const handleSubmit = async () => {
     if (!transaction || selectedInvoices.size === 0) return;
 
+    const customerId = transaction.confirmed_customer_id || transaction.auto_matched_customer_id;
+    if (!customerId) {
+      enqueueSnackbar('No customer matched. Please select a customer first.', { variant: 'error' });
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -240,7 +248,7 @@ export default function PaymentAllocationPage() {
         payment_type: 'online',
         payment_source: 'interac',
         interac_transaction_id: transaction.id,
-        customer_id: transaction.confirmed_customer_id,
+        customer_id: customerId,
         amount: transaction.amount,
         payment_date: transaction.email_date,
         reference_number: transaction.reference_number,
@@ -338,7 +346,7 @@ export default function PaymentAllocationPage() {
                     Customer
                   </Typography>
                   <Typography variant="body1">
-                    {transaction.confirmed_customer_name}
+                    {transaction.confirmed_customer_name || transaction.auto_matched_customer_name}
                   </Typography>
                 </Box>
                 <Box>
