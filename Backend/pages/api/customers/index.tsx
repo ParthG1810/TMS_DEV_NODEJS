@@ -44,9 +44,13 @@ async function handleGetCustomers(
   res: NextApiResponse<ApiResponse>
 ) {
   try {
+    // Fetch customers with order count
     const customers = (await query(
-      'SELECT * FROM customers ORDER BY created_at DESC'
-    )) as Customer[];
+      `SELECT c.*,
+        (SELECT COUNT(*) FROM customer_orders WHERE customer_id = c.id) as order_count
+       FROM customers c
+       ORDER BY c.created_at DESC`
+    )) as (Customer & { order_count: number })[];
 
     return res.status(200).json({
       success: true,

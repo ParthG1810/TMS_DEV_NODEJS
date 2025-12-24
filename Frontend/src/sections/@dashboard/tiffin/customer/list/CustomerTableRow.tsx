@@ -6,6 +6,7 @@ import {
   TableCell,
   IconButton,
   MenuItem,
+  Tooltip,
 } from '@mui/material';
 // @types
 import { ICustomer } from '../../../../../@types/tms';
@@ -22,6 +23,7 @@ type Props = {
   onEditRow: VoidFunction;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
+  hasOrders?: boolean;
 };
 
 export default function CustomerTableRow({
@@ -30,6 +32,7 @@ export default function CustomerTableRow({
   onEditRow,
   onSelectRow,
   onDeleteRow,
+  hasOrders = false,
 }: Props) {
   const { name, phone, address } = row;
 
@@ -88,16 +91,21 @@ export default function CustomerTableRow({
           Edit
         </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            handleOpenConfirm();
-            handleClosePopover();
-          }}
-          sx={{ color: 'error.main' }}
-        >
-          <Iconify icon="eva:trash-2-outline" />
-          Delete
-        </MenuItem>
+        <Tooltip title={hasOrders ? 'Cannot delete customer with orders' : ''}>
+          <span>
+            <MenuItem
+              onClick={() => {
+                handleOpenConfirm();
+                handleClosePopover();
+              }}
+              sx={{ color: hasOrders ? 'text.disabled' : 'error.main' }}
+              disabled={hasOrders}
+            >
+              <Iconify icon="eva:trash-2-outline" />
+              Delete
+            </MenuItem>
+          </span>
+        </Tooltip>
       </MenuPopover>
 
       <ConfirmDialog
