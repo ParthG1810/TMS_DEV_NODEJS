@@ -49,8 +49,9 @@ interface PaymentRecord {
   amount_applied: number;
   applied_at: string;
   applied_by: string | null;
-  payment_method: string;
-  transaction_reference: string | null;
+  payment_type: string;
+  payment_source: string | null;
+  reference_number: string | null;
 }
 
 export default async function handler(
@@ -158,8 +159,9 @@ async function handleGet(
       ip.amount_applied,
       ip.applied_at,
       ip.applied_by,
-      pr.payment_method,
-      pr.transaction_reference
+      pr.payment_type,
+      pr.payment_source,
+      pr.reference_number
     FROM invoice_payments ip
     INNER JOIN payment_records pr ON ip.payment_record_id = pr.id
     WHERE ip.invoice_id = ?
