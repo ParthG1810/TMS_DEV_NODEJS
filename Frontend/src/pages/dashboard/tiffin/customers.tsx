@@ -240,6 +240,7 @@ export default function CustomersPage() {
                         onSelectRow={() => onSelectRow(String(row.id))}
                         onDeleteRow={() => handleDeleteRow(row.id)}
                         onEditRow={() => handleEditRow(row.id)}
+                        hasOrders={(row.order_count ?? 0) > 0}
                       />
                     ))}
 
