@@ -299,9 +299,9 @@ async function handleUpdate(
       [id, payment_record_id, paymentAmount, applied_by || null]
     );
 
-    // Update invoice amounts
-    const newAmountPaid = Number(invoice.amount_paid) + paymentAmount;
-    const newBalance = Number(invoice.total_amount) - newAmountPaid;
+    // Update invoice amounts - round to avoid floating-point precision issues
+    const newAmountPaid = Math.round((Number(invoice.amount_paid) + paymentAmount) * 100) / 100;
+    const newBalance = Math.round((Number(invoice.total_amount) - newAmountPaid) * 100) / 100;
     const newStatus = newBalance <= 0 ? 'paid' : 'partial_paid';
 
     await query(
