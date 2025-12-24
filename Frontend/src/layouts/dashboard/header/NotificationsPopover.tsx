@@ -57,6 +57,19 @@ export default function NotificationsPopover() {
     fetchNotifications();
   }, []);
 
+  // Listen for custom event to refresh notifications (e.g., after approval)
+  useEffect(() => {
+    const handleRefreshNotifications = () => {
+      fetchNotifications();
+    };
+
+    window.addEventListener('refresh-notifications', handleRefreshNotifications);
+
+    return () => {
+      window.removeEventListener('refresh-notifications', handleRefreshNotifications);
+    };
+  }, []);
+
   // Show startup alert for pending approvals
   useEffect(() => {
     if (!hasShownStartupAlert && notifications.length > 0) {
@@ -297,6 +310,12 @@ function renderContent(notification: PaymentNotification) {
   if (notification.notification_type === 'billing_pending_approval') {
     return {
       avatar: <Iconify icon="eva:credit-card-fill" width={24} />,
+      title,
+    };
+  }
+  if (notification.notification_type === 'order_approved') {
+    return {
+      avatar: <Iconify icon="eva:checkmark-square-fill" width={24} />,
       title,
     };
   }

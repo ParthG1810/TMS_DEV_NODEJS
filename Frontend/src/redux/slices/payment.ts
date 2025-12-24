@@ -182,6 +182,9 @@ export function getCalendarGrid(month: string, customerId?: number) {
         params.customer_id = customerId;
       }
 
+      // Add timestamp to prevent caching
+      params._t = Date.now();
+
       const response = await axios.get('/api/monthly-billing', { params });
       dispatch(slice.actions.getCalendarGridSuccess(response.data.data));
     } catch (error) {
@@ -293,6 +296,9 @@ export function getMonthlyBillings(month?: string, customerId?: number) {
       const params: any = {};
       if (month) params.month = month;
       if (customerId) params.customer_id = customerId;
+
+      // Add timestamp to prevent caching
+      params._t = Date.now();
 
       const response = await axios.get('/api/monthly-billing', { params });
       dispatch(slice.actions.getMonthlyBillingsSuccess(response.data.data));
