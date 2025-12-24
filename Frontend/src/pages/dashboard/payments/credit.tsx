@@ -68,7 +68,7 @@ interface SourcePayment {
   id: number;
   payment_date: string;
   amount: number;
-  payment_method: string;
+  payment_type: string;
   reference_number: string | null;
 }
 
@@ -596,9 +596,9 @@ export default function CustomerCreditPage() {
                         <Typography variant="body2">{fCurrency(creditHistory.source_payment.amount)}</Typography>
                       </Grid>
                       <Grid item xs={6} sm={3}>
-                        <Typography variant="caption" color="text.secondary">Method</Typography>
+                        <Typography variant="caption" color="text.secondary">Type</Typography>
                         <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
-                          {creditHistory.source_payment.payment_method}
+                          {creditHistory.source_payment.payment_type}
                         </Typography>
                       </Grid>
                       <Grid item xs={6} sm={3}>
