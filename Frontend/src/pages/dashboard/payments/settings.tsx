@@ -32,6 +32,11 @@ interface GmailStatus {
   lastSyncAt?: string;
   syncEnabled?: boolean;
   accountName?: string;
+  activeAccount?: {
+    id: number;
+    email_address: string;
+    last_sync_at: string | null;
+  } | null;
 }
 
 // ----------------------------------------------------------------------
@@ -86,7 +91,12 @@ export default function PaymentSettingsPage() {
 
   const handleDisconnectGmail = async () => {
     try {
-      const response = await axios.delete('/api/gmail/disconnect');
+      const accountId = gmailStatus.activeAccount?.id;
+      if (!accountId) {
+        enqueueSnackbar('No active Gmail account to disconnect', { variant: 'error' });
+        return;
+      }
+      const response = await axios.delete(`/api/gmail/disconnect?id=${accountId}`);
       if (response.data.success) {
         enqueueSnackbar('Gmail disconnected successfully', { variant: 'success' });
         setGmailStatus({ connected: false });
