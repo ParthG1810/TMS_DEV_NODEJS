@@ -76,6 +76,7 @@ interface PaymentAllocation {
   customer_name: string;
   billing_month: string;
   allocated_amount: number;
+  credit_amount: number;
   resulting_status: string;
 }
 
@@ -611,7 +612,8 @@ export default function PaymentHistoryPage() {
                     <TableHead>
                       <TableRow>
                         <TableCell>Invoice</TableCell>
-                        <TableCell align="right">Amount Allocated</TableCell>
+                        <TableCell align="right">Payment</TableCell>
+                        <TableCell align="right">Credit</TableCell>
                         <TableCell align="center">Status</TableCell>
                       </TableRow>
                     </TableHead>
@@ -647,6 +649,17 @@ export default function PaymentHistoryPage() {
                             <Typography variant="subtitle2" color="success.main">
                               {fCurrency(alloc.allocated_amount)}
                             </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            {alloc.credit_amount > 0 ? (
+                              <Typography variant="subtitle2" color="info.main">
+                                {fCurrency(alloc.credit_amount)}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                -
+                              </Typography>
+                            )}
                           </TableCell>
                           <TableCell align="center">
                             <Label color={alloc.resulting_status === 'paid' ? 'success' : 'warning'}>
