@@ -201,19 +201,28 @@ export default function PaymentAllocationPage() {
   }, [fetchData]);
 
   const handleAllocationChange = (invoiceId: number, value: string) => {
-    const amount = parseFloat(value) || 0;
+    const newAllocations = new Map(selectedInvoices);
+
+    // Handle empty input - remove allocation
+    if (value === '') {
+      newAllocations.delete(invoiceId);
+      let total = 0;
+      newAllocations.forEach(val => { total += val; });
+      setSelectedInvoices(newAllocations);
+      setTotalAllocated(total);
+      setRemainingAmount(transaction ? transaction.amount - total : 0);
+      return;
+    }
+
+    const amount = parseFloat(value);
+    if (isNaN(amount)) return;
+
     const invoice = invoices.find(i => i.id === invoiceId);
     if (!invoice) return;
 
-    // Limit to balance due
-    const maxAmount = Math.min(amount, invoice.balance_due);
-
-    const newAllocations = new Map(selectedInvoices);
-    if (maxAmount > 0) {
-      newAllocations.set(invoiceId, maxAmount);
-    } else {
-      newAllocations.delete(invoiceId);
-    }
+    // Limit to balance due (allow 0)
+    const maxAmount = Math.max(0, Math.min(amount, invoice.balance_due));
+    newAllocations.set(invoiceId, maxAmount);
 
     // Calculate total
     let total = 0;
@@ -250,7 +259,21 @@ export default function PaymentAllocationPage() {
   };
 
   const handleCreditAllocationChange = (invoiceId: number, value: string) => {
-    const amount = parseFloat(value) || 0;
+    const newCreditAllocations = new Map(creditAllocations);
+
+    // Handle empty input - remove credit allocation
+    if (value === '') {
+      newCreditAllocations.delete(invoiceId);
+      let totalCredit = 0;
+      newCreditAllocations.forEach(val => { totalCredit += val; });
+      setCreditAllocations(newCreditAllocations);
+      setTotalCreditApplied(totalCredit);
+      return;
+    }
+
+    const amount = parseFloat(value);
+    if (isNaN(amount)) return;
+
     const invoice = invoices.find(i => i.id === invoiceId);
     if (!invoice) return;
 
@@ -266,14 +289,8 @@ export default function PaymentAllocationPage() {
     });
 
     const availableCredit = (customerCredit?.total_available || 0) - otherCreditAllocated;
-    const maxCreditForInvoice = Math.min(amount, remainingBalanceAfterPayment, availableCredit);
-
-    const newCreditAllocations = new Map(creditAllocations);
-    if (maxCreditForInvoice > 0) {
-      newCreditAllocations.set(invoiceId, maxCreditForInvoice);
-    } else {
-      newCreditAllocations.delete(invoiceId);
-    }
+    const maxCreditForInvoice = Math.max(0, Math.min(amount, remainingBalanceAfterPayment, availableCredit));
+    newCreditAllocations.set(invoiceId, maxCreditForInvoice);
 
     // Calculate total credit applied
     let totalCredit = 0;
@@ -621,7 +638,7 @@ export default function PaymentAllocationPage() {
                                 <TextField
                                   size="small"
                                   type="number"
-                                  value={allocatedAmount || ''}
+                                  value={selectedInvoices.has(invoice.id) ? allocatedAmount : ''}
                                   onChange={(e) => handleAllocationChange(invoice.id, e.target.value)}
                                   inputProps={{
                                     min: 0,
@@ -636,7 +653,7 @@ export default function PaymentAllocationPage() {
                                   <TextField
                                     size="small"
                                     type="number"
-                                    value={creditAmount || ''}
+                                    value={creditAllocations.has(invoice.id) ? creditAmount : ''}
                                     onChange={(e) => handleCreditAllocationChange(invoice.id, e.target.value)}
                                     inputProps={{
                                       min: 0,
