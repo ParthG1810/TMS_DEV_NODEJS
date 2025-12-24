@@ -11,6 +11,7 @@ interface AllocationResult {
   success: boolean;
   payment_record_id: number;
   total_allocated: number;
+  credit_applied: number;
   excess_amount: number;
   allocation_status: string;
   message: string;
@@ -23,7 +24,7 @@ interface AllocationResult {
 
 /**
  * @api {post} /api/payment-records/:id/allocate Allocate payment to invoices
- * @apiBody {number[]} billing_ids - Array of billing IDs in allocation order
+ * @apiBody {Array<{invoice_id: number, amount: number}>} allocations - Array of allocations with custom amounts
  * @apiBody {number} [created_by] - User ID who performed allocation
  */
 export default async function handler(
@@ -52,12 +53,21 @@ export default async function handler(
   const connection = await getConnection();
 
   try {
-    const { billing_ids, created_by } = req.body;
+    const { allocations: requestedAllocations, billing_ids, created_by, credit_to_apply } = req.body;
 
-    if (!billing_ids || !Array.isArray(billing_ids) || billing_ids.length === 0) {
+    // Support both new format (allocations) and legacy format (billing_ids)
+    let allocationRequests: { invoice_id: number; amount: number }[] = [];
+
+    if (requestedAllocations && Array.isArray(requestedAllocations) && requestedAllocations.length > 0) {
+      // New format: { invoice_id, amount }[]
+      allocationRequests = requestedAllocations;
+    } else if (billing_ids && Array.isArray(billing_ids) && billing_ids.length > 0) {
+      // Legacy format: just invoice IDs, amounts will be calculated automatically
+      allocationRequests = billing_ids.map((id: number) => ({ invoice_id: id, amount: null }));
+    } else {
       return res.status(400).json({
         success: false,
-        error: 'billing_ids array is required and must not be empty',
+        error: 'allocations array is required and must not be empty',
       });
     }
 
@@ -87,8 +97,9 @@ export default async function handler(
       });
     }
 
-    // Verify all invoice IDs exist and are valid
-    const placeholders = billing_ids.map(() => '?').join(',');
+    // Extract invoice IDs for query
+    const invoiceIds = allocationRequests.map(a => a.invoice_id);
+    const placeholders = invoiceIds.map(() => '?').join(',');
     const [billings]: any = await connection.query(`
       SELECT id, customer_id, total_amount,
              COALESCE(amount_paid, 0) as amount_paid,
@@ -97,7 +108,7 @@ export default async function handler(
       FROM invoices
       WHERE id IN (${placeholders})
       AND payment_status IN ('unpaid', 'partial_paid')
-    `, billing_ids);
+    `, invoiceIds);
 
     if (billings.length === 0) {
       await connection.rollback();
@@ -111,18 +122,30 @@ export default async function handler(
     const billingMap = new Map();
     billings.forEach((b: any) => billingMap.set(b.id, b));
 
-    // Process allocations
+    // Process allocations using custom amounts
     let remainingAmount = payment.amount - (payment.total_allocated || 0);
     let allocationOrder = 1;
     const allocations: any[] = [];
 
-    for (const billingId of billing_ids) {
+    for (const allocationReq of allocationRequests) {
       if (remainingAmount <= 0) break;
 
-      const billing = billingMap.get(billingId);
+      const billing = billingMap.get(allocationReq.invoice_id);
       if (!billing || billing.balance_due <= 0) continue;
 
-      const allocateAmount = Math.min(remainingAmount, billing.balance_due);
+      // Use custom amount if provided, otherwise use minimum of remaining and balance
+      let allocateAmount: number;
+      if (allocationReq.amount !== null && allocationReq.amount !== undefined) {
+        // Custom amount: validate it doesn't exceed balance or remaining payment
+        allocateAmount = Math.min(allocationReq.amount, billing.balance_due, remainingAmount);
+      } else {
+        // Auto-calculate: allocate as much as possible
+        allocateAmount = Math.min(remainingAmount, billing.balance_due);
+      }
+
+      if (allocateAmount <= 0) continue;
+
+      const invoiceId = allocationReq.invoice_id;
 
       // Insert allocation record (billing_id column stores invoice ID)
       await connection.query(`
@@ -134,7 +157,7 @@ export default async function handler(
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         paymentId,
-        billingId,
+        invoiceId,
         billing.customer_id,
         allocationOrder,
         allocateAmount,
@@ -152,16 +175,89 @@ export default async function handler(
           payment_status = IF((balance_due - ?) <= 0, 'paid', 'partial_paid'),
           updated_at = NOW()
         WHERE id = ?
-      `, [allocateAmount, allocateAmount, allocateAmount, billingId]);
+      `, [allocateAmount, allocateAmount, allocateAmount, invoiceId]);
 
       allocations.push({
-        billing_id: billingId,
+        billing_id: invoiceId,
         allocated_amount: allocateAmount,
         resulting_status: billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial_paid',
       });
 
       remainingAmount -= allocateAmount;
       allocationOrder++;
+    }
+
+    // Apply customer credit if requested
+    let creditApplied = 0;
+    if (credit_to_apply && credit_to_apply > 0) {
+      // Get available credits for this customer (oldest first)
+      const [availableCredits]: any = await connection.query(`
+        SELECT id, current_balance
+        FROM customer_credit
+        WHERE customer_id = ?
+        AND status = 'available'
+        AND current_balance > 0
+        ORDER BY created_at ASC
+      `, [payment.customer_id]);
+
+      let remainingCreditToApply = credit_to_apply;
+
+      // Apply credit to invoices that still have balance after payment allocation
+      for (const allocationReq of allocationRequests) {
+        if (remainingCreditToApply <= 0) break;
+
+        const billing = billingMap.get(allocationReq.invoice_id);
+        if (!billing) continue;
+
+        // Calculate remaining balance after payment allocation
+        const paymentAllocation = allocations.find(a => a.billing_id === allocationReq.invoice_id);
+        const balanceAfterPayment = billing.balance_due - (paymentAllocation?.allocated_amount || 0);
+
+        if (balanceAfterPayment <= 0) continue;
+
+        // Apply credit to this invoice
+        const creditForThisInvoice = Math.min(remainingCreditToApply, balanceAfterPayment);
+
+        // Deduct from available credits
+        let creditToDeduct = creditForThisInvoice;
+        for (const credit of availableCredits) {
+          if (creditToDeduct <= 0) break;
+          if (credit.current_balance <= 0) continue;
+
+          const deductAmount = Math.min(creditToDeduct, credit.current_balance);
+
+          // Update credit record
+          await connection.query(`
+            UPDATE customer_credit SET
+              current_balance = current_balance - ?,
+              status = IF(current_balance - ? <= 0, 'used', 'available'),
+              updated_at = NOW()
+            WHERE id = ?
+          `, [deductAmount, deductAmount, credit.id]);
+
+          // Record credit usage (use invoices table ID)
+          await connection.query(`
+            INSERT INTO customer_credit_usage (credit_id, billing_id, amount_used)
+            VALUES (?, ?, ?)
+          `, [credit.id, allocationReq.invoice_id, deductAmount]);
+
+          credit.current_balance -= deductAmount;
+          creditToDeduct -= deductAmount;
+        }
+
+        // Update invoice with credit applied
+        await connection.query(`
+          UPDATE invoices SET
+            amount_paid = COALESCE(amount_paid, 0) + ?,
+            balance_due = balance_due - ?,
+            payment_status = IF((balance_due - ?) <= 0, 'paid', 'partial_paid'),
+            updated_at = NOW()
+          WHERE id = ?
+        `, [creditForThisInvoice, creditForThisInvoice, creditForThisInvoice, allocationReq.invoice_id]);
+
+        creditApplied += creditForThisInvoice;
+        remainingCreditToApply -= creditForThisInvoice;
+      }
     }
 
     // Calculate totals
@@ -237,15 +333,22 @@ export default async function handler(
 
     await connection.commit();
 
+    let message = `Successfully allocated $${totalAllocated.toFixed(2)} to ${allocations.length} invoice(s).`;
+    if (creditApplied > 0) {
+      message += ` Applied $${creditApplied.toFixed(2)} from credit.`;
+    }
+    if (excessAmount > 0) {
+      message = `Allocated $${totalAllocated.toFixed(2)}. Excess $${excessAmount.toFixed(2)} saved as credit.`;
+    }
+
     const result: AllocationResult = {
       success: true,
       payment_record_id: paymentId,
       total_allocated: totalAllocated,
+      credit_applied: creditApplied,
       excess_amount: excessAmount,
       allocation_status: allocationStatus,
-      message: excessAmount > 0
-        ? `Allocated $${totalAllocated.toFixed(2)}. Excess $${excessAmount.toFixed(2)} saved as credit.`
-        : `Successfully allocated $${totalAllocated.toFixed(2)} to ${allocations.length} invoice(s).`,
+      message,
       allocations,
     };
 

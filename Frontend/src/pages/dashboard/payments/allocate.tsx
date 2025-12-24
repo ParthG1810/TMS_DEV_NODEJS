@@ -61,6 +61,18 @@ interface Transaction {
   confirmed_customer_name: string;
 }
 
+interface CustomerCredit {
+  id: number;
+  original_amount: number;
+  current_balance: number;
+  created_at: string;
+}
+
+interface CreditSummary {
+  total_available: number;
+  credits: CustomerCredit[];
+}
+
 interface AllocationItem {
   invoiceId: number;
   amount: number;
@@ -88,6 +100,8 @@ export default function PaymentAllocationPage() {
   const [selectedInvoices, setSelectedInvoices] = useState<Map<number, number>>(new Map());
   const [totalAllocated, setTotalAllocated] = useState(0);
   const [remainingAmount, setRemainingAmount] = useState(0);
+  const [customerCredit, setCustomerCredit] = useState<CreditSummary | null>(null);
+  const [creditToApply, setCreditToApply] = useState(0);
 
   const fetchData = useCallback(async () => {
     if (!transactionId) return;
@@ -137,6 +151,16 @@ export default function PaymentAllocationPage() {
         setSelectedInvoices(initialAllocations);
         setTotalAllocated(total);
         setRemainingAmount(remaining_amount);
+      }
+
+      // Fetch customer credit
+      try {
+        const creditResponse = await axios.get(`/api/customers/${customerId}/credit`);
+        if (creditResponse.data.success) {
+          setCustomerCredit(creditResponse.data.data);
+        }
+      } catch (creditError) {
+        console.log('No credit available or error fetching credit');
       }
     } catch (error: any) {
       console.error('Error fetching data:', error);
@@ -199,6 +223,12 @@ export default function PaymentAllocationPage() {
     setRemainingAmount(transaction ? transaction.amount - total : 0);
   };
 
+  const handleCreditChange = (value: string) => {
+    const amount = parseFloat(value) || 0;
+    const maxCredit = customerCredit?.total_available || 0;
+    setCreditToApply(Math.min(amount, maxCredit));
+  };
+
   const handleSubmit = async () => {
     if (!transaction || selectedInvoices.size === 0) return;
 
@@ -223,27 +253,28 @@ export default function PaymentAllocationPage() {
 
       const paymentId = paymentResponse.data.data.id;
 
-      // Allocate to invoices - API expects billing_ids array in allocation order
-      const billing_ids: number[] = [];
+      // Allocate to invoices - send custom allocation amounts
+      const allocations: { invoice_id: number; amount: number }[] = [];
       selectedInvoices.forEach((amount, invoiceId) => {
-        billing_ids.push(invoiceId);
+        allocations.push({ invoice_id: invoiceId, amount });
       });
 
       const allocateResponse = await axios.post(`/api/payment-records/${paymentId}/allocate`, {
-        billing_ids,
+        allocations,
+        credit_to_apply: creditToApply > 0 ? creditToApply : undefined,
       });
 
       if (allocateResponse.data.success) {
-        const { allocation_status, excess_amount } = allocateResponse.data.data;
+        const { allocation_status, excess_amount, credit_applied } = allocateResponse.data.data;
 
-        if (allocation_status === 'has_excess' && excess_amount > 0) {
-          enqueueSnackbar(
-            `Payment allocated. ${fCurrency(excess_amount)} added to customer credit.`,
-            { variant: 'success' }
-          );
-        } else {
-          enqueueSnackbar('Payment allocated successfully', { variant: 'success' });
+        let successMsg = 'Payment allocated successfully';
+        if (credit_applied > 0) {
+          successMsg += `. ${fCurrency(credit_applied)} credit applied.`;
         }
+        if (allocation_status === 'has_excess' && excess_amount > 0) {
+          successMsg += ` ${fCurrency(excess_amount)} added to customer credit.`;
+        }
+        enqueueSnackbar(successMsg, { variant: 'success' });
 
         router.push(PATH_DASHBOARD.payments.history);
       } else {
@@ -347,6 +378,14 @@ export default function PaymentAllocationPage() {
                   <Typography variant="body2">Total Allocated:</Typography>
                   <Typography variant="subtitle2">{fCurrency(totalAllocated)}</Typography>
                 </Stack>
+                {creditToApply > 0 && (
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2">Credit Applied:</Typography>
+                    <Typography variant="subtitle2" color="success.main">
+                      {fCurrency(creditToApply)}
+                    </Typography>
+                  </Stack>
+                )}
                 <Stack direction="row" justifyContent="space-between">
                   <Typography variant="body2">Remaining:</Typography>
                   <Typography variant="subtitle2" color={remainingAmount > 0 ? 'warning.main' : 'text.secondary'}>
@@ -384,12 +423,57 @@ export default function PaymentAllocationPage() {
 
           {/* Invoice Selection */}
           <Grid item xs={12} md={8}>
+            {/* Customer Credit Card */}
+            {customerCredit && customerCredit.total_available > 0 && (
+              <Card sx={{ p: 3, mb: 3, bgcolor: 'success.lighter' }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="eva:credit-card-fill" sx={{ color: 'success.main' }} width={24} />
+                      <Typography variant="h6">Customer Credit Available</Typography>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      This customer has {fCurrency(customerCredit.total_available)} credit that can be applied to invoices
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <TextField
+                      size="small"
+                      label="Apply Credit"
+                      type="number"
+                      value={creditToApply || ''}
+                      onChange={(e) => handleCreditChange(e.target.value)}
+                      inputProps={{
+                        min: 0,
+                        max: customerCredit.total_available,
+                        step: 0.01,
+                      }}
+                      sx={{ width: 130 }}
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="success"
+                      onClick={() => setCreditToApply(customerCredit.total_available)}
+                    >
+                      Use All
+                    </Button>
+                  </Stack>
+                </Stack>
+                {creditToApply > 0 && (
+                  <Alert severity="success" sx={{ mt: 2 }}>
+                    {fCurrency(creditToApply)} credit will be applied to remaining invoice balances
+                  </Alert>
+                )}
+              </Card>
+            )}
+
             <Card sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>
                 Select Invoices to Pay
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                The 3 oldest unpaid invoices are auto-selected. You can modify allocations below.
+                The oldest unpaid invoices are auto-selected. You can modify allocations below.
               </Typography>
 
               {invoices.length === 0 ? (
