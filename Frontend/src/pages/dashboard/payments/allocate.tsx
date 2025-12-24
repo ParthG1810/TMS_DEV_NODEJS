@@ -22,6 +22,10 @@ import {
   TableContainer,
   Paper,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
@@ -104,6 +108,9 @@ export default function PaymentAllocationPage() {
   const [remainingAmount, setRemainingAmount] = useState(0);
   const [customerCredit, setCustomerCredit] = useState<CreditSummary | null>(null);
   const [creditToApply, setCreditToApply] = useState(0);
+  const [nameMismatch, setNameMismatch] = useState<{ matched: string; invoice: string } | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [userConfirmed, setUserConfirmed] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!transactionId) return;
@@ -153,6 +160,22 @@ export default function PaymentAllocationPage() {
         setSelectedInvoices(initialAllocations);
         setTotalAllocated(total);
         setRemainingAmount(remaining_amount);
+
+        // Check for name mismatch between matched customer and invoice customer
+        const matchedCustomerName = tx.confirmed_customer_name || tx.auto_matched_customer_name;
+        if (selected_invoices.length > 0 && matchedCustomerName) {
+          const invoiceCustomerName = selected_invoices[0].customer_name;
+          // Normalize names for comparison (case-insensitive, trim whitespace)
+          const normalizedMatched = matchedCustomerName.toLowerCase().trim();
+          const normalizedInvoice = invoiceCustomerName?.toLowerCase().trim();
+
+          if (normalizedInvoice && normalizedMatched !== normalizedInvoice) {
+            setNameMismatch({
+              matched: matchedCustomerName,
+              invoice: invoiceCustomerName,
+            });
+          }
+        }
       }
 
       // Fetch customer credit
@@ -231,7 +254,16 @@ export default function PaymentAllocationPage() {
     setCreditToApply(Math.min(amount, maxCredit));
   };
 
-  const handleSubmit = async () => {
+  const handleConfirmMismatch = () => {
+    setUserConfirmed(true);
+    setShowConfirmDialog(false);
+    // Trigger submit after confirmation
+    setTimeout(() => {
+      handleSubmitAfterConfirm();
+    }, 100);
+  };
+
+  const handleSubmitAfterConfirm = async () => {
     if (!transaction || selectedInvoices.size === 0) return;
 
     const customerId = transaction.confirmed_customer_id || transaction.auto_matched_customer_id;
@@ -296,6 +328,19 @@ export default function PaymentAllocationPage() {
     }
   };
 
+  const handleSubmit = async () => {
+    if (!transaction || selectedInvoices.size === 0) return;
+
+    // Check for name mismatch - require confirmation
+    if (nameMismatch && !userConfirmed) {
+      setShowConfirmDialog(true);
+      return;
+    }
+
+    // Proceed with allocation
+    handleSubmitAfterConfirm();
+  };
+
   if (loading) {
     return (
       <Container maxWidth={themeStretch ? false : 'lg'}>
@@ -330,6 +375,22 @@ export default function PaymentAllocationPage() {
             { name: 'Allocate' },
           ]}
         />
+
+        {/* Name Mismatch Warning */}
+        {nameMismatch && !userConfirmed && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Iconify icon="eva:alert-triangle-fill" width={20} />
+              <Box>
+                <Typography variant="subtitle2">Customer Name Mismatch Detected</Typography>
+                <Typography variant="body2">
+                  Matched customer "<strong>{nameMismatch.matched}</strong>" does not match invoice customer "<strong>{nameMismatch.invoice}</strong>".
+                  You will need to confirm before allocating.
+                </Typography>
+              </Box>
+            </Stack>
+          </Alert>
+        )}
 
         <Grid container spacing={3}>
           {/* Payment Details */}
@@ -584,6 +645,50 @@ export default function PaymentAllocationPage() {
             </Card>
           </Grid>
         </Grid>
+
+        {/* Name Mismatch Confirmation Dialog */}
+        <Dialog open={showConfirmDialog} onClose={() => setShowConfirmDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ color: 'warning.main' }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Iconify icon="eva:alert-triangle-fill" width={24} />
+              <span>Customer Name Mismatch</span>
+            </Stack>
+          </DialogTitle>
+          <DialogContent>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              The matched customer name does not match the invoice customer name.
+            </Alert>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Matched Customer (from payment):
+                </Typography>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  {nameMismatch?.matched}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Invoice Customer:
+                </Typography>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  {nameMismatch?.invoice}
+                </Typography>
+              </Box>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Are you sure you want to allocate this payment to these invoices?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowConfirmDialog(false)} color="inherit">
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmMismatch} variant="contained" color="warning">
+              Yes, Allocate Anyway
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </>
   );
