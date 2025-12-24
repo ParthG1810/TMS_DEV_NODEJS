@@ -35,9 +35,10 @@ interface OrderInvoice {
     base_amount: number;
     extra_amount: number;
     total_amount: number;
-    status: 'calculating' | 'finalized';
+    status: 'calculating' | 'finalized' | 'approved' | 'invoiced';
     finalized_at: string | null;
     finalized_by: string | null;
+    invoice_id: number | null;
   };
   calendar_entries: CalendarEntry[];
 }
@@ -126,7 +127,8 @@ export default async function handler(
           total_amount,
           status,
           finalized_at,
-          finalized_by
+          finalized_by,
+          invoice_id
         FROM order_billing
         WHERE order_id = ? AND billing_month = ?
       `,
@@ -145,6 +147,7 @@ export default async function handler(
       status: 'calculating',
       finalized_at: null,
       finalized_by: null,
+      invoice_id: null,
     };
 
     // Get calendar entries for this order in the billing month
@@ -193,6 +196,7 @@ export default async function handler(
         status: billing.status || 'calculating',
         finalized_at: billing.finalized_at || null,
         finalized_by: billing.finalized_by || null,
+        invoice_id: billing.invoice_id || null,
       },
       calendar_entries: entries.map((e) => ({
         ...e,
