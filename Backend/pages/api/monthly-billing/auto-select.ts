@@ -102,19 +102,21 @@ export default async function handler(
       LIMIT ${fetchLimit}
     `, [customerId]);
 
-    // Calculate allocations
+    // Calculate allocations - show ALL unpaid invoices, auto-allocate to oldest first
     let remainingAmount = amount;
     let selectionOrder = 1;
     const selectedInvoices: AutoSelectedInvoice[] = [];
     let totalToAllocate = 0;
 
+    // Add all invoices up to the limit, allocating payment to oldest first
     for (const invoice of invoices) {
-      if (selectedInvoices.length >= maxInvoices && remainingAmount <= 0) {
+      if (selectedInvoices.length >= maxInvoices) {
         break;
       }
 
       const balanceDue = invoice.balance_due;
-      const willAllocate = Math.min(remainingAmount, balanceDue);
+      // Only allocate if there's remaining payment amount
+      const willAllocate = remainingAmount > 0 ? Math.min(remainingAmount, balanceDue) : 0;
       const balanceAfter = balanceDue - willAllocate;
 
       selectedInvoices.push({
@@ -128,34 +130,6 @@ export default async function handler(
       totalToAllocate += willAllocate;
       remainingAmount -= willAllocate;
       selectionOrder++;
-
-      // Stop if we've allocated everything
-      if (remainingAmount <= 0) break;
-
-      // Continue adding invoices up to maxInvoices if there's still money
-      if (selectedInvoices.length >= maxInvoices) break;
-    }
-
-    // If there's still remaining amount, add more invoices if available
-    if (remainingAmount > 0) {
-      for (let i = selectedInvoices.length; i < invoices.length && remainingAmount > 0; i++) {
-        const invoice = invoices[i];
-        const balanceDue = invoice.balance_due;
-        const willAllocate = Math.min(remainingAmount, balanceDue);
-        const balanceAfter = balanceDue - willAllocate;
-
-        selectedInvoices.push({
-          ...invoice,
-          selection_order: selectionOrder,
-          will_allocate: willAllocate,
-          balance_after: balanceAfter,
-          will_be_paid: balanceAfter <= 0,
-        });
-
-        totalToAllocate += willAllocate;
-        remainingAmount -= willAllocate;
-        selectionOrder++;
-      }
     }
 
     const result: AutoSelectResult = {
