@@ -169,17 +169,17 @@ export default async function handler(
     const monthYearStr = `${monthNames[parseInt(billingMonthNum, 10) - 1]}-${billingYear}`;
 
     // Generate invoice number based on type
-    // Single: INV-C{CustomerID}-O{OrderID/Month-Year}-{YYYYMMDD}-{Counter}
-    // Combined: INV-C{CustomerID}-O{OrderID/Month-Year}-CMB-{YYYYMMDD}-{Counter}
+    // Single: INV-C{CustomerID}-O{OrderID_Month-Year}-{YYYYMMDD}-{Counter}
+    // Combined: INV-C{CustomerID}-O{OrderID_Month-Year}-CMB-{YYYYMMDD}-{Counter}
     let invoiceNumberPrefix: string;
     let invoiceNumberPattern: string;
 
     if (invoiceType === 'individual') {
-      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}/${monthYearStr}-${dateStr}`;
-      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}/${monthYearStr}-${dateStr}-%`;
+      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}_${monthYearStr}-${dateStr}`;
+      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}_${monthYearStr}-${dateStr}-%`;
     } else {
-      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}/${monthYearStr}-CMB-${dateStr}`;
-      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}/${monthYearStr}-CMB-${dateStr}-%`;
+      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}_${monthYearStr}-CMB-${dateStr}`;
+      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}_${monthYearStr}-CMB-${dateStr}-%`;
     }
 
     // Get the next counter for this pattern
