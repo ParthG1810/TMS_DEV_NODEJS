@@ -64,6 +64,7 @@ interface PaymentRecord {
   id: number;
   payment_record_id: number;
   amount_applied: number;
+  credit_applied: number;
   applied_at: string;
   sender_name: string | null;
   payment_type: string;
@@ -543,6 +544,7 @@ export default function InvoiceDetailPage() {
                     <TableCell>Payment Type</TableCell>
                     <TableCell>Reference</TableCell>
                     <TableCell align="right">Amount</TableCell>
+                    <TableCell align="right">Credit</TableCell>
                     <TableCell>Sender Name</TableCell>
                   </TableRow>
                 </TableHead>
@@ -592,6 +594,17 @@ export default function InvoiceDetailPage() {
                           {fCurrency(payment.amount_applied)}
                         </Typography>
                       </TableCell>
+                      <TableCell align="right">
+                        {payment.credit_applied > 0 ? (
+                          <Typography variant="subtitle2" color="info.main">
+                            {fCurrency(payment.credit_applied)}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Typography variant="body2">
                           {payment.sender_name || '-'}
@@ -608,8 +621,15 @@ export default function InvoiceDetailPage() {
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="h6" color="success.main">
-                        {fCurrency(invoice.amount_paid)}
+                        {fCurrency(invoice.payments.reduce((sum, p) => sum + p.amount_applied, 0))}
                       </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      {invoice.payments.reduce((sum, p) => sum + p.credit_applied, 0) > 0 && (
+                        <Typography variant="h6" color="info.main">
+                          {fCurrency(invoice.payments.reduce((sum, p) => sum + p.credit_applied, 0))}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell />
                   </TableRow>

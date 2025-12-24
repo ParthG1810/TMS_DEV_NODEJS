@@ -245,10 +245,23 @@ export default async function handler(
           `, [deductAmount, deductAmount, credit.id]);
 
           // Record credit usage (use invoices table ID)
-          await connection.query(`
-            INSERT INTO customer_credit_usage (credit_id, payment_record_id, billing_id, amount_used)
-            VALUES (?, ?, ?, ?)
-          `, [credit.id, paymentId, allocationReq.invoice_id, deductAmount]);
+          // Try with payment_record_id first, fall back to without if column doesn't exist
+          try {
+            await connection.query(`
+              INSERT INTO customer_credit_usage (credit_id, payment_record_id, billing_id, amount_used)
+              VALUES (?, ?, ?, ?)
+            `, [credit.id, paymentId, allocationReq.invoice_id, deductAmount]);
+          } catch (insertError: any) {
+            // If payment_record_id column doesn't exist, insert without it
+            if (insertError.code === 'ER_BAD_FIELD_ERROR') {
+              await connection.query(`
+                INSERT INTO customer_credit_usage (credit_id, billing_id, amount_used)
+                VALUES (?, ?, ?)
+              `, [credit.id, allocationReq.invoice_id, deductAmount]);
+            } else {
+              throw insertError;
+            }
+          }
 
           credit.current_balance -= deductAmount;
           creditToDeduct -= deductAmount;
