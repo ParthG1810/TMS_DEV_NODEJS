@@ -160,10 +160,8 @@ export default function NotificationsPopover() {
     try {
       await axios.delete(`/api/payment-notifications/${notificationId}`);
       await fetchNotifications();
-      enqueueSnackbar('Notification dismissed', { variant: 'success' });
     } catch (error) {
       console.error('Error dismissing notification:', error);
-      enqueueSnackbar('Failed to dismiss notification', { variant: 'error' });
     }
   };
 
