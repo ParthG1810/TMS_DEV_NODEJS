@@ -65,8 +65,9 @@ interface PaymentRecord {
   amount_applied: number;
   applied_at: string;
   applied_by: string | null;
-  payment_method: string;
-  transaction_reference: string | null;
+  payment_type: string;
+  payment_source: string | null;
+  reference_number: string | null;
 }
 
 interface InvoiceDetail {
@@ -173,7 +174,18 @@ export default function InvoiceDetailPage() {
 
       if (response.data.success) {
         enqueueSnackbar('Invoice deleted successfully', { variant: 'success' });
-        router.push(PATH_DASHBOARD.tiffin.invoices);
+        // Redirect to billing calendar with the customer's month
+        if (invoice && invoice.orders.length > 0) {
+          const firstOrder = invoice.orders[0];
+          router.push({
+            pathname: PATH_DASHBOARD.tiffin.billingCalendar,
+            query: {
+              month: firstOrder.billing_month,
+            },
+          });
+        } else {
+          router.push(PATH_DASHBOARD.tiffin.billingCalendar);
+        }
       } else {
         enqueueSnackbar(response.data.error || 'Failed to delete invoice', {
           variant: 'error',
@@ -181,7 +193,7 @@ export default function InvoiceDetailPage() {
       }
     } catch (error: any) {
       console.error('Error deleting invoice:', error);
-      enqueueSnackbar(error.message || 'Failed to delete invoice', { variant: 'error' });
+      enqueueSnackbar(error.response?.data?.error || error.message || 'Failed to delete invoice', { variant: 'error' });
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -536,7 +548,7 @@ export default function InvoiceDetailPage() {
                             </Typography>
                           </Box>
                           <Chip
-                            label={payment.payment_method}
+                            label={payment.payment_source ? `${payment.payment_type} (${payment.payment_source})` : payment.payment_type}
                             size="small"
                             variant="outlined"
                           />
