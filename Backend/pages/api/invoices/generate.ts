@@ -71,6 +71,9 @@ export default async function handler(
       });
     }
 
+    // Convert customer_id to number for proper comparison
+    const customerIdNum = Number(customer_id);
+
     if (!order_billing_ids || !Array.isArray(order_billing_ids) || order_billing_ids.length === 0) {
       return res.status(400).json({
         success: false,
@@ -123,7 +126,7 @@ export default async function handler(
     }
 
     // Check all belong to the same customer
-    const wrongCustomer = orderBillings.filter(ob => ob.customer_id !== customer_id);
+    const wrongCustomer = orderBillings.filter(ob => ob.customer_id !== customerIdNum);
     if (wrongCustomer.length > 0) {
       return res.status(400).json({
         success: false,
@@ -175,11 +178,11 @@ export default async function handler(
     let invoiceNumberPattern: string;
 
     if (invoiceType === 'individual') {
-      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}_${monthYearStr}-${dateStr}`;
-      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}_${monthYearStr}-${dateStr}-%`;
+      invoiceNumberPrefix = `INV-C${customerIdNum}-O${firstOrderId}_${monthYearStr}-${dateStr}`;
+      invoiceNumberPattern = `INV-C${customerIdNum}-O${firstOrderId}_${monthYearStr}-${dateStr}-%`;
     } else {
-      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}_${monthYearStr}-CMB-${dateStr}`;
-      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}_${monthYearStr}-CMB-${dateStr}-%`;
+      invoiceNumberPrefix = `INV-C${customerIdNum}-O${firstOrderId}_${monthYearStr}-CMB-${dateStr}`;
+      invoiceNumberPattern = `INV-C${customerIdNum}-O${firstOrderId}_${monthYearStr}-CMB-${dateStr}-%`;
     }
 
     // Get the next counter for this pattern
@@ -211,7 +214,7 @@ export default async function handler(
       ) VALUES (?, ?, ?, ?, 0, ?, 'unpaid', ?, ?, ?)`,
       [
         invoiceNumber,
-        customer_id,
+        customerIdNum,
         invoiceType,
         totalAmount,
         totalAmount,
@@ -275,7 +278,7 @@ export default async function handler(
       })),
     };
 
-    console.log(`[Invoice Generate] Created invoice ${invoiceNumber} for customer ${customer_id} with ${orderBillings.length} order(s), total: ${totalAmount}`);
+    console.log(`[Invoice Generate] Created invoice ${invoiceNumber} for customer ${customerIdNum} with ${orderBillings.length} order(s), total: ${totalAmount}`);
 
     return res.status(201).json({
       success: true,
