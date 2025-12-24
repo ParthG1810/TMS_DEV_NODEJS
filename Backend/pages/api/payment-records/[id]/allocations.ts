@@ -6,6 +6,8 @@ import cors from '../../../../src/utils/cors';
 interface PaymentAllocation {
   id: number;
   billing_id: number;
+  invoice_number: string;
+  customer_name: string;
   billing_month: string;
   allocated_amount: number;
   resulting_status: string;
@@ -42,12 +44,15 @@ export default async function handler(
       SELECT
         pa.id,
         pa.billing_id,
-        mb.billing_month,
+        i.invoice_number,
+        c.name as customer_name,
+        i.generated_at as billing_month,
         pa.allocated_amount,
         pa.resulting_status,
         pa.created_at
       FROM payment_allocations pa
-      LEFT JOIN monthly_billing mb ON pa.billing_id = mb.id
+      LEFT JOIN invoices i ON pa.billing_id = i.id
+      LEFT JOIN customers c ON i.customer_id = c.id
       WHERE pa.payment_record_id = ?
       ORDER BY pa.allocation_order ASC
     `, [id]);
