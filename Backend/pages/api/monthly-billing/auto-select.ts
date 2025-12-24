@@ -91,11 +91,11 @@ export default async function handler(
       FROM invoices i
       INNER JOIN customers c ON i.customer_id = c.id
       WHERE i.customer_id = ?
-      AND i.payment_status IN ('unpaid', 'partial')
+      AND i.payment_status IN ('unpaid', 'partial_paid')
       AND i.balance_due > 0
       ORDER BY
         CASE i.payment_status
-          WHEN 'partial' THEN 1
+          WHEN 'partial_paid' THEN 1
           ELSE 2
         END,
         i.generated_at ASC
