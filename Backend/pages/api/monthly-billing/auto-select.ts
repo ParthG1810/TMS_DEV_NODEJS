@@ -74,29 +74,33 @@ export default async function handler(
     }
 
     // Get all unpaid/partially paid invoices for customer, oldest first
-    // Prioritize partial_paid, then finalized, ordered by billing_month
+    // Query from invoices table (new invoice system)
     const invoices = await query<MonthlyBillingWithBalance[]>(`
       SELECT
-        mb.*,
-        COALESCE(mb.amount_paid, 0) as amount_paid,
-        COALESCE(mb.credit_applied, 0) as credit_applied,
-        (mb.total_amount - COALESCE(mb.amount_paid, 0) - COALESCE(mb.credit_applied, 0)) as balance_due,
-        COALESCE(mb.payment_count, 0) as payment_count,
+        i.id,
+        i.invoice_number,
+        i.customer_id,
+        i.total_amount,
+        COALESCE(i.amount_paid, 0) as amount_paid,
+        COALESCE(i.credit_applied, 0) as credit_applied,
+        (i.total_amount - COALESCE(i.amount_paid, 0) - COALESCE(i.credit_applied, 0)) as balance_due,
+        i.payment_status as status,
+        i.generated_at as billing_month,
         c.name as customer_name,
         c.phone as customer_phone
-      FROM monthly_billing mb
-      INNER JOIN customers c ON mb.customer_id = c.id
-      WHERE mb.customer_id = ?
-      AND mb.status IN ('finalized', 'partial_paid')
-      AND (mb.total_amount - COALESCE(mb.amount_paid, 0) - COALESCE(mb.credit_applied, 0)) > 0
+      FROM invoices i
+      INNER JOIN customers c ON i.customer_id = c.id
+      WHERE i.customer_id = ?
+      AND i.payment_status IN ('unpaid', 'partial')
+      AND (i.total_amount - COALESCE(i.amount_paid, 0) - COALESCE(i.credit_applied, 0)) > 0
       ORDER BY
-        CASE mb.status
-          WHEN 'partial_paid' THEN 1
+        CASE i.payment_status
+          WHEN 'partial' THEN 1
           ELSE 2
         END,
-        mb.billing_month ASC
+        i.generated_at ASC
       LIMIT ${fetchLimit}
-    `, [customerId]); // Fetch a few extra in case we need more
+    `, [customerId]);
 
     // Calculate allocations
     let remainingAmount = amount;
