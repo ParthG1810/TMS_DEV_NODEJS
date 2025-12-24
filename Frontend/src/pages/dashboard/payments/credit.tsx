@@ -273,7 +273,7 @@ export default function CustomerCreditPage() {
       case 'pending':
         return <Label color="warning">Pending</Label>;
       case 'completed':
-        return <Label color="success">Completed</Label>;
+        return <Label color="success">Refunded</Label>;
       case 'cancelled':
         return <Label color="error">Cancelled</Label>;
       default:
