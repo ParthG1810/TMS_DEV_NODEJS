@@ -72,6 +72,8 @@ interface PaymentRecord {
 interface PaymentAllocation {
   id: number;
   billing_id: number;
+  invoice_number: string;
+  customer_name: string;
   billing_month: string;
   allocated_amount: number;
   resulting_status: string;
@@ -608,7 +610,7 @@ export default function PaymentHistoryPage() {
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Invoice Period</TableCell>
+                        <TableCell>Invoice</TableCell>
                         <TableCell align="right">Amount Allocated</TableCell>
                         <TableCell align="center">Status</TableCell>
                       </TableRow>
@@ -617,9 +619,29 @@ export default function PaymentHistoryPage() {
                       {paymentAllocations.map((alloc) => (
                         <TableRow key={alloc.id}>
                           <TableCell>
-                            <Typography variant="body2">
-                              {fDate(alloc.billing_month, 'MMMM yyyy')}
+                            <Typography
+                              variant="body2"
+                              component="span"
+                              onClick={() => {
+                                setOpenDetails(false);
+                                router.push(PATH_DASHBOARD.tiffin.invoiceDetails(String(alloc.billing_id)));
+                              }}
+                              sx={{
+                                cursor: 'pointer',
+                                color: 'primary.main',
+                                fontWeight: 500,
+                                '&:hover': {
+                                  textDecoration: 'underline',
+                                },
+                              }}
+                            >
+                              {alloc.invoice_number || `Invoice #${alloc.billing_id}`}
                             </Typography>
+                            {alloc.customer_name && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {alloc.customer_name}
+                              </Typography>
+                            )}
                           </TableCell>
                           <TableCell align="right">
                             <Typography variant="subtitle2" color="success.main">
