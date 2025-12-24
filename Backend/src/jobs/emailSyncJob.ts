@@ -10,7 +10,12 @@ let isRunning = false;
 let intervalId: NodeJS.Timeout | null = null;
 let lastRunAt: Date | null = null;
 let lastRunResults: any = null;
-let autoStartAttempted = false;
+
+// Use global to persist auto-start state across hot module reloads in Next.js dev mode
+declare global {
+  // eslint-disable-next-line no-var
+  var emailSyncAutoStartAttempted: boolean | undefined;
+}
 
 /**
  * Run the email sync job
@@ -123,9 +128,9 @@ export async function triggerManualSync(): Promise<void> {
 // Delay start to allow database connection to establish
 // Only start if we're in a server environment (not during build)
 if (typeof window === 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
-  // Prevent duplicate auto-start attempts (module may be re-imported in Next.js dev mode)
-  if (!autoStartAttempted) {
-    autoStartAttempted = true;
+  // Use global flag to prevent duplicate auto-start attempts across hot module reloads
+  if (!global.emailSyncAutoStartAttempted) {
+    global.emailSyncAutoStartAttempted = true;
     setTimeout(() => {
       startEmailSyncJob();
     }, 10000); // 10 second delay to ensure DB is ready
