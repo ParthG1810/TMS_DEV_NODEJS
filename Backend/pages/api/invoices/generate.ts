@@ -155,13 +155,39 @@ export default async function handler(
     // Determine invoice type
     const invoiceType = orderBillings.length === 1 ? 'individual' : 'combined';
 
-    // Get the billing month for invoice number (use the first one if combined)
-    const billingMonth = orderBillings[0].billing_month;
+    // Get current date for invoice number (YYYYMMDD format)
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
 
-    // Generate invoice number using stored procedure
-    await query('CALL sp_generate_invoice_number(?, @invoice_number)', [billingMonth]);
-    const invoiceNumberResult = await query<any[]>('SELECT @invoice_number as invoice_number');
-    const invoiceNumber = invoiceNumberResult[0].invoice_number;
+    // Get the first order_id for the invoice number
+    const firstOrderId = orderBillings[0].order_id;
+
+    // Generate invoice number based on type
+    // Single: INV-C{CustomerID}-O{OrderID}-{YYYYMMDD}-{Counter}
+    // Combined: INV-C{CustomerID}-CMB-{YYYYMMDD}-{Counter}
+    let invoiceNumberPrefix: string;
+    let invoiceNumberPattern: string;
+
+    if (invoiceType === 'individual') {
+      invoiceNumberPrefix = `INV-C${customer_id}-O${firstOrderId}-${dateStr}`;
+      invoiceNumberPattern = `INV-C${customer_id}-O${firstOrderId}-${dateStr}-%`;
+    } else {
+      invoiceNumberPrefix = `INV-C${customer_id}-CMB-${dateStr}`;
+      invoiceNumberPattern = `INV-C${customer_id}-CMB-${dateStr}-%`;
+    }
+
+    // Get the next counter for this pattern
+    const counterResult = await query<any[]>(
+      `SELECT COALESCE(MAX(
+        CAST(SUBSTRING_INDEX(invoice_number, '-', -1) AS UNSIGNED)
+      ), 0) + 1 as next_counter
+      FROM invoices
+      WHERE invoice_number LIKE ?`,
+      [invoiceNumberPattern]
+    );
+
+    const nextCounter = counterResult[0].next_counter;
+    const invoiceNumber = `${invoiceNumberPrefix}-${String(nextCounter).padStart(3, '0')}`;
 
     // Create the invoice
     const insertResult = await query<any>(
