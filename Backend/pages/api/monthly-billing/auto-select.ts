@@ -45,7 +45,7 @@ export default async function handler(
   }
 
   try {
-    const { customer_id, payment_amount, max_invoices = '3' } = req.query;
+    const { customer_id, payment_amount, max_invoices = '10' } = req.query;
 
     if (!customer_id || !payment_amount) {
       return res.status(400).json({
