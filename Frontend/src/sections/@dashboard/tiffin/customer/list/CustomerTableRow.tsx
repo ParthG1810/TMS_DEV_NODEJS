@@ -59,7 +59,15 @@ export default function CustomerTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          <Tooltip title={hasOrders ? 'Cannot select customer with orders' : ''}>
+            <span>
+              <Checkbox
+                checked={selected}
+                onClick={onSelectRow}
+                disabled={hasOrders}
+              />
+            </span>
+          </Tooltip>
         </TableCell>
 
         <TableCell>{name}</TableCell>
