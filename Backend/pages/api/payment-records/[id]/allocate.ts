@@ -143,9 +143,16 @@ export default async function handler(
         allocateAmount = Math.min(remainingAmount, billing.balance_due);
       }
 
+      // Round to 2 decimal places to avoid floating-point precision issues
+      allocateAmount = Math.round(allocateAmount * 100) / 100;
+
       if (allocateAmount <= 0) continue;
 
       const invoiceId = allocationReq.invoice_id;
+
+      // Calculate the new balance after allocation (rounded to avoid precision issues)
+      const balanceAfterAllocation = Math.round((billing.balance_due - allocateAmount) * 100) / 100;
+      const resultingStatus = balanceAfterAllocation <= 0 ? 'paid' : 'partial_paid';
 
       // Insert allocation record (billing_id column stores invoice ID)
       await connection.query(`
@@ -162,17 +169,17 @@ export default async function handler(
         allocationOrder,
         allocateAmount,
         billing.balance_due,
-        billing.balance_due - allocateAmount,
-        billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial_paid',
+        balanceAfterAllocation,
+        resultingStatus,
         created_by || null,
       ]);
 
-      // Update invoice record
+      // Update invoice record - use ROUND to avoid floating-point precision issues
       await connection.query(`
         UPDATE invoices SET
           amount_paid = COALESCE(amount_paid, 0) + ?,
-          balance_due = balance_due - ?,
-          payment_status = IF((balance_due - ?) <= 0, 'paid', 'partial_paid'),
+          balance_due = ROUND(balance_due - ?, 2),
+          payment_status = IF(ROUND(balance_due - ?, 2) <= 0, 'paid', 'partial_paid'),
           updated_at = NOW()
         WHERE id = ?
       `, [allocateAmount, allocateAmount, allocateAmount, invoiceId]);
@@ -180,7 +187,7 @@ export default async function handler(
       allocations.push({
         billing_id: invoiceId,
         allocated_amount: allocateAmount,
-        resulting_status: billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial_paid',
+        resulting_status: resultingStatus,
       });
 
       remainingAmount -= allocateAmount;
@@ -209,14 +216,15 @@ export default async function handler(
         const billing = billingMap.get(allocationReq.invoice_id);
         if (!billing) continue;
 
-        // Calculate remaining balance after payment allocation
+        // Calculate remaining balance after payment allocation (rounded)
         const paymentAllocation = allocations.find(a => a.billing_id === allocationReq.invoice_id);
-        const balanceAfterPayment = billing.balance_due - (paymentAllocation?.allocated_amount || 0);
+        const balanceAfterPayment = Math.round((billing.balance_due - (paymentAllocation?.allocated_amount || 0)) * 100) / 100;
 
         if (balanceAfterPayment <= 0) continue;
 
-        // Apply credit to this invoice
-        const creditForThisInvoice = Math.min(remainingCreditToApply, balanceAfterPayment);
+        // Apply credit to this invoice (rounded)
+        let creditForThisInvoice = Math.min(remainingCreditToApply, balanceAfterPayment);
+        creditForThisInvoice = Math.round(creditForThisInvoice * 100) / 100;
 
         // Deduct from available credits
         let creditToDeduct = creditForThisInvoice;
@@ -224,13 +232,14 @@ export default async function handler(
           if (creditToDeduct <= 0) break;
           if (credit.current_balance <= 0) continue;
 
-          const deductAmount = Math.min(creditToDeduct, credit.current_balance);
+          let deductAmount = Math.min(creditToDeduct, credit.current_balance);
+          deductAmount = Math.round(deductAmount * 100) / 100;
 
           // Update credit record
           await connection.query(`
             UPDATE customer_credit SET
-              current_balance = current_balance - ?,
-              status = IF(current_balance - ? <= 0, 'used', 'available'),
+              current_balance = ROUND(current_balance - ?, 2),
+              status = IF(ROUND(current_balance - ?, 2) <= 0, 'used', 'available'),
               updated_at = NOW()
             WHERE id = ?
           `, [deductAmount, deductAmount, credit.id]);
@@ -245,12 +254,12 @@ export default async function handler(
           creditToDeduct -= deductAmount;
         }
 
-        // Update invoice with credit applied
+        // Update invoice with credit applied - use ROUND for precision
         await connection.query(`
           UPDATE invoices SET
             amount_paid = COALESCE(amount_paid, 0) + ?,
-            balance_due = balance_due - ?,
-            payment_status = IF((balance_due - ?) <= 0, 'paid', 'partial_paid'),
+            balance_due = ROUND(balance_due - ?, 2),
+            payment_status = IF(ROUND(balance_due - ?, 2) <= 0, 'paid', 'partial_paid'),
             updated_at = NOW()
           WHERE id = ?
         `, [creditForThisInvoice, creditForThisInvoice, creditForThisInvoice, allocationReq.invoice_id]);
