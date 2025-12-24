@@ -44,3 +44,6 @@ Backend/.env
 .netlify
 
 _static
+
+# TypeScript
+*.tsbuildinfo
