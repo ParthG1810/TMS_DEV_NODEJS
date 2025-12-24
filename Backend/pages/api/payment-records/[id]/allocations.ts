@@ -10,6 +10,7 @@ interface PaymentAllocation {
   customer_name: string;
   billing_month: string;
   allocated_amount: number;
+  credit_amount: number;
   resulting_status: string;
   created_at: string;
 }
@@ -40,6 +41,7 @@ export default async function handler(
   }
 
   try {
+    // Get payment allocations with credit usage
     const allocations = await query<PaymentAllocation[]>(`
       SELECT
         pa.id,
@@ -48,11 +50,17 @@ export default async function handler(
         c.name as customer_name,
         i.generated_at as billing_month,
         pa.allocated_amount,
+        COALESCE(cu.credit_amount, 0) as credit_amount,
         pa.resulting_status,
         pa.created_at
       FROM payment_allocations pa
       LEFT JOIN invoices i ON pa.billing_id = i.id
       LEFT JOIN customers c ON i.customer_id = c.id
+      LEFT JOIN (
+        SELECT billing_id, payment_record_id, SUM(amount_used) as credit_amount
+        FROM customer_credit_usage
+        GROUP BY billing_id, payment_record_id
+      ) cu ON cu.billing_id = pa.billing_id AND cu.payment_record_id = pa.payment_record_id
       WHERE pa.payment_record_id = ?
       ORDER BY pa.allocation_order ASC
     `, [id]);
