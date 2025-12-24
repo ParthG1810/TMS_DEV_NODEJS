@@ -246,9 +246,9 @@ export default async function handler(
 
           // Record credit usage (use invoices table ID)
           await connection.query(`
-            INSERT INTO customer_credit_usage (credit_id, billing_id, amount_used)
-            VALUES (?, ?, ?)
-          `, [credit.id, allocationReq.invoice_id, deductAmount]);
+            INSERT INTO customer_credit_usage (credit_id, payment_record_id, billing_id, amount_used)
+            VALUES (?, ?, ?, ?)
+          `, [credit.id, paymentId, allocationReq.invoice_id, deductAmount]);
 
           credit.current_balance -= deductAmount;
           creditToDeduct -= deductAmount;
