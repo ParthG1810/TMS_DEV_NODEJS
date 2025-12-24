@@ -621,13 +621,13 @@ export default function InvoiceDetailPage() {
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="h6" color="success.main">
-                        {fCurrency(invoice.payments.reduce((sum, p) => sum + p.amount_applied, 0))}
+                        {fCurrency(Math.round(invoice.payments.reduce((sum, p) => sum + p.amount_applied, 0) * 100) / 100)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      {invoice.payments.reduce((sum, p) => sum + p.credit_applied, 0) > 0 && (
+                      {Math.round(invoice.payments.reduce((sum, p) => sum + p.credit_applied, 0) * 100) / 100 > 0 && (
                         <Typography variant="h6" color="info.main">
-                          {fCurrency(invoice.payments.reduce((sum, p) => sum + p.credit_applied, 0))}
+                          {fCurrency(Math.round(invoice.payments.reduce((sum, p) => sum + p.credit_applied, 0) * 100) / 100)}
                         </Typography>
                       )}
                     </TableCell>
