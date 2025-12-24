@@ -237,9 +237,9 @@ export default function InvoicesPage() {
                   setPagination((prev) => ({ ...prev, page: 1 }));
                 }}
                 views={['year', 'month']}
-                slotProps={{
-                  textField: { size: 'small', sx: { minWidth: 150 } },
-                }}
+                renderInput={(params) => (
+                  <TextField {...params} size="small" sx={{ minWidth: 150 }} />
+                )}
               />
 
               {(paymentStatus || invoiceType || selectedMonth) && (
