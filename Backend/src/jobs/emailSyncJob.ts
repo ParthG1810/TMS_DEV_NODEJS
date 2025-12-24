@@ -10,6 +10,7 @@ let isRunning = false;
 let intervalId: NodeJS.Timeout | null = null;
 let lastRunAt: Date | null = null;
 let lastRunResults: any = null;
+let autoStartAttempted = false;
 
 /**
  * Run the email sync job
@@ -50,12 +51,18 @@ async function runSync(): Promise<void> {
 /**
  * Start the email sync job (runs every 30 minutes)
  * Note: Does NOT run immediately on start - users should trigger first sync manually
+ * @param silent - If true, suppress "already started" log messages (for repeated calls from status API)
  */
-export function startEmailSyncJob(): void {
+export function startEmailSyncJob(silent: boolean = false): void {
   if (intervalId) {
-    console.log('[EmailSync] Job already started');
+    // Only log if not silent - avoids spam from repeated status API calls
+    if (!silent) {
+      console.log('[EmailSync] Job already started');
+    }
     return;
   }
+
+  console.log('[EmailSync] Starting background job...');
 
   // DON'T run immediately - let users manually trigger first sync
   // This ensures the "Sync Now" button shows the actual results
@@ -116,8 +123,11 @@ export async function triggerManualSync(): Promise<void> {
 // Delay start to allow database connection to establish
 // Only start if we're in a server environment (not during build)
 if (typeof window === 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
-  setTimeout(() => {
-    console.log('[EmailSync] Auto-starting background job...');
-    startEmailSyncJob();
-  }, 10000); // 10 second delay to ensure DB is ready
+  // Prevent duplicate auto-start attempts (module may be re-imported in Next.js dev mode)
+  if (!autoStartAttempted) {
+    autoStartAttempted = true;
+    setTimeout(() => {
+      startEmailSyncJob();
+    }, 10000); // 10 second delay to ensure DB is ready
+  }
 }
