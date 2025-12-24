@@ -96,7 +96,7 @@ export default async function handler(
              payment_status as status
       FROM invoices
       WHERE id IN (${placeholders})
-      AND payment_status IN ('unpaid', 'partial')
+      AND payment_status IN ('unpaid', 'partial_paid')
     `, billing_ids);
 
     if (billings.length === 0) {
@@ -149,7 +149,7 @@ export default async function handler(
         UPDATE invoices SET
           amount_paid = COALESCE(amount_paid, 0) + ?,
           balance_due = balance_due - ?,
-          payment_status = IF((balance_due - ?) <= 0, 'paid', 'partial'),
+          payment_status = IF((balance_due - ?) <= 0, 'paid', 'partial_paid'),
           updated_at = NOW()
         WHERE id = ?
       `, [allocateAmount, allocateAmount, allocateAmount, billingId]);
