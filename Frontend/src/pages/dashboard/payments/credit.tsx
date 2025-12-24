@@ -423,9 +423,7 @@ export default function CustomerCreditPage() {
                 label="Refund Date *"
                 value={refundDate}
                 onChange={(newValue) => setRefundDate(newValue)}
-                slotProps={{
-                  textField: { fullWidth: true },
-                }}
+                renderInput={(params) => <TextField {...params} fullWidth />}
               />
 
               <TextField
