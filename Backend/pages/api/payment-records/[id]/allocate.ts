@@ -140,7 +140,7 @@ export default async function handler(
         allocateAmount,
         billing.balance_due,
         billing.balance_due - allocateAmount,
-        billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial',
+        billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial_paid',
         created_by || null,
       ]);
 
@@ -157,7 +157,7 @@ export default async function handler(
       allocations.push({
         billing_id: billingId,
         allocated_amount: allocateAmount,
-        resulting_status: billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial',
+        resulting_status: billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial_paid',
       });
 
       remainingAmount -= allocateAmount;
