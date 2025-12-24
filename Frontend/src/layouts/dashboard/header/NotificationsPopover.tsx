@@ -155,6 +155,18 @@ export default function NotificationsPopover() {
     }
   };
 
+  const handleDismissNotification = async (e: React.MouseEvent, notificationId: number) => {
+    e.stopPropagation(); // Prevent triggering the click handler
+    try {
+      await axios.delete(`/api/payment-notifications/${notificationId}`);
+      await fetchNotifications();
+      enqueueSnackbar('Notification dismissed', { variant: 'success' });
+    } catch (error) {
+      console.error('Error dismissing notification:', error);
+      enqueueSnackbar('Failed to dismiss notification', { variant: 'error' });
+    }
+  };
+
   return (
     <>
       <IconButtonAnimate
@@ -188,7 +200,7 @@ export default function NotificationsPopover() {
 
         <Divider sx={{ borderStyle: 'dashed' }} />
 
-        <Scrollbar sx={{ height: { xs: 340, sm: 'auto' } }}>
+        <Scrollbar sx={{ maxHeight: 400 }}>
           {notifications.length === 0 ? (
             <Box sx={{ p: 3, textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">
@@ -207,12 +219,12 @@ export default function NotificationsPopover() {
               >
                 {notifications
                   .filter((n) => !n.is_read)
-                  .slice(0, 5)
                   .map((notification) => (
                     <NotificationItem
                       key={notification.id}
                       notification={notification}
                       onClick={() => handleNotificationClick(notification)}
+                      onDismiss={handleDismissNotification}
                     />
                   ))}
               </List>
@@ -228,12 +240,12 @@ export default function NotificationsPopover() {
                 >
                   {notifications
                     .filter((n) => n.is_read)
-                    .slice(0, 5)
                     .map((notification) => (
                       <NotificationItem
                         key={notification.id}
                         notification={notification}
                         onClick={() => handleNotificationClick(notification)}
+                        onDismiss={handleDismissNotification}
                       />
                     ))}
                 </List>
@@ -259,9 +271,11 @@ export default function NotificationsPopover() {
 function NotificationItem({
   notification,
   onClick,
+  onDismiss,
 }: {
   notification: PaymentNotification;
   onClick: () => void;
+  onDismiss: (e: React.MouseEvent, id: number) => void;
 }) {
   const { avatar, title } = renderContent(notification);
 
@@ -291,6 +305,16 @@ function NotificationItem({
           </Stack>
         }
       />
+
+      <Tooltip title="Dismiss">
+        <IconButton
+          size="small"
+          onClick={(e) => onDismiss(e, notification.id)}
+          sx={{ ml: 1 }}
+        >
+          <Iconify icon="eva:close-fill" width={18} />
+        </IconButton>
+      </Tooltip>
     </ListItemButton>
   );
 }
@@ -328,6 +352,12 @@ function renderContent(notification: PaymentNotification) {
   if (notification.notification_type === 'payment_received') {
     return {
       avatar: <Iconify icon="eva:checkmark-circle-fill" width={24} />,
+      title,
+    };
+  }
+  if (notification.notification_type === 'invoice_generated') {
+    return {
+      avatar: <Iconify icon="eva:file-text-fill" width={24} />,
       title,
     };
   }

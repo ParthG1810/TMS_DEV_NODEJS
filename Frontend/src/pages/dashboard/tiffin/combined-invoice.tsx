@@ -225,6 +225,8 @@ export default function CombinedInvoicePage() {
           `Invoice ${response.data.data.invoice_number} generated successfully!`,
           { variant: 'success' }
         );
+        // Trigger notification refresh to remove billing pending approval notifications
+        window.dispatchEvent(new CustomEvent('refresh-notifications'));
         router.push('/dashboard/tiffin/invoices');
       } else {
         enqueueSnackbar(response.data.error || 'Failed to generate invoice', {
