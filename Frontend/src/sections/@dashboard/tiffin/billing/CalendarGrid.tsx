@@ -584,6 +584,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
         // Refresh the UI
         await onUpdate();
+
+        // Trigger notification refresh so the new notification appears immediately
+        window.dispatchEvent(new CustomEvent('refresh-notifications'));
+
         setFinalizingCustomerId(null);
       } else {
         enqueueSnackbar(response.data.error || 'Failed to finalize order', { variant: 'error' });
