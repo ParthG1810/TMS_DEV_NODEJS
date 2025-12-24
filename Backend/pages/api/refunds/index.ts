@@ -168,8 +168,8 @@ async function handlePost(
     await query(`
       INSERT INTO payment_notifications (
         customer_id, notification_type, title, message,
-        priority, action_url, auto_delete_on_action
-      ) VALUES (?, 'refund_request', ?, ?, 'high', ?, 1)
+        priority, action_url
+      ) VALUES (?, 'refund_request', ?, ?, 'high', ?)
     `, [
       body.customer_id,
       `Refund Request: $${body.refund_amount.toFixed(2)}`,
