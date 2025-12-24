@@ -87,17 +87,17 @@ export default async function handler(
       });
     }
 
-    // Verify all billing IDs exist and are valid
+    // Verify all invoice IDs exist and are valid
     const placeholders = billing_ids.map(() => '?').join(',');
     const [billings]: any = await connection.query(`
       SELECT id, customer_id, total_amount,
              COALESCE(amount_paid, 0) as amount_paid,
              COALESCE(credit_applied, 0) as credit_applied,
              (total_amount - COALESCE(amount_paid, 0) - COALESCE(credit_applied, 0)) as balance_due,
-             status
-      FROM monthly_billing
+             payment_status as status
+      FROM invoices
       WHERE id IN (${placeholders})
-      AND status IN ('finalized', 'partial_paid')
+      AND payment_status IN ('unpaid', 'partial')
     `, billing_ids);
 
     if (billings.length === 0) {
@@ -125,7 +125,7 @@ export default async function handler(
 
       const allocateAmount = Math.min(remainingAmount, billing.balance_due);
 
-      // Insert allocation record
+      // Insert allocation record (billing_id column stores invoice ID)
       await connection.query(`
         INSERT INTO payment_allocations (
           payment_record_id, billing_id, customer_id,
@@ -141,25 +141,24 @@ export default async function handler(
         allocateAmount,
         billing.balance_due,
         billing.balance_due - allocateAmount,
-        billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial_paid',
+        billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial',
         created_by || null,
       ]);
 
-      // Update billing record
+      // Update invoice record
       await connection.query(`
-        UPDATE monthly_billing SET
+        UPDATE invoices SET
           amount_paid = COALESCE(amount_paid, 0) + ?,
-          status = IF((total_amount - COALESCE(amount_paid, 0) - ? - COALESCE(credit_applied, 0)) <= 0, 'paid', 'partial_paid'),
-          last_payment_date = CURDATE(),
-          payment_count = COALESCE(payment_count, 0) + 1,
+          balance_due = total_amount - COALESCE(amount_paid, 0) - ? - COALESCE(credit_applied, 0),
+          payment_status = IF((total_amount - COALESCE(amount_paid, 0) - ? - COALESCE(credit_applied, 0)) <= 0, 'paid', 'partial'),
           updated_at = NOW()
         WHERE id = ?
-      `, [allocateAmount, allocateAmount, billingId]);
+      `, [allocateAmount, allocateAmount, allocateAmount, billingId]);
 
       allocations.push({
         billing_id: billingId,
         allocated_amount: allocateAmount,
-        resulting_status: billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial_paid',
+        resulting_status: billing.balance_due - allocateAmount <= 0 ? 'paid' : 'partial',
       });
 
       remainingAmount -= allocateAmount;
