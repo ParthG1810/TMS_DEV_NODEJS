@@ -53,13 +53,13 @@ export default async function handler(
   const connection = await getConnection();
 
   try {
-    const { allocations: requestedAllocations, billing_ids, created_by, credit_to_apply } = req.body;
+    const { allocations: requestedAllocations, billing_ids, created_by } = req.body;
 
-    // Support both new format (allocations) and legacy format (billing_ids)
-    let allocationRequests: { invoice_id: number; amount: number }[] = [];
+    // Support both new format (allocations with credit_amount) and legacy format (billing_ids)
+    let allocationRequests: { invoice_id: number; amount: number | null; credit_amount?: number }[] = [];
 
     if (requestedAllocations && Array.isArray(requestedAllocations) && requestedAllocations.length > 0) {
-      // New format: { invoice_id, amount }[]
+      // New format: { invoice_id, amount, credit_amount? }[]
       allocationRequests = requestedAllocations;
     } else if (billing_ids && Array.isArray(billing_ids) && billing_ids.length > 0) {
       // Legacy format: just invoice IDs, amounts will be calculated automatically
@@ -194,9 +194,11 @@ export default async function handler(
       allocationOrder++;
     }
 
-    // Apply customer credit if requested
+    // Apply per-invoice credit if requested
     let creditApplied = 0;
-    if (credit_to_apply && credit_to_apply > 0) {
+    const creditRequests = allocationRequests.filter(a => a.credit_amount && a.credit_amount > 0);
+
+    if (creditRequests.length > 0) {
       // Get available credits for this customer (oldest first)
       const [availableCredits]: any = await connection.query(`
         SELECT id, current_balance
@@ -207,12 +209,8 @@ export default async function handler(
         ORDER BY created_at ASC
       `, [payment.customer_id]);
 
-      let remainingCreditToApply = credit_to_apply;
-
-      // Apply credit to invoices that still have balance after payment allocation
-      for (const allocationReq of allocationRequests) {
-        if (remainingCreditToApply <= 0) break;
-
+      // Apply credit to each invoice that has a credit_amount specified
+      for (const allocationReq of creditRequests) {
         const billing = billingMap.get(allocationReq.invoice_id);
         if (!billing) continue;
 
@@ -222,9 +220,11 @@ export default async function handler(
 
         if (balanceAfterPayment <= 0) continue;
 
-        // Apply credit to this invoice (rounded)
-        let creditForThisInvoice = Math.min(remainingCreditToApply, balanceAfterPayment);
+        // Use the specific credit amount requested for this invoice (rounded)
+        let creditForThisInvoice = Math.min(allocationReq.credit_amount!, balanceAfterPayment);
         creditForThisInvoice = Math.round(creditForThisInvoice * 100) / 100;
+
+        if (creditForThisInvoice <= 0) continue;
 
         // Deduct from available credits
         let creditToDeduct = creditForThisInvoice;
@@ -265,7 +265,6 @@ export default async function handler(
         `, [creditForThisInvoice, creditForThisInvoice, creditForThisInvoice, allocationReq.invoice_id]);
 
         creditApplied += creditForThisInvoice;
-        remainingCreditToApply -= creditForThisInvoice;
       }
     }
 
