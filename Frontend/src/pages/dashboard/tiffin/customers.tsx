@@ -96,6 +96,9 @@ export default function CustomersPage() {
     filterName,
   });
 
+  // Get only deletable rows (customers without orders)
+  const deletableRows = dataFiltered.filter((row) => (row.order_count ?? 0) === 0);
+
   const dataInPage = dataFiltered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const denseHeight = dense ? 52 : 72;
   const isFiltered = filterName !== '';
@@ -196,11 +199,11 @@ export default function CustomersPage() {
             <TableSelectedAction
               dense={dense}
               numSelected={selected.length}
-              rowCount={tableData.length}
+              rowCount={deletableRows.length}
               onSelectAllRows={(checked) =>
                 onSelectAllRows(
                   checked,
-                  tableData.map((row) => String(row.id))
+                  deletableRows.map((row) => String(row.id))
                 )
               }
               action={
@@ -218,13 +221,13 @@ export default function CustomersPage() {
                   order={order}
                   orderBy={orderBy}
                   headLabel={TABLE_HEAD}
-                  rowCount={tableData.length}
+                  rowCount={deletableRows.length}
                   numSelected={selected.length}
                   onSort={onSort}
                   onSelectAllRows={(checked) =>
                     onSelectAllRows(
                       checked,
-                      tableData.map((row) => String(row.id))
+                      deletableRows.map((row) => String(row.id))
                     )
                   }
                 />
