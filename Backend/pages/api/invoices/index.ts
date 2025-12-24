@@ -111,6 +111,8 @@ export default async function handler(
     const totalPages = Math.ceil(total / limitNum);
 
     // Get invoices with aggregated order info
+    // Note: LIMIT and OFFSET are embedded directly as they're validated integers
+    // This avoids mysql2 prepared statement issues with GROUP BY queries
     const invoices = await query<InvoiceListItem[]>(
       `SELECT
         i.id,
@@ -133,8 +135,8 @@ export default async function handler(
        ${whereClause}
        GROUP BY i.id
        ORDER BY ${sortColumn === 'customer_name' ? 'c.name' : `i.${sortColumn}`} ${sortDir}
-       LIMIT ? OFFSET ?`,
-      [...params, limitNum, offset]
+       LIMIT ${limitNum} OFFSET ${offset}`,
+      params
     );
 
     // Format amounts
