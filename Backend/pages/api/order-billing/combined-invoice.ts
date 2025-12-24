@@ -19,7 +19,7 @@ interface OrderBillingDetail {
   base_amount: number;
   extra_amount: number;
   total_amount: number;
-  status: 'calculating' | 'finalized';
+  status: 'calculating' | 'finalized' | 'approved' | 'invoiced' | 'paid' | 'partial_paid';
   finalized_at: string | null;
   finalized_by: string | null;
   meal_plan_name: string;
@@ -191,8 +191,10 @@ export default async function handler(
     const allOrders = [...formattedOrderBillings, ...placeholderBillings];
 
     // Calculate summary
+    // Count orders that are ready for invoicing (finalized, approved, invoiced, paid, or partial_paid)
     const totalOrders = allOrders.length;
-    const finalizedOrders = allOrders.filter((o) => o.status === 'finalized').length;
+    const readyStatuses = ['finalized', 'approved', 'invoiced', 'paid', 'partial_paid'];
+    const finalizedOrders = allOrders.filter((o) => readyStatuses.includes(o.status)).length;
     const allFinalized = totalOrders > 0 && finalizedOrders === totalOrders;
 
     const summary = {
