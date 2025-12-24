@@ -55,6 +55,18 @@ interface Invoice {
   customer_name: string;
 }
 
+interface CustomerCredit {
+  id: number;
+  original_amount: number;
+  current_balance: number;
+  created_at: string;
+}
+
+interface CreditSummary {
+  total_available: number;
+  credits: CustomerCredit[];
+}
+
 interface AllocationItem {
   invoiceId: number;
   amount: number;
@@ -83,7 +95,10 @@ export default function CashPaymentPage() {
   const [notes, setNotes] = useState('');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoices, setSelectedInvoices] = useState<Map<number, number>>(new Map());
+  const [creditAllocations, setCreditAllocations] = useState<Map<number, number>>(new Map());
   const [totalAllocated, setTotalAllocated] = useState(0);
+  const [totalCreditApplied, setTotalCreditApplied] = useState(0);
+  const [customerCredit, setCustomerCredit] = useState<CreditSummary | null>(null);
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -104,6 +119,9 @@ export default function CashPaymentPage() {
     if (!selectedCustomer || !paymentAmount) {
       setInvoices([]);
       setSelectedInvoices(new Map());
+      setCreditAllocations(new Map());
+      setTotalCreditApplied(0);
+      setCustomerCredit(null);
       return;
     }
 
@@ -132,6 +150,21 @@ export default function CashPaymentPage() {
         setSelectedInvoices(initialAllocations);
         setTotalAllocated(total);
       }
+
+      // Fetch customer credit
+      try {
+        const creditResponse = await axios.get(`/api/customers/${selectedCustomer.id}/credit`);
+        if (creditResponse.data.success) {
+          setCustomerCredit(creditResponse.data.data);
+        }
+      } catch (creditError) {
+        console.log('No credit available or error fetching credit');
+        setCustomerCredit(null);
+      }
+
+      // Reset credit allocations
+      setCreditAllocations(new Map());
+      setTotalCreditApplied(0);
     } catch (error: any) {
       console.error('Error fetching invoices:', error);
     } finally {
@@ -147,22 +180,33 @@ export default function CashPaymentPage() {
   }, [fetchInvoices]);
 
   const handleAllocationChange = (invoiceId: number, value: string) => {
-    const amount = parseFloat(value) || 0;
+    const newAllocations = new Map(selectedInvoices);
+
+    // Handle empty input - remove allocation
+    if (value === '') {
+      newAllocations.delete(invoiceId);
+      let total = 0;
+      newAllocations.forEach(val => { total += val; });
+      setSelectedInvoices(newAllocations);
+      setTotalAllocated(total);
+      return;
+    }
+
+    const amount = parseFloat(value);
+    if (isNaN(amount)) return;
+
     const invoice = invoices.find(i => i.id === invoiceId);
     if (!invoice) return;
 
-    const maxAmount = Math.min(amount, invoice.balance_due);
+    // Limit to balance due (allow 0)
+    const maxAmount = Math.max(0, Math.min(amount, invoice.balance_due));
+    newAllocations.set(invoiceId, maxAmount);
 
-    const newAllocations = new Map(selectedInvoices);
-    if (maxAmount > 0) {
-      newAllocations.set(invoiceId, maxAmount);
-    } else {
-      newAllocations.delete(invoiceId);
-    }
-
+    // Calculate total
     let total = 0;
     newAllocations.forEach(val => { total += val; });
 
+    // Limit total to payment amount
     const paymentAmt = parseFloat(paymentAmount) || 0;
     if (total > paymentAmt) {
       return;
@@ -170,6 +214,52 @@ export default function CashPaymentPage() {
 
     setSelectedInvoices(newAllocations);
     setTotalAllocated(total);
+  };
+
+  const handleCreditAllocationChange = (invoiceId: number, value: string) => {
+    const newCreditAllocations = new Map(creditAllocations);
+
+    // Handle empty input - remove credit allocation
+    if (value === '') {
+      newCreditAllocations.delete(invoiceId);
+      let totalCredit = 0;
+      newCreditAllocations.forEach(val => { totalCredit += val; });
+      setCreditAllocations(newCreditAllocations);
+      setTotalCreditApplied(totalCredit);
+      return;
+    }
+
+    const amount = parseFloat(value);
+    if (isNaN(amount)) return;
+
+    const invoice = invoices.find(i => i.id === invoiceId);
+    if (!invoice) return;
+
+    // Get payment allocation for this invoice
+    const paymentAllocation = selectedInvoices.get(invoiceId) || 0;
+    // Credit can only fill the remaining balance after payment allocation
+    const remainingBalanceAfterPayment = Math.max(0, invoice.balance_due - paymentAllocation);
+
+    // Calculate how much credit is already allocated to other invoices
+    let otherCreditAllocated = 0;
+    creditAllocations.forEach((val, id) => {
+      if (id !== invoiceId) otherCreditAllocated += val;
+    });
+
+    const availableCredit = (customerCredit?.total_available || 0) - otherCreditAllocated;
+    const maxCreditForInvoice = Math.max(0, Math.min(amount, remainingBalanceAfterPayment, availableCredit));
+    newCreditAllocations.set(invoiceId, maxCreditForInvoice);
+
+    // Calculate total credit applied
+    let totalCredit = 0;
+    newCreditAllocations.forEach(val => { totalCredit += val; });
+
+    setCreditAllocations(newCreditAllocations);
+    setTotalCreditApplied(totalCredit);
+  };
+
+  const getRemainingCredit = () => {
+    return (customerCredit?.total_available || 0) - totalCreditApplied;
   };
 
   const handleToggleInvoice = (invoice: Invoice) => {
@@ -193,7 +283,7 @@ export default function CashPaymentPage() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedCustomer || !paymentAmount || selectedInvoices.size === 0 || !paymentDate) {
+    if (!selectedCustomer || !paymentAmount || (selectedInvoices.size === 0 && creditAllocations.size === 0) || !paymentDate) {
       enqueueSnackbar('Please fill all required fields', { variant: 'warning' });
       return;
     }
@@ -216,12 +306,26 @@ export default function CashPaymentPage() {
 
       const paymentId = paymentResponse.data.data.id;
 
-      // Allocate to invoices
-      const allocations: AllocationItem[] = [];
-      let order = 1;
+      // Allocate to invoices - send custom allocation amounts with per-invoice credit
+      const allocations: { invoice_id: number; amount: number; credit_amount?: number }[] = [];
       selectedInvoices.forEach((amount, invoiceId) => {
-        allocations.push({ invoiceId, amount, order });
-        order++;
+        const creditAmount = creditAllocations.get(invoiceId) || 0;
+        allocations.push({
+          invoice_id: invoiceId,
+          amount,
+          credit_amount: creditAmount > 0 ? creditAmount : undefined,
+        });
+      });
+
+      // Also include invoices that only have credit (no payment allocation)
+      creditAllocations.forEach((creditAmount, invoiceId) => {
+        if (!selectedInvoices.has(invoiceId) && creditAmount > 0) {
+          allocations.push({
+            invoice_id: invoiceId,
+            amount: 0,
+            credit_amount: creditAmount,
+          });
+        }
       });
 
       const allocateResponse = await axios.post(`/api/payment-records/${paymentId}/allocate`, {
@@ -229,16 +333,16 @@ export default function CashPaymentPage() {
       });
 
       if (allocateResponse.data.success) {
-        const { has_excess, excess_amount } = allocateResponse.data.data;
+        const { allocation_status, excess_amount, credit_applied } = allocateResponse.data.data;
 
-        if (has_excess) {
-          enqueueSnackbar(
-            `Payment recorded. ${fCurrency(excess_amount)} added to customer credit.`,
-            { variant: 'success' }
-          );
-        } else {
-          enqueueSnackbar('Cash payment recorded successfully', { variant: 'success' });
+        let successMsg = 'Cash payment recorded successfully';
+        if (credit_applied > 0) {
+          successMsg += `. ${fCurrency(credit_applied)} credit applied.`;
         }
+        if (allocation_status === 'has_excess' && excess_amount > 0) {
+          successMsg += ` ${fCurrency(excess_amount)} added to customer credit.`;
+        }
+        enqueueSnackbar(successMsg, { variant: 'success' });
 
         router.push(PATH_DASHBOARD.payments.history);
       } else {
@@ -324,9 +428,7 @@ export default function CashPaymentPage() {
                   label="Payment Date *"
                   value={paymentDate}
                   onChange={(newValue) => setPaymentDate(newValue)}
-                  slotProps={{
-                    textField: { fullWidth: true },
-                  }}
+                  renderInput={(params) => <TextField {...params} fullWidth />}
                 />
 
                 <TextField
@@ -351,6 +453,14 @@ export default function CashPaymentPage() {
                       <Typography variant="body2">Allocated:</Typography>
                       <Typography variant="subtitle2">{fCurrency(totalAllocated)}</Typography>
                     </Stack>
+                    {totalCreditApplied > 0 && (
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography variant="body2">Credit Applied:</Typography>
+                        <Typography variant="subtitle2" color="success.main">
+                          {fCurrency(totalCreditApplied)}
+                        </Typography>
+                      </Stack>
+                    )}
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="body2">Remaining:</Typography>
                       <Typography
@@ -374,7 +484,7 @@ export default function CashPaymentPage() {
                   size="large"
                   fullWidth
                   onClick={handleSubmit}
-                  disabled={submitting || !selectedCustomer || !paymentAmount || selectedInvoices.size === 0}
+                  disabled={submitting || !selectedCustomer || !paymentAmount || (selectedInvoices.size === 0 && creditAllocations.size === 0)}
                   startIcon={submitting ? <CircularProgress size={20} /> : <Iconify icon="eva:checkmark-circle-2-fill" />}
                 >
                   {submitting ? 'Recording...' : 'Record Payment'}
@@ -393,6 +503,48 @@ export default function CashPaymentPage() {
 
           {/* Invoice Selection */}
           <Grid item xs={12} md={8}>
+            {/* Customer Credit Card */}
+            {customerCredit && customerCredit.total_available > 0 && (
+              <Card sx={{ p: 3, mb: 3, bgcolor: 'success.lighter' }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="eva:credit-card-fill" sx={{ color: 'success.main' }} width={24} />
+                      <Typography variant="h6">Customer Credit Available</Typography>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Use the "Credit" column below to apply credit to specific invoices
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <Box textAlign="right">
+                      <Typography variant="caption" color="text.secondary">
+                        Total Available
+                      </Typography>
+                      <Typography variant="h5" color="success.main">
+                        {fCurrency(customerCredit.total_available)}
+                      </Typography>
+                    </Box>
+                    {totalCreditApplied > 0 && (
+                      <Box textAlign="right">
+                        <Typography variant="caption" color="text.secondary">
+                          Remaining
+                        </Typography>
+                        <Typography variant="h5" color="warning.main">
+                          {fCurrency(getRemainingCredit())}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Stack>
+                </Stack>
+                {totalCreditApplied > 0 && (
+                  <Alert severity="success" sx={{ mt: 2 }}>
+                    {fCurrency(totalCreditApplied)} credit will be applied to selected invoices
+                  </Alert>
+                )}
+              </Card>
+            )}
+
             <Card sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>
                 Allocate to Invoices
@@ -429,6 +581,9 @@ export default function CashPaymentPage() {
                           <TableCell align="right">Paid</TableCell>
                           <TableCell align="right">Balance Due</TableCell>
                           <TableCell align="right">Allocate</TableCell>
+                          {customerCredit && customerCredit.total_available > 0 && (
+                            <TableCell align="right">Credit</TableCell>
+                          )}
                           <TableCell align="right">After</TableCell>
                         </TableRow>
                       </TableHead>
@@ -436,7 +591,9 @@ export default function CashPaymentPage() {
                         {invoices.map((invoice) => {
                           const isSelected = selectedInvoices.has(invoice.id);
                           const allocatedAmount = selectedInvoices.get(invoice.id) || 0;
-                          const afterPayment = invoice.balance_due - allocatedAmount;
+                          const creditAmount = creditAllocations.get(invoice.id) || 0;
+                          const afterPayment = invoice.balance_due - allocatedAmount - creditAmount;
+                          const remainingAfterPayment = Math.max(0, invoice.balance_due - allocatedAmount);
 
                           return (
                             <TableRow
@@ -446,7 +603,7 @@ export default function CashPaymentPage() {
                             >
                               <TableCell padding="checkbox">
                                 <Checkbox
-                                  checked={isSelected}
+                                  checked={isSelected || creditAmount > 0}
                                   onChange={() => handleToggleInvoice(invoice)}
                                 />
                               </TableCell>
@@ -473,20 +630,37 @@ export default function CashPaymentPage() {
                                   {fCurrency(invoice.balance_due)}
                                 </Typography>
                               </TableCell>
-                              <TableCell align="right" sx={{ width: 120 }}>
+                              <TableCell align="right" sx={{ width: 100 }}>
                                 <TextField
                                   size="small"
                                   type="number"
-                                  value={allocatedAmount || ''}
+                                  value={selectedInvoices.has(invoice.id) ? allocatedAmount : ''}
                                   onChange={(e) => handleAllocationChange(invoice.id, e.target.value)}
                                   inputProps={{
                                     min: 0,
                                     max: invoice.balance_due,
                                     step: 0.01,
                                   }}
-                                  sx={{ width: 100 }}
+                                  sx={{ width: 90 }}
                                 />
                               </TableCell>
+                              {customerCredit && customerCredit.total_available > 0 && (
+                                <TableCell align="right" sx={{ width: 100 }}>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    value={creditAllocations.has(invoice.id) ? creditAmount : ''}
+                                    onChange={(e) => handleCreditAllocationChange(invoice.id, e.target.value)}
+                                    inputProps={{
+                                      min: 0,
+                                      max: remainingAfterPayment,
+                                      step: 0.01,
+                                    }}
+                                    sx={{ width: 90 }}
+                                    disabled={remainingAfterPayment <= 0}
+                                  />
+                                </TableCell>
+                              )}
                               <TableCell align="right">
                                 <Typography
                                   variant="body2"

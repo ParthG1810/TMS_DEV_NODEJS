@@ -62,9 +62,11 @@ interface OrderBillingDetail {
 
 interface PaymentRecord {
   id: number;
+  payment_record_id: number;
   amount_applied: number;
+  credit_applied: number;
   applied_at: string;
-  applied_by: string | null;
+  sender_name: string | null;
   payment_type: string;
   payment_source: string | null;
   reference_number: string | null;
@@ -520,47 +522,122 @@ export default function InvoiceDetailPage() {
                   </Typography>
                 </Box>
               </Stack>
-
-              {/* Payment History */}
-              {invoice.payments.length > 0 && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Payment History
-                  </Typography>
-                  <Stack spacing={1}>
-                    {invoice.payments.map((payment) => (
-                      <Paper
-                        key={payment.id}
-                        variant="outlined"
-                        sx={{ p: 1.5 }}
-                      >
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
-                        >
-                          <Box>
-                            <Typography variant="body2" fontWeight="medium">
-                              {fCurrency(payment.amount_applied)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {fDateTime(payment.applied_at)}
-                            </Typography>
-                          </Box>
-                          <Chip
-                            label={payment.payment_source ? `${payment.payment_type} (${payment.payment_source})` : payment.payment_type}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
-                </Box>
-              )}
             </Card>
           </Grid>
         </Grid>
+
+        {/* Payment History Section - Only show if there are payments */}
+        {invoice.payments.length > 0 && (
+          <Card sx={{ p: 3, mt: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Iconify icon="solar:history-bold" width={24} />
+                <span>Payment History</span>
+              </Stack>
+            </Typography>
+
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Payment Type</TableCell>
+                    <TableCell>Reference</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell align="right">Credit</TableCell>
+                    <TableCell>Sender Name</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {invoice.payments.map((payment) => (
+                    <TableRow
+                      key={payment.id}
+                      hover
+                      sx={{ cursor: 'pointer' }}
+                      onClick={() => router.push(PATH_DASHBOARD.payments.history)}
+                    >
+                      <TableCell>
+                        <Typography variant="body2">{fDate(payment.applied_at)}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {fDateTime(payment.applied_at, 'HH:mm')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Iconify
+                            icon={payment.payment_type === 'online' ? 'mdi:credit-card-outline' : 'mdi:cash'}
+                            width={20}
+                          />
+                          <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
+                            {payment.payment_type === 'online' ? 'Interac e-Transfer' : payment.payment_type}
+                          </Typography>
+                        </Stack>
+                        {payment.payment_source && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {payment.payment_source}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {payment.reference_number ? (
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            {payment.reference_number}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="subtitle2" color="success.main">
+                          {fCurrency(payment.amount_applied)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        {payment.credit_applied > 0 ? (
+                          <Typography variant="subtitle2" color="info.main">
+                            {fCurrency(payment.credit_applied)}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {payment.sender_name || '-'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Total Row */}
+                  <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
+                    <TableCell colSpan={3}>
+                      <Typography variant="subtitle2">
+                        Total Payments ({invoice.payments.length})
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="h6" color="success.main">
+                        {fCurrency(Math.round(invoice.payments.reduce((sum, p) => sum + p.amount_applied, 0) * 100) / 100)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      {Math.round(invoice.payments.reduce((sum, p) => sum + p.credit_applied, 0) * 100) / 100 > 0 && (
+                        <Typography variant="h6" color="info.main">
+                          {fCurrency(Math.round(invoice.payments.reduce((sum, p) => sum + p.credit_applied, 0) * 100) / 100)}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        )}
       </Container>
 
       {/* PDF Preview Dialog */}

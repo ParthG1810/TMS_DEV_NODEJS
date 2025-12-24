@@ -45,7 +45,7 @@ export default async function handler(
   }
 
   try {
-    const { customer_id, payment_amount, max_invoices = '3' } = req.query;
+    const { customer_id, payment_amount, max_invoices = '10' } = req.query;
 
     if (!customer_id || !payment_amount) {
       return res.status(400).json({
@@ -56,8 +56,8 @@ export default async function handler(
 
     const customerId = parseInt(customer_id as string);
     const amount = parseFloat(payment_amount as string);
-    const maxInvoices = parseInt(max_invoices as string);
-    const fetchLimit = Math.max(1, Math.min(maxInvoices + 5, 20)); // Limit to max 20
+    const maxInvoices = parseInt(max_invoices as string); // Max invoices to auto-allocate (default 3)
+    const fetchLimit = 50; // Return up to 50 invoices so user can choose
 
     if (isNaN(amount) || amount <= 0) {
       return res.status(400).json({
@@ -74,43 +74,48 @@ export default async function handler(
     }
 
     // Get all unpaid/partially paid invoices for customer, oldest first
-    // Prioritize partial_paid, then finalized, ordered by billing_month
+    // Query from invoices table (new invoice system)
     const invoices = await query<MonthlyBillingWithBalance[]>(`
       SELECT
-        mb.*,
-        COALESCE(mb.amount_paid, 0) as amount_paid,
-        COALESCE(mb.credit_applied, 0) as credit_applied,
-        (mb.total_amount - COALESCE(mb.amount_paid, 0) - COALESCE(mb.credit_applied, 0)) as balance_due,
-        COALESCE(mb.payment_count, 0) as payment_count,
+        i.id,
+        i.invoice_number,
+        i.customer_id,
+        i.total_amount,
+        COALESCE(i.amount_paid, 0) as amount_paid,
+        0 as credit_applied,
+        i.balance_due,
+        i.payment_status as status,
+        i.generated_at as billing_month,
         c.name as customer_name,
         c.phone as customer_phone
-      FROM monthly_billing mb
-      INNER JOIN customers c ON mb.customer_id = c.id
-      WHERE mb.customer_id = ?
-      AND mb.status IN ('finalized', 'partial_paid')
-      AND (mb.total_amount - COALESCE(mb.amount_paid, 0) - COALESCE(mb.credit_applied, 0)) > 0
+      FROM invoices i
+      INNER JOIN customers c ON i.customer_id = c.id
+      WHERE i.customer_id = ?
+      AND i.payment_status IN ('unpaid', 'partial_paid')
+      AND i.balance_due > 0
       ORDER BY
-        CASE mb.status
+        CASE i.payment_status
           WHEN 'partial_paid' THEN 1
           ELSE 2
         END,
-        mb.billing_month ASC
+        i.generated_at ASC
       LIMIT ${fetchLimit}
-    `, [customerId]); // Fetch a few extra in case we need more
+    `, [customerId]);
 
-    // Calculate allocations
+    // Return ALL unpaid invoices so user can choose which to pay
+    // Auto-allocate payment to the first `maxInvoices` (oldest) as a suggestion
     let remainingAmount = amount;
     let selectionOrder = 1;
     const selectedInvoices: AutoSelectedInvoice[] = [];
     let totalToAllocate = 0;
 
+    // Add ALL invoices, but only auto-allocate to the first `maxInvoices`
     for (const invoice of invoices) {
-      if (selectedInvoices.length >= maxInvoices && remainingAmount <= 0) {
-        break;
-      }
-
       const balanceDue = invoice.balance_due;
-      const willAllocate = Math.min(remainingAmount, balanceDue);
+
+      // Only auto-allocate to first `maxInvoices` invoices (oldest first)
+      const shouldAutoAllocate = selectionOrder <= maxInvoices && remainingAmount > 0;
+      const willAllocate = shouldAutoAllocate ? Math.min(remainingAmount, balanceDue) : 0;
       const balanceAfter = balanceDue - willAllocate;
 
       selectedInvoices.push({
@@ -121,37 +126,11 @@ export default async function handler(
         will_be_paid: balanceAfter <= 0,
       });
 
-      totalToAllocate += willAllocate;
-      remainingAmount -= willAllocate;
-      selectionOrder++;
-
-      // Stop if we've allocated everything
-      if (remainingAmount <= 0) break;
-
-      // Continue adding invoices up to maxInvoices if there's still money
-      if (selectedInvoices.length >= maxInvoices) break;
-    }
-
-    // If there's still remaining amount, add more invoices if available
-    if (remainingAmount > 0) {
-      for (let i = selectedInvoices.length; i < invoices.length && remainingAmount > 0; i++) {
-        const invoice = invoices[i];
-        const balanceDue = invoice.balance_due;
-        const willAllocate = Math.min(remainingAmount, balanceDue);
-        const balanceAfter = balanceDue - willAllocate;
-
-        selectedInvoices.push({
-          ...invoice,
-          selection_order: selectionOrder,
-          will_allocate: willAllocate,
-          balance_after: balanceAfter,
-          will_be_paid: balanceAfter <= 0,
-        });
-
+      if (shouldAutoAllocate) {
         totalToAllocate += willAllocate;
         remainingAmount -= willAllocate;
-        selectionOrder++;
       }
+      selectionOrder++;
     }
 
     const result: AutoSelectResult = {

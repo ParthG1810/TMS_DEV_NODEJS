@@ -55,8 +55,9 @@ export default async function handler(
     const activeSettings = await getActiveGmailSettings();
 
     // Start the email sync job if there's an active account (lazy start)
+    // Use silent mode to avoid log spam on repeated status API calls
     if (activeSettings && activeSettings.sync_enabled) {
-      startEmailSyncJob();
+      startEmailSyncJob(true);
     }
 
     // Get auto-sync job status

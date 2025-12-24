@@ -46,9 +46,10 @@ interface InvoiceDetail {
 
 interface PaymentRecord {
   id: number;
+  payment_record_id: number;
   amount_applied: number;
   applied_at: string;
-  applied_by: string | null;
+  sender_name: string | null;
   payment_type: string;
   payment_source: string | null;
   reference_number: string | null;
@@ -152,20 +153,28 @@ async function handleGet(
     [id]
   );
 
-  // Get payment records
+  // Get payment records from payment_allocations (main allocation table) with credit usage
   const payments = await query<any[]>(
     `SELECT
-      ip.id,
-      ip.amount_applied,
-      ip.applied_at,
-      ip.applied_by,
+      pa.id,
+      pa.payment_record_id,
+      pa.allocated_amount as amount_applied,
+      COALESCE(cu.credit_amount, 0) as credit_applied,
+      pa.created_at as applied_at,
+      COALESCE(it.sender_name, pr.payer_name) as sender_name,
       pr.payment_type,
       pr.payment_source,
       pr.reference_number
-    FROM invoice_payments ip
-    INNER JOIN payment_records pr ON ip.payment_record_id = pr.id
-    WHERE ip.invoice_id = ?
-    ORDER BY ip.applied_at DESC`,
+    FROM payment_allocations pa
+    INNER JOIN payment_records pr ON pa.payment_record_id = pr.id
+    LEFT JOIN interac_transactions it ON pr.interac_transaction_id = it.id
+    LEFT JOIN (
+      SELECT billing_id, payment_record_id, SUM(amount_used) as credit_amount
+      FROM customer_credit_usage
+      GROUP BY billing_id, payment_record_id
+    ) cu ON cu.billing_id = pa.billing_id AND cu.payment_record_id = pa.payment_record_id
+    WHERE pa.billing_id = ?
+    ORDER BY pa.created_at DESC`,
     [id]
   );
 
@@ -195,6 +204,7 @@ async function handleGet(
     payments: payments.map(p => ({
       ...p,
       amount_applied: Number(p.amount_applied),
+      credit_applied: Number(p.credit_applied),
     })),
   };
 
@@ -299,9 +309,9 @@ async function handleUpdate(
       [id, payment_record_id, paymentAmount, applied_by || null]
     );
 
-    // Update invoice amounts
-    const newAmountPaid = Number(invoice.amount_paid) + paymentAmount;
-    const newBalance = Number(invoice.total_amount) - newAmountPaid;
+    // Update invoice amounts - round to avoid floating-point precision issues
+    const newAmountPaid = Math.round((Number(invoice.amount_paid) + paymentAmount) * 100) / 100;
+    const newBalance = Math.round((Number(invoice.total_amount) - newAmountPaid) * 100) / 100;
     const newStatus = newBalance <= 0 ? 'paid' : 'partial_paid';
 
     await query(

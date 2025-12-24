@@ -72,8 +72,11 @@ interface PaymentRecord {
 interface PaymentAllocation {
   id: number;
   billing_id: number;
+  invoice_number: string;
+  customer_name: string;
   billing_month: string;
   allocated_amount: number;
+  credit_amount: number;
   resulting_status: string;
 }
 
@@ -573,10 +576,18 @@ export default function PaymentHistoryPage() {
                     <Typography variant="body2" color="text.secondary">Allocated</Typography>
                     <Typography variant="subtitle2">{fCurrency(selectedPayment.total_allocated)}</Typography>
                   </Stack>
+                  {/* Show credit used from allocations */}
+                  {Math.round(paymentAllocations.reduce((sum, a) => sum + (a.credit_amount || 0), 0) * 100) / 100 > 0 && (
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2" color="text.secondary">Credit Used</Typography>
+                      <Chip size="small" label={fCurrency(Math.round(paymentAllocations.reduce((sum, a) => sum + (a.credit_amount || 0), 0) * 100) / 100)} color="info" />
+                    </Stack>
+                  )}
+                  {/* Show excess amount that became customer credit */}
                   {selectedPayment.excess_amount > 0 && (
                     <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">Customer Credit</Typography>
-                      <Chip size="small" label={fCurrency(selectedPayment.excess_amount)} color="primary" />
+                      <Typography variant="body2" color="text.secondary">Excess (New Credit)</Typography>
+                      <Chip size="small" label={fCurrency(selectedPayment.excess_amount)} color="success" />
                     </Stack>
                   )}
                   <Stack direction="row" justifyContent="space-between">
@@ -608,8 +619,9 @@ export default function PaymentHistoryPage() {
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Invoice Period</TableCell>
-                        <TableCell align="right">Amount Allocated</TableCell>
+                        <TableCell>Invoice</TableCell>
+                        <TableCell align="right">Payment</TableCell>
+                        <TableCell align="right">Credit</TableCell>
                         <TableCell align="center">Status</TableCell>
                       </TableRow>
                     </TableHead>
@@ -617,14 +629,45 @@ export default function PaymentHistoryPage() {
                       {paymentAllocations.map((alloc) => (
                         <TableRow key={alloc.id}>
                           <TableCell>
-                            <Typography variant="body2">
-                              {fDate(alloc.billing_month, 'MMMM yyyy')}
+                            <Typography
+                              variant="body2"
+                              component="span"
+                              onClick={() => {
+                                setOpenDetails(false);
+                                router.push(PATH_DASHBOARD.tiffin.invoiceDetails(String(alloc.billing_id)));
+                              }}
+                              sx={{
+                                cursor: 'pointer',
+                                color: 'primary.main',
+                                fontWeight: 500,
+                                '&:hover': {
+                                  textDecoration: 'underline',
+                                },
+                              }}
+                            >
+                              {alloc.invoice_number || `Invoice #${alloc.billing_id}`}
                             </Typography>
+                            {alloc.customer_name && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {alloc.customer_name}
+                              </Typography>
+                            )}
                           </TableCell>
                           <TableCell align="right">
                             <Typography variant="subtitle2" color="success.main">
                               {fCurrency(alloc.allocated_amount)}
                             </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            {alloc.credit_amount > 0 ? (
+                              <Typography variant="subtitle2" color="info.main">
+                                {fCurrency(alloc.credit_amount)}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                -
+                              </Typography>
+                            )}
                           </TableCell>
                           <TableCell align="center">
                             <Label color={alloc.resulting_status === 'paid' ? 'success' : 'warning'}>
