@@ -56,10 +56,22 @@ import DashboardLayout from '../../../layouts/dashboard';
 import axios from '../../../utils/axios';
 
 // Dynamically import ReactQuill to avoid SSR issues
-const ReactQuill = dynamic(() => import('react-quill'), {
-  ssr: false,
-  loading: () => <Box sx={{ height: 200, bgcolor: 'grey.100' }} />,
-});
+const ReactQuill = dynamic(
+  async () => {
+    const { default: RQ } = await import('react-quill');
+    const { default: Quill } = await import('quill');
+    const { default: ImageResize } = await import('quill-image-resize-module-react');
+
+    // Register image resize module
+    Quill.register('modules/imageResize', ImageResize);
+
+    return RQ;
+  },
+  {
+    ssr: false,
+    loading: () => <Box sx={{ height: 200, bgcolor: 'grey.100' }} />,
+  }
+);
 import 'react-quill/dist/quill.snow.css';
 
 // Helper to clean HTML from ReactQuill artifacts (empty paragraphs, trailing breaks)
@@ -326,6 +338,9 @@ export default function LabelEditorPage() {
       delay: 500,
       maxStack: 100,
       userOnly: true,
+    },
+    imageResize: {
+      modules: ['Resize', 'DisplaySize'],
     },
   };
 
