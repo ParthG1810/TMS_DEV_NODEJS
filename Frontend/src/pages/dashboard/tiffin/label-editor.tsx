@@ -319,10 +319,6 @@ export default function LabelEditorPage() {
           ]}
         />
 
-        <Alert severity="info" sx={{ mb: 3 }}>
-          Keyboard shortcuts: Ctrl+S (Save), Escape (Cancel)
-        </Alert>
-
         <Grid container spacing={3}>
           {/* Left Column - Editor */}
           <Grid item xs={12} md={8}>
@@ -412,9 +408,15 @@ export default function LabelEditorPage() {
             <Card sx={{ mb: 3 }}>
               <CardHeader title="Template Editor" />
               <CardContent>
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  Design your label within the blue bordered area. Content outside this area will be clipped during printing.
+                </Alert>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Keyboard shortcuts: Ctrl+S (Save), Escape (Cancel)
+                </Alert>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
                   Fixed canvas: {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
-                  {inchesToPixels(heightInches)}px) — Content must fit within this area
+                  {inchesToPixels(heightInches)}px)
                 </Typography>
                 <Box
                   sx={{
@@ -457,9 +459,6 @@ export default function LabelEditorPage() {
                     formats={quillFormats}
                   />
                 </Box>
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  Design your label within the blue bordered area. Content outside this area will be clipped during printing.
-                </Alert>
               </CardContent>
             </Card>
 
@@ -502,8 +501,16 @@ export default function LabelEditorPage() {
                       bgcolor: 'white',
                       transform: `scale(${previewZoom / 100})`,
                       transformOrigin: 'top left',
-                      p: 1,
+                      padding: '8px',
                       overflow: 'hidden',
+                      // Match Quill editor paragraph styling
+                      '& p': {
+                        margin: 0,
+                        padding: 0,
+                      },
+                      '& img': {
+                        maxWidth: '100%',
+                      },
                     }}
                     dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
                   />
@@ -527,7 +534,15 @@ export default function LabelEditorPage() {
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                   System Placeholders
                 </Typography>
-                <Stack spacing={1} sx={{ mb: 2 }}>
+                <Stack
+                  spacing={1}
+                  sx={{
+                    mb: 2,
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                    pr: 1,
+                  }}
+                >
                   {SYSTEM_PLACEHOLDERS.map((p) => (
                     <Box
                       key={p.key}
