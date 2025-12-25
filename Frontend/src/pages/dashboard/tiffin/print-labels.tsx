@@ -152,59 +152,60 @@ export default function PrintLabelsPage() {
       size: ${widthIn}in ${heightIn}in;
       margin: 0;
     }
-    @media print {
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: ${widthIn}in !important;
-        height: ${heightIn}in !important;
-        overflow: hidden !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      .print-area {
-        position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: ${widthIn}in !important;
-        height: ${heightIn}in !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: hidden !important;
-      }
-      .print-label-container {
-        width: ${widthPx}px !important;
-        height: ${heightPx}px !important;
-        max-width: ${widthPx}px !important;
-        max-height: ${heightPx}px !important;
-        overflow: hidden !important;
-        position: relative !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        page-break-inside: avoid;
-      }
-      .print-label-content {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: ${widthPx}px !important;
-        height: ${heightPx}px !important;
-        max-width: ${widthPx}px !important;
-        max-height: ${heightPx}px !important;
-        padding: 8px !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-        margin: 0 !important;
-        clip: rect(0, ${widthPx}px, ${heightPx}px, 0) !important;
-      }
-      .print-label-content p {
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      .print-label-content img {
-        max-width: 100% !important;
-      }
+    * {
+      margin: 0 !important;
+      padding: 0 !important;
+      box-sizing: border-box !important;
+    }
+    html, body {
+      width: ${widthIn}in !important;
+      height: ${heightIn}in !important;
+      overflow: hidden !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-area {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: ${widthPx}px !important;
+      height: ${heightPx}px !important;
+      overflow: hidden !important;
+    }
+    .print-label-container {
+      width: ${widthPx}px !important;
+      height: ${heightPx}px !important;
+      max-height: ${heightPx}px !important;
+      overflow: hidden !important;
+      position: relative !important;
+    }
+    .print-label-content {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: ${widthPx}px !important;
+      height: ${heightPx}px !important;
+      max-height: ${heightPx}px !important;
+      padding: 8px !important;
+      overflow: hidden !important;
+      line-height: 1.2 !important;
+    }
+    .print-label-content p {
+      margin: 0 !important;
+      padding: 0 !important;
+      line-height: 1.2 !important;
+    }
+    .print-label-content img {
+      max-width: 100% !important;
+      display: block !important;
+      margin: 0 auto !important;
+    }
+    /* Override all Quill styles */
+    .ql-editor {
+      min-height: 0 !important;
+      height: auto !important;
+      padding: 8px !important;
+      line-height: 1.2 !important;
     }
   `;
   };
@@ -567,7 +568,7 @@ export default function PrintLabelsPage() {
           {printContent.map((html, index) => (
             <div key={index} className="print-label-container">
               <div
-                className="print-label-content ql-editor"
+                className="print-label-content"
                 dangerouslySetInnerHTML={{ __html: html }}
               />
             </div>
