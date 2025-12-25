@@ -127,6 +127,12 @@ export const PATH_DASHBOARD = {
     invoices: path(ROOTS_DASHBOARD, '/tiffin/invoices'),
     invoiceDetails: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/invoices/${id}`),
     settings: path(ROOTS_DASHBOARD, '/tiffin/settings'),
+    // Label printing system
+    labelEditor: path(ROOTS_DASHBOARD, '/tiffin/label-editor'),
+    labelEditorEdit: (id: string) => path(ROOTS_DASHBOARD, `/tiffin/label-editor?id=${id}`),
+    labelTemplates: path(ROOTS_DASHBOARD, '/tiffin/label-templates'),
+    customerPrintOrder: path(ROOTS_DASHBOARD, '/tiffin/customer-print-order'),
+    printLabels: path(ROOTS_DASHBOARD, '/tiffin/print-labels'),
   },
   payments: {
     root: path(ROOTS_DASHBOARD, '/payments'),
