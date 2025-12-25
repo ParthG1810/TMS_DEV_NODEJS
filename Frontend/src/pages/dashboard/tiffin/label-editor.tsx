@@ -69,6 +69,7 @@ export default function LabelEditorPage() {
   const { push, query } = useRouter();
   const { enqueueSnackbar } = useSnackbar();
   const editorRef = useRef<any>(null);
+  const skipOverflowCheckRef = useRef(false); // Skip overflow check during load
 
   const editId = query.id ? parseInt(query.id as string) : null;
   const isEdit = !!editId;
@@ -104,6 +105,7 @@ export default function LabelEditorPage() {
 
   const loadTemplate = async (id: number) => {
     setIsLoading(true);
+    skipOverflowCheckRef.current = true; // Disable overflow check during load
     try {
       const response = await axios.get(`/api/label-templates/${id}`);
       if (response.data.success) {
@@ -118,10 +120,15 @@ export default function LabelEditorPage() {
         setPrintSettings(template.print_settings || DEFAULT_ZEBRA_PRINT_SETTINGS);
         setIsDefault(template.is_default);
         setOriginalTemplate(template);
+        // Re-enable overflow check after DOM settles
+        setTimeout(() => {
+          skipOverflowCheckRef.current = false;
+        }, 500);
       }
     } catch (error) {
       console.error('Error loading template:', error);
       enqueueSnackbar('Failed to load template', { variant: 'error' });
+      skipOverflowCheckRef.current = false;
     } finally {
       setIsLoading(false);
     }
@@ -289,11 +296,24 @@ export default function LabelEditorPage() {
 
   // Handle editor change with overflow detection
   const handleEditorChange = useCallback((content: string) => {
+    // Skip overflow check during template loading
+    if (skipOverflowCheckRef.current) {
+      setTemplateHtml(content);
+      setLastValidContent(content);
+      return;
+    }
+
     // Temporarily set content to measure
     setTemplateHtml(content);
 
     // Use setTimeout to allow DOM to update, then check overflow
     setTimeout(() => {
+      // Skip if still loading
+      if (skipOverflowCheckRef.current) {
+        setLastValidContent(content);
+        return;
+      }
+
       // Find the editor element directly from DOM (works with dynamic import)
       const editorElement = document.querySelector('.ql-container .ql-editor') as HTMLElement;
 
@@ -322,11 +342,6 @@ export default function LabelEditorPage() {
       }
     }, 0);
   }, [lastValidContent, isOverflowWarningShown, enqueueSnackbar]);
-
-  // Update lastValidContent when template is loaded
-  useEffect(() => {
-    setLastValidContent(templateHtml);
-  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
