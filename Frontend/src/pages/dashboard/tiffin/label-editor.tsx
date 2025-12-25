@@ -70,6 +70,7 @@ export default function LabelEditorPage() {
   const { enqueueSnackbar } = useSnackbar();
   const editorRef = useRef<any>(null);
   const skipOverflowCheckRef = useRef(false); // Skip overflow check during load
+  const loadedContentRef = useRef<string>(''); // Store originally loaded content
 
   const editId = query.id ? parseInt(query.id as string) : null;
   const isEdit = !!editId;
@@ -116,14 +117,15 @@ export default function LabelEditorPage() {
         setHeightInches(template.height_inches);
         setTemplateHtml(template.template_html);
         setLastValidContent(template.template_html); // Track loaded content as valid
+        loadedContentRef.current = template.template_html; // Store for overflow comparison
         setCustomPlaceholders(template.custom_placeholders || []);
         setPrintSettings(template.print_settings || DEFAULT_ZEBRA_PRINT_SETTINGS);
         setIsDefault(template.is_default);
         setOriginalTemplate(template);
-        // Re-enable overflow check after DOM settles
+        // Re-enable overflow check after DOM fully settles (longer delay for Quill)
         setTimeout(() => {
           skipOverflowCheckRef.current = false;
-        }, 500);
+        }, 1500);
       }
     } catch (error) {
       console.error('Error loading template:', error);
@@ -309,10 +311,19 @@ export default function LabelEditorPage() {
     // Check if this is a deletion (content is shorter)
     const isDeleting = content.length < lastValidContent.length;
 
+    // Check if content matches the originally loaded content (always allow saved content)
+    const isLoadedContent = content === loadedContentRef.current;
+
     // Use setTimeout to allow DOM to update, then check overflow
     setTimeout(() => {
       // Skip if still loading
       if (skipOverflowCheckRef.current) {
+        setLastValidContent(content);
+        return;
+      }
+
+      // Always allow the originally loaded/saved content
+      if (isLoadedContent) {
         setLastValidContent(content);
         return;
       }
