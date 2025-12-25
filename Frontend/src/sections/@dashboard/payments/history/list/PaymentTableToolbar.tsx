@@ -9,13 +9,14 @@ import MenuPopover from '../../../../../components/menu-popover';
 type Props = {
   isFiltered: boolean;
   filterName: string;
-  filterMonth: string;
+  filterStartDate: Date | null;
+  filterEndDate: Date | null;
   filterPaymentType: string;
   filterAmountOperator: string;
   filterAmountValue: string;
-  monthOptions: string[];
   onFilterName: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onFilterMonth: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onFilterStartDate: (date: Date | null) => void;
+  onFilterEndDate: (date: Date | null) => void;
   onFilterPaymentType: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onFilterAmountOperator: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onFilterAmountValue: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -43,13 +44,14 @@ const PAYMENT_TYPES = [
 export default function PaymentTableToolbar({
   isFiltered,
   filterName,
-  filterMonth,
+  filterStartDate,
+  filterEndDate,
   filterPaymentType,
   filterAmountOperator,
   filterAmountValue,
-  monthOptions,
   onFilterName,
-  onFilterMonth,
+  onFilterStartDate,
+  onFilterEndDate,
   onFilterPaymentType,
   onFilterAmountOperator,
   onFilterAmountValue,
@@ -70,7 +72,7 @@ export default function PaymentTableToolbar({
 
   return (
     <Stack spacing={2} sx={{ px: 2.5, py: 3 }}>
-      {/* First row: Month filter, payment type, amount filter, search, and actions */}
+      {/* First row: Date filters, payment type, amount filter, search, and actions */}
       <Stack
         spacing={2}
         alignItems="center"
@@ -79,29 +81,27 @@ export default function PaymentTableToolbar({
           md: 'row',
         }}
       >
-        {/* Month Filter */}
+        {/* Start Date */}
         <TextField
-          select
           fullWidth
-          label="Month"
-          value={filterMonth}
-          onChange={onFilterMonth}
-          SelectProps={{
-            MenuProps: {
-              PaperProps: {
-                sx: { maxHeight: 240 },
-              },
-            },
-          }}
-          sx={{ maxWidth: { md: 180 } }}
-        >
-          <MenuItem value="">All Months</MenuItem>
-          {monthOptions.map((month) => (
-            <MenuItem key={month} value={month}>
-              {month}
-            </MenuItem>
-          ))}
-        </TextField>
+          type="date"
+          label="Start date"
+          value={filterStartDate ? filterStartDate.toISOString().split('T')[0] : ''}
+          onChange={(e) => onFilterStartDate(e.target.value ? new Date(e.target.value) : null)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ maxWidth: { md: 160 } }}
+        />
+
+        {/* End Date */}
+        <TextField
+          fullWidth
+          type="date"
+          label="End date"
+          value={filterEndDate ? filterEndDate.toISOString().split('T')[0] : ''}
+          onChange={(e) => onFilterEndDate(e.target.value ? new Date(e.target.value) : null)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ maxWidth: { md: 160 } }}
+        />
 
         {/* Payment Type Filter */}
         <TextField
