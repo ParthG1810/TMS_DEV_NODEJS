@@ -11,8 +11,6 @@ import {
   IconButton,
   Typography,
 } from '@mui/material';
-// @types
-import { IUserAccountGeneral } from '../../../../@types/user';
 // components
 import Label from '../../../../components/label';
 import Iconify from '../../../../components/iconify';
@@ -21,8 +19,16 @@ import ConfirmDialog from '../../../../components/confirm-dialog';
 
 // ----------------------------------------------------------------------
 
+type UserRowData = {
+  id: string;
+  avatarUrl: string;
+  name: string;
+  email: string;
+  role: string;
+};
+
 type Props = {
-  row: IUserAccountGeneral;
+  row: UserRowData;
   selected: boolean;
   onEditRow: VoidFunction;
   onSelectRow: VoidFunction;
@@ -36,7 +42,7 @@ export default function UserTableRow({
   onSelectRow,
   onDeleteRow,
 }: Props) {
-  const { name, avatarUrl, email, role, isVerified, status } = row;
+  const { name, avatarUrl, email, role } = row;
 
   const [openConfirm, setOpenConfirm] = useState(false);
 
@@ -58,6 +64,21 @@ export default function UserTableRow({
     setOpenPopover(null);
   };
 
+  const getRoleColor = (userRole: string) => {
+    switch (userRole) {
+      case 'admin':
+        return 'error';
+      case 'manager':
+        return 'warning';
+      case 'staff':
+        return 'info';
+      case 'tester':
+        return 'secondary';
+      default:
+        return 'success';
+    }
+  };
+
   return (
     <>
       <TableRow hover selected={selected}>
@@ -77,29 +98,13 @@ export default function UserTableRow({
 
         <TableCell align="left">{email}</TableCell>
 
-        <TableCell align="left" sx={{ textTransform: 'capitalize' }}>
-          {role}
-        </TableCell>
-
-        <TableCell align="center">
-          <Iconify
-            icon={isVerified ? 'eva:checkmark-circle-fill' : 'eva:clock-outline'}
-            sx={{
-              width: 20,
-              height: 20,
-              color: 'success.main',
-              ...(!isVerified && { color: 'warning.main' }),
-            }}
-          />
-        </TableCell>
-
         <TableCell align="left">
           <Label
             variant="soft"
-            color={(status === 'banned' && 'error') || 'success'}
+            color={getRoleColor(role)}
             sx={{ textTransform: 'capitalize' }}
           >
-            {status}
+            {role}
           </Label>
         </TableCell>
 
