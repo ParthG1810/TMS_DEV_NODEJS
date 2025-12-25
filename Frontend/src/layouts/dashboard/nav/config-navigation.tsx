@@ -85,6 +85,19 @@ const navConfig = [
         ],
       },
 
+      // LABEL PRINT
+      {
+        title: 'Label Print',
+        path: PATH_DASHBOARD.tiffin.labelTemplates,
+        icon: ICONS.label,
+        children: [
+          { title: 'Label Templates', path: PATH_DASHBOARD.tiffin.labelTemplates },
+          { title: 'New Template', path: PATH_DASHBOARD.tiffin.labelEditor },
+          { title: 'Customer Print Order', path: PATH_DASHBOARD.tiffin.customerPrintOrder },
+          { title: 'Print Labels', path: PATH_DASHBOARD.tiffin.printLabels },
+        ],
+      },
+
       // PAYMENTS
       {
         title: 'Payments',
