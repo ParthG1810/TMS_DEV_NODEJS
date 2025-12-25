@@ -79,7 +79,7 @@ interface BillingRecord {
   orders?: OrderDetail[];
 }
 
-const STATUS_OPTIONS = ['all', 'calculating', 'pending', 'finalized', 'paid'];
+const STATUS_OPTIONS = ['all', 'calculating', 'pending', 'finalized', 'partial_paid', 'paid'];
 
 // ----------------------------------------------------------------------
 
@@ -222,6 +222,8 @@ export default function BillingStatusPage() {
         return 'info';
       case 'finalized':
         return 'success';
+      case 'partial_paid':
+        return 'primary';
       case 'paid':
         return 'success';
       default:
@@ -234,9 +236,11 @@ export default function BillingStatusPage() {
       case 'calculating':
         return 'Calculating';
       case 'pending':
-        return 'Pending';
+        return 'Pending Approval';
       case 'finalized':
         return 'Invoiced';
+      case 'partial_paid':
+        return 'Partial Paid';
       case 'paid':
         return 'Paid';
       default:
@@ -279,7 +283,11 @@ export default function BillingStatusPage() {
             }}
           >
             {STATUS_OPTIONS.map((tab) => (
-              <Tab key={tab} label={tab} value={tab} sx={{ textTransform: 'capitalize' }} />
+              <Tab
+                key={tab}
+                label={tab === 'all' ? 'All' : getStatusLabel(tab)}
+                value={tab}
+              />
             ))}
           </Tabs>
 

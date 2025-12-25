@@ -127,15 +127,31 @@ async function handleGet(
       const key = `${billing.customer_id}-${billing.billing_month}`;
       const orders = orderDetailsMap.get(key) || [];
 
-      // Determine effective status based on order statuses
+      // Determine effective status based on order statuses (priority order: top to bottom)
+      // 1. Calculating - if ANY order is still calculating
+      // 2. Pending - if ANY order is pending approval
+      // 3. Finalized - if ALL orders are finalized (invoiced, waiting for payment)
+      // 4. Partial Paid - if SOME orders are paid but not ALL
+      // 5. Paid - if ALL orders are paid
       let effectiveStatus = billing.status;
       if (orders.length > 0) {
-        const allFinalized = orders.every((o: any) => o.status === 'finalized' || o.status === 'paid');
-        const anyPaid = orders.some((o: any) => o.status === 'paid');
-        if (allFinalized && !anyPaid) {
+        const hasCalculating = orders.some((o: any) => o.status === 'calculating');
+        const hasPending = orders.some((o: any) => o.status === 'pending');
+        const allFinalized = orders.every((o: any) => o.status === 'finalized');
+        const allPaid = orders.every((o: any) => o.status === 'paid');
+        const somePaid = orders.some((o: any) => o.status === 'paid');
+        const someFinalized = orders.some((o: any) => o.status === 'finalized');
+
+        if (hasCalculating) {
+          effectiveStatus = 'calculating';
+        } else if (hasPending) {
+          effectiveStatus = 'pending';
+        } else if (allFinalized) {
           effectiveStatus = 'finalized';
-        } else if (anyPaid) {
+        } else if (allPaid) {
           effectiveStatus = 'paid';
+        } else if (somePaid && someFinalized) {
+          effectiveStatus = 'partial_paid';
         }
       }
 
