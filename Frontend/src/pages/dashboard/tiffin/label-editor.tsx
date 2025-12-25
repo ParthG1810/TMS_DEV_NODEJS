@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Head from 'next/head';
+import ImageResize from 'quill-image-resize-module-react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 // @mui
@@ -105,7 +106,9 @@ export default function LabelEditorPage() {
   const [description, setDescription] = useState('');
   const [widthInches, setWidthInches] = useState(4.0);
   const [heightInches, setHeightInches] = useState(2.0);
-  const [templateHtml, setTemplateHtml] = useState('<p>{{customerName}}</p><p>{{customerAddress}}</p>');
+  const [templateHtml, setTemplateHtml] = useState(
+    '<p>{{customerName}}</p><p>{{customerAddress}}</p>'
+  );
   const [customPlaceholders, setCustomPlaceholders] = useState<CustomPlaceholder[]>([]);
   const [printSettings, setPrintSettings] = useState(DEFAULT_ZEBRA_PRINT_SETTINGS);
   const [isDefault, setIsDefault] = useState(false);
@@ -119,7 +122,11 @@ export default function LabelEditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [customPlaceholderDialog, setCustomPlaceholderDialog] = useState(false);
-  const [newPlaceholder, setNewPlaceholder] = useState({ key: '', defaultValue: '', description: '' });
+  const [newPlaceholder, setNewPlaceholder] = useState({
+    key: '',
+    defaultValue: '',
+    description: '',
+  });
   const [originalTemplate, setOriginalTemplate] = useState<LabelTemplate | null>(null);
 
   // Load template if editing
@@ -225,10 +232,9 @@ export default function LabelEditorPage() {
       return;
     }
     if (widthInches < 0.75 || widthInches > ZEBRA_GX430D_SPECS.maxPrintWidth) {
-      enqueueSnackbar(
-        `Width must be between 0.75 and ${ZEBRA_GX430D_SPECS.maxPrintWidth} inches`,
-        { variant: 'error' }
-      );
+      enqueueSnackbar(`Width must be between 0.75 and ${ZEBRA_GX430D_SPECS.maxPrintWidth} inches`, {
+        variant: 'error',
+      });
       return;
     }
     if (!templateHtml.trim()) {
@@ -263,7 +269,9 @@ export default function LabelEditorPage() {
       push(PATH_DASHBOARD.tiffin.labelTemplates);
     } catch (error: any) {
       console.error('Error saving template:', error);
-      enqueueSnackbar(error.response?.data?.error || 'Failed to save template', { variant: 'error' });
+      enqueueSnackbar(error.response?.data?.error || 'Failed to save template', {
+        variant: 'error',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -299,13 +307,20 @@ export default function LabelEditorPage() {
   // Quill modules configuration
   const quillModules = {
     toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      [{ size: ['8pt', '10pt', '12pt', '14pt', '18pt', '24pt'] }],
+      [{ header: [1, 2, 3, 4, 5, 6, false] }],
+      [{ size: ['small', 'medium', 'large', 'huge', false] }],
       ['bold', 'italic', 'underline', 'strike'],
+      ['blockquote', 'code-block'],
+      ['link', 'image', 'video', 'formula'],
+      [{ script: 'sub' }, { script: 'super' }],
+      [{ indent: '-1' }, { indent: '+1' }],
+      [{ direction: 'rtl' }],
       [{ color: [] }, { background: [] }],
+      [{ font: [] }],
       [{ align: [] }],
-      ['image'],
+      [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
       ['clean'],
+      [{ size: ['8pt', '10pt', '12pt', '14pt', '18pt', '24pt'] }],
     ],
     history: {
       delay: 500,
@@ -325,71 +340,78 @@ export default function LabelEditorPage() {
     'background',
     'align',
     'image',
+    'font',
+    'list',
+    'bullet',
+    'link',
   ];
 
   // Handle editor change with overflow detection
-  const handleEditorChange = useCallback((content: string) => {
-    // Clean the HTML to remove ReactQuill artifacts (empty paragraphs, trailing breaks)
-    const cleanedContent = cleanQuillHtml(content);
+  const handleEditorChange = useCallback(
+    (content: string) => {
+      // Clean the HTML to remove ReactQuill artifacts (empty paragraphs, trailing breaks)
+      const cleanedContent = cleanQuillHtml(content);
 
-    // Skip overflow check during template loading
-    if (skipOverflowCheckRef.current) {
-      setTemplateHtml(cleanedContent);
-      setLastValidContent(cleanedContent);
-      return;
-    }
-
-    // Always allow the content change first
-    setTemplateHtml(cleanedContent);
-
-    // Check if this is a deletion (content is shorter)
-    const isDeleting = cleanedContent.length < lastValidContent.length;
-
-    // Check if content matches the originally loaded content (always allow saved content)
-    const isLoadedContent = cleanedContent === loadedContentRef.current;
-
-    // Use setTimeout to allow DOM to update, then check overflow
-    setTimeout(() => {
-      // Skip if still loading
+      // Skip overflow check during template loading
       if (skipOverflowCheckRef.current) {
+        setTemplateHtml(cleanedContent);
         setLastValidContent(cleanedContent);
         return;
       }
 
-      // Always allow the originally loaded/saved content
-      if (isLoadedContent) {
-        setLastValidContent(cleanedContent);
-        return;
-      }
+      // Always allow the content change first
+      setTemplateHtml(cleanedContent);
 
-      // Find the editor element directly from DOM (works with dynamic import)
-      const editorElement = document.querySelector('.ql-container .ql-editor') as HTMLElement;
+      // Check if this is a deletion (content is shorter)
+      const isDeleting = cleanedContent.length < lastValidContent.length;
 
-      if (editorElement) {
-        // Check if content overflows the container
-        const isOverflowing = editorElement.scrollHeight > editorElement.clientHeight;
+      // Check if content matches the originally loaded content (always allow saved content)
+      const isLoadedContent = cleanedContent === loadedContentRef.current;
 
-        if (isOverflowing && !isDeleting) {
-          // Only revert if adding content caused overflow, not deleting
-          setTemplateHtml(lastValidContent);
-
-          // Show warning only once per overflow attempt
-          if (!isOverflowWarningShown) {
-            enqueueSnackbar('Content exceeds label size. Remove some content to add more.', {
-              variant: 'warning',
-              autoHideDuration: 3000,
-            });
-            setIsOverflowWarningShown(true);
-            // Reset warning flag after a short delay
-            setTimeout(() => setIsOverflowWarningShown(false), 1000);
-          }
-        } else {
-          // Content fits OR user is deleting (allow deletions even if still overflowing)
+      // Use setTimeout to allow DOM to update, then check overflow
+      setTimeout(() => {
+        // Skip if still loading
+        if (skipOverflowCheckRef.current) {
           setLastValidContent(cleanedContent);
+          return;
         }
-      }
-    }, 0);
-  }, [lastValidContent, isOverflowWarningShown, enqueueSnackbar]);
+
+        // Always allow the originally loaded/saved content
+        if (isLoadedContent) {
+          setLastValidContent(cleanedContent);
+          return;
+        }
+
+        // Find the editor element directly from DOM (works with dynamic import)
+        const editorElement = document.querySelector('.ql-container .ql-editor') as HTMLElement;
+
+        if (editorElement) {
+          // Check if content overflows the container
+          const isOverflowing = editorElement.scrollHeight > editorElement.clientHeight;
+
+          if (isOverflowing && !isDeleting) {
+            // Only revert if adding content caused overflow, not deleting
+            setTemplateHtml(lastValidContent);
+
+            // Show warning only once per overflow attempt
+            if (!isOverflowWarningShown) {
+              enqueueSnackbar('Content exceeds label size. Remove some content to add more.', {
+                variant: 'warning',
+                autoHideDuration: 3000,
+              });
+              setIsOverflowWarningShown(true);
+              // Reset warning flag after a short delay
+              setTimeout(() => setIsOverflowWarningShown(false), 1000);
+            }
+          } else {
+            // Content fits OR user is deleting (allow deletions even if still overflowing)
+            setLastValidContent(cleanedContent);
+          }
+        }
+      }, 0);
+    },
+    [lastValidContent, isOverflowWarningShown, enqueueSnackbar]
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -518,12 +540,17 @@ export default function LabelEditorPage() {
               <CardHeader title="Template Editor" />
               <CardContent>
                 <Alert severity="warning" sx={{ mb: 1 }}>
-                  Design your label within the blue bordered area. Content outside this area will be clipped during printing.
+                  Design your label within the blue bordered area. Content outside this area will be
+                  clipped during printing.
                 </Alert>
                 <Alert severity="info" sx={{ mb: 2 }}>
                   Keyboard shortcuts: Ctrl+S (Save), Escape (Cancel)
                 </Alert>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: 'block', mb: 2 }}
+                >
                   Fixed canvas: {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
                   {inchesToPixels(heightInches)}px)
                 </Typography>
@@ -656,7 +683,11 @@ export default function LabelEditorPage() {
                     />
                   </Box>
                 </Paper>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 1, display: 'block' }}
+                >
                   Preview shows sample data. Actual values will be replaced during printing.
                 </Typography>
               </CardContent>
@@ -667,10 +698,7 @@ export default function LabelEditorPage() {
           <Grid item xs={12} md={4}>
             {/* Placeholders */}
             <Card sx={{ mb: 3 }}>
-              <CardHeader
-                title="Placeholders"
-                subheader="Click to insert into template"
-              />
+              <CardHeader title="Placeholders" subheader="Click to insert into template" />
               <CardContent>
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                   System Placeholders
@@ -716,7 +744,12 @@ export default function LabelEditorPage() {
 
                 <Divider sx={{ my: 2 }} />
 
-                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mb: 1 }}
+                >
                   <Typography variant="subtitle2" color="text.secondary">
                     Custom Placeholders
                   </Typography>
@@ -904,14 +937,18 @@ export default function LabelEditorPage() {
               fullWidth
               label="Default Value"
               value={newPlaceholder.defaultValue}
-              onChange={(e) => setNewPlaceholder((prev) => ({ ...prev, defaultValue: e.target.value }))}
+              onChange={(e) =>
+                setNewPlaceholder((prev) => ({ ...prev, defaultValue: e.target.value }))
+              }
               placeholder="e.g., R1"
             />
             <TextField
               fullWidth
               label="Description"
               value={newPlaceholder.description}
-              onChange={(e) => setNewPlaceholder((prev) => ({ ...prev, description: e.target.value }))}
+              onChange={(e) =>
+                setNewPlaceholder((prev) => ({ ...prev, description: e.target.value }))
+              }
               placeholder="e.g., Route number for delivery"
             />
           </Stack>
