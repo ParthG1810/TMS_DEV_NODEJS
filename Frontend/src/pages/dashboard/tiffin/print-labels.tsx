@@ -1,6 +1,5 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Head from 'next/head';
-import { useReactToPrint } from 'react-to-print';
 // @mui
 import {
   Card,
@@ -53,7 +52,6 @@ PrintLabelsPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page
 
 export default function PrintLabelsPage() {
   const { enqueueSnackbar } = useSnackbar();
-  const printRef = useRef<HTMLDivElement>(null);
 
   // Data state
   const [templates, setTemplates] = useState<LabelTemplate[]>([]);
@@ -67,10 +65,6 @@ export default function PrintLabelsPage() {
   // Bulk print state
   const [bulkTemplateId, setBulkTemplateId] = useState<number | null>(null);
   const [selectAll, setSelectAll] = useState(false);
-
-  // Print content state
-  const [printContent, setPrintContent] = useState<string[]>([]);
-  const [currentPrintMode, setCurrentPrintMode] = useState<'single' | 'bulk'>('single');
 
   // Fetch data
   useEffect(() => {
@@ -143,121 +137,132 @@ export default function PrintLabelsPage() {
     []
   );
 
-  // Print styles - EXACTLY matches editor/preview structure
-  const getQuillPrintStyles = (widthIn: number, heightIn: number) => {
+  // Custom print function using window.open
+  const printLabels = (labels: string[], template: LabelTemplate) => {
+    const { width_inches: widthIn, height_inches: heightIn } = template;
     const widthPx = Math.round(widthIn * 96);
     const heightPx = Math.round(heightIn * 96);
-    return `
+
+    // Generate HTML for each label
+    const labelsHtml = labels
+      .map(
+        (html) => `
+      <div class="label">
+        <div class="label-content">${html}</div>
+      </div>
+    `
+      )
+      .join('');
+
+    // Full HTML document
+    const printDocument = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Print Labels</title>
+  <style>
     @page {
       size: ${widthIn}in ${heightIn}in;
       margin: 0;
     }
     * {
-      margin: 0 !important;
-      padding: 0 !important;
-      box-sizing: border-box !important;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
     html, body {
-      width: ${widthIn}in !important;
-      height: ${heightIn}in !important;
-      overflow: hidden !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
+      width: ${widthIn}in;
+      height: auto;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
-    .print-area {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: ${widthPx}px !important;
-      height: ${heightPx}px !important;
-      overflow: hidden !important;
+    .label {
+      width: ${widthPx}px;
+      height: ${heightPx}px;
+      overflow: hidden;
+      position: relative;
+      page-break-after: always;
+      page-break-inside: avoid;
     }
-    .print-label-container {
-      width: ${widthPx}px !important;
-      height: ${heightPx}px !important;
-      max-height: ${heightPx}px !important;
-      overflow: hidden !important;
-      position: relative !important;
+    .label:last-child {
+      page-break-after: auto;
     }
-    .print-label-content {
-      position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: ${widthPx}px !important;
-      height: ${heightPx}px !important;
-      max-height: ${heightPx}px !important;
-      padding: 8px !important;
-      overflow: hidden !important;
-      line-height: 1.2 !important;
+    .label-content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: ${widthPx}px;
+      height: ${heightPx}px;
+      padding: 8px;
+      overflow: hidden;
+      line-height: 1.2;
     }
-    .print-label-content p {
-      margin: 0 !important;
-      padding: 0 !important;
-      line-height: 1.2 !important;
+    .label-content p {
+      margin: 0;
+      padding: 0;
+      line-height: 1.2;
     }
-    .print-label-content img {
-      max-width: 100% !important;
-      display: block !important;
-      margin: 0 auto !important;
+    .label-content img {
+      max-width: 100%;
+      display: block;
+      margin: 0 auto;
     }
-    /* Override all Quill styles */
-    .ql-editor {
-      min-height: 0 !important;
-      height: auto !important;
-      padding: 8px !important;
-      line-height: 1.2 !important;
+  </style>
+</head>
+<body>
+  ${labelsHtml}
+  <script>
+    window.onload = function() {
+      window.print();
+      window.onafterprint = function() {
+        window.close();
+      };
+    };
+  </script>
+</body>
+</html>
+    `;
+
+    // Open new window and print
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printDocument);
+      printWindow.document.close();
     }
-  `;
   };
 
   // Handle single print
-  const handleSinglePrint = useReactToPrint({
-    contentRef: printRef,
-    pageStyle: () => {
-      const template = getTemplate(selectedTemplateId);
-      if (!template) return '';
-      return getQuillPrintStyles(template.width_inches, template.height_inches);
-    },
-    onBeforePrint: () => {
-      const template = getTemplate(selectedTemplateId);
-      const customer = customers.find((c) => c.id === selectedCustomerId);
-      if (template && customer) {
-        setPrintContent([generateLabelHtml(customer, template, 1)]);
-        setCurrentPrintMode('single');
-      }
-      return Promise.resolve();
-    },
-  });
+  const handleSinglePrint = () => {
+    const template = getTemplate(selectedTemplateId);
+    const customer = customers.find((c) => c.id === selectedCustomerId);
+    if (template && customer) {
+      const labelHtml = generateLabelHtml(customer, template, 1);
+      printLabels([labelHtml], template);
+    }
+  };
 
   // Handle bulk print
-  const handleBulkPrint = useReactToPrint({
-    contentRef: printRef,
-    pageStyle: () => {
-      const template = getTemplate(bulkTemplateId);
-      if (!template) return '';
-      return getQuillPrintStyles(template.width_inches, template.height_inches);
-    },
-    onBeforePrint: () => {
-      const template = getTemplate(bulkTemplateId);
-      if (!template) return Promise.resolve();
+  const handleBulkPrint = () => {
+    const template = getTemplate(bulkTemplateId);
+    if (!template) return;
 
-      const labels: string[] = [];
-      let serialNumber = 1;
+    const labels: string[] = [];
+    let serialNumber = 1;
 
-      customers
-        .filter((c) => c.selected)
-        .forEach((customer) => {
-          for (let i = 0; i < customer.copies; i++) {
-            labels.push(generateLabelHtml(customer, template, serialNumber));
-            serialNumber++;
-          }
-        });
+    customers
+      .filter((c) => c.selected)
+      .forEach((customer) => {
+        for (let i = 0; i < customer.copies; i++) {
+          labels.push(generateLabelHtml(customer, template, serialNumber));
+          serialNumber++;
+        }
+      });
 
-      setPrintContent(labels);
-      setCurrentPrintMode('bulk');
-      return Promise.resolve();
-    },
-  });
+    if (labels.length > 0) {
+      printLabels(labels, template);
+    }
+  };
 
   // Toggle select all
   const handleSelectAll = (checked: boolean) => {
@@ -561,20 +566,6 @@ export default function PrintLabelsPage() {
           </CardContent>
         </Card>
       </Container>
-
-      {/* Hidden print area - structure matches editor exactly */}
-      <div style={{ display: 'none' }}>
-        <div ref={printRef} className="print-area">
-          {printContent.map((html, index) => (
-            <div key={index} className="print-label-container">
-              <div
-                className="print-label-content"
-                dangerouslySetInnerHTML={{ __html: html }}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
     </>
   );
 }
