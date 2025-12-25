@@ -26,6 +26,7 @@ import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import Scrollbar from '../../../components/scrollbar';
 import Iconify from '../../../components/iconify';
+import Label from '../../../components/label';
 import { PATH_DASHBOARD } from '../../../routes/paths';
 import { useSettingsContext } from '../../../components/settings';
 import axios from '../../../utils/axios';
@@ -83,7 +84,7 @@ interface BillingRecord {
   orders?: OrderDetail[];
 }
 
-const STATUS_OPTIONS = ['all', 'calculating', 'pending', 'finalized', 'partial_paid', 'paid'];
+// Status options moved to TABS array inside component for dynamic counts
 
 // ----------------------------------------------------------------------
 
@@ -163,6 +164,15 @@ export default function BillingStatusPage() {
     if (tableData.length === 0) return 0;
     return (getStatusCount(status) / tableData.length) * 100;
   };
+
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: tableData.length },
+    { value: 'calculating', label: 'Calculating', color: 'default', count: getStatusCount('calculating') },
+    { value: 'pending', label: 'Pending Approval', color: 'warning', count: getStatusCount('pending') },
+    { value: 'finalized', label: 'Invoiced', color: 'info', count: getStatusCount('finalized') },
+    { value: 'partial_paid', label: 'Partial Paid', color: 'secondary', count: getStatusCount('partial_paid') },
+    { value: 'paid', label: 'Paid', color: 'success', count: getStatusCount('paid') },
+  ] as const;
 
   const handleFilterStatus = (event: React.SyntheticEvent<Element, Event>, newValue: string) => {
     setFilterStatus(newValue);
@@ -625,11 +635,16 @@ export default function BillingStatusPage() {
               bgcolor: 'background.neutral',
             }}
           >
-            {STATUS_OPTIONS.map((tab) => (
+            {TABS.map((tab) => (
               <Tab
-                key={tab}
-                label={tab === 'all' ? 'All' : getStatusLabel(tab)}
-                value={tab}
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                icon={
+                  <Label color={tab.color} sx={{ mr: 1 }}>
+                    {tab.count}
+                  </Label>
+                }
               />
             ))}
           </Tabs>
