@@ -303,8 +303,11 @@ export default function LabelEditorPage() {
       return;
     }
 
-    // Temporarily set content to measure
+    // Always allow the content change first
     setTemplateHtml(content);
+
+    // Check if this is a deletion (content is shorter)
+    const isDeleting = content.length < lastValidContent.length;
 
     // Use setTimeout to allow DOM to update, then check overflow
     setTimeout(() => {
@@ -321,8 +324,8 @@ export default function LabelEditorPage() {
         // Check if content overflows the container
         const isOverflowing = editorElement.scrollHeight > editorElement.clientHeight;
 
-        if (isOverflowing) {
-          // Revert to last valid content
+        if (isOverflowing && !isDeleting) {
+          // Only revert if adding content caused overflow, not deleting
           setTemplateHtml(lastValidContent);
 
           // Show warning only once per overflow attempt
@@ -336,7 +339,7 @@ export default function LabelEditorPage() {
             setTimeout(() => setIsOverflowWarningShown(false), 1000);
           }
         } else {
-          // Content fits, update last valid content
+          // Content fits OR user is deleting (allow deletions even if still overflowing)
           setLastValidContent(content);
         }
       }
