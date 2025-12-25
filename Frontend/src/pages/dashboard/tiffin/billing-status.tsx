@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { useTheme } from '@mui/material/styles';
 import {
   Tab,
   Tabs,
@@ -16,7 +17,6 @@ import {
   IconButton,
   Tooltip,
   Chip,
-  Button,
   Stack,
   MenuItem,
   TextField,
@@ -28,13 +28,18 @@ import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import Scrollbar from '../../../components/scrollbar';
 import Iconify from '../../../components/iconify';
+import Label from '../../../components/label';
 import { PATH_DASHBOARD } from '../../../routes/paths';
 import { useSettingsContext } from '../../../components/settings';
 import axios from '../../../utils/axios';
 import { useSnackbar } from '../../../components/snackbar';
 import { fCurrency } from '../../../utils/formatNumber';
-import { fDate } from '../../../utils/formatTime';
-import { useTable, getComparator, TablePaginationCustom } from '../../../components/table';
+import {
+  useTable,
+  getComparator,
+  TablePaginationCustom,
+} from '../../../components/table';
+import { BillingStatusAnalytic, BillingStatusTableToolbar } from '../../../sections/@dashboard/tiffin/billing/list';
 
 // ----------------------------------------------------------------------
 
@@ -86,6 +91,7 @@ BillingStatusPage.getLayout = (page: React.ReactElement) => (
 
 export default function BillingStatusPage() {
   const router = useRouter();
+  const theme = useTheme();
   const { themeStretch } = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -95,6 +101,7 @@ export default function BillingStatusPage() {
     order,
     orderBy,
     rowsPerPage,
+    setPage,
     onSort,
     onChangeDense,
     onChangePage,
@@ -130,9 +137,64 @@ export default function BillingStatusPage() {
     }
   };
 
+  // Calculate status counts
+  const getStatusCount = (status: string) => {
+    if (status === 'all') return tableData.length;
+    return tableData.filter((record) => record.status === status).length;
+  };
+
+  const getTotalAmountByStatus = (status: string) => {
+    if (status === 'all') return sumBy(tableData, (record) => Number(record.total_amount) || 0);
+    return sumBy(
+      tableData.filter((record) => record.status === status),
+      (record) => Number(record.total_amount) || 0
+    );
+  };
+
+  const getPercentByStatus = (status: string) => {
+    if (tableData.length === 0) return 0;
+    return (getStatusCount(status) / tableData.length) * 100;
+  };
+
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: tableData.length },
+    { value: 'calculating', label: 'Calculating', color: 'default', count: getStatusCount('calculating') },
+    { value: 'pending', label: 'Pending', color: 'warning', count: getStatusCount('pending') },
+    { value: 'finalized', label: 'Finalized', color: 'info', count: getStatusCount('finalized') },
+    { value: 'paid', label: 'Paid', color: 'success', count: getStatusCount('paid') },
+  ] as const;
+
   const handleFilterStatus = (event: React.SyntheticEvent<Element, Event>, newValue: string) => {
     setFilterStatus(newValue);
-    onChangePage(null as any, 0);
+    setPage(0);
+  };
+
+  const handleFilterName = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterName(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterMonth = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterMonth(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterAmountOperator = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterAmountOperator(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterAmountValue = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterAmountValue(event.target.value);
+    setPage(0);
+  };
+
+  const handleResetFilter = () => {
+    setFilterStatus('all');
+    setFilterMonth('');
+    setFilterName('');
+    setFilterAmountOperator('');
+    setFilterAmountValue('');
   };
 
   const handleToggleExpand = (billingId: number) => {
@@ -239,9 +301,7 @@ export default function BillingStatusPage() {
               </tr>
             </thead>
             <tbody>
-              ${dataFiltered
-                .map(
-                  (record) => `
+              ${dataFiltered.map((record) => `
                 <tr>
                   <td>${record.customer_name}</td>
                   <td>${record.customer_phone || '-'}</td>
@@ -252,9 +312,7 @@ export default function BillingStatusPage() {
                   <td class="text-right">$${Number(record.total_amount).toFixed(2)}</td>
                   <td>${record.status}</td>
                 </tr>
-              `
-                )
-                .join('')}
+              `).join('')}
             </tbody>
           </table>
         </body>
@@ -339,9 +397,7 @@ export default function BillingStatusPage() {
       }
 
       if (successCount > 0) {
-        enqueueSnackbar(`Imported ${successCount} billing record(s) successfully`, {
-          variant: 'success',
-        });
+        enqueueSnackbar(`Imported ${successCount} billing record(s) successfully`, { variant: 'success' });
         fetchBillingRecords();
       }
 
@@ -394,7 +450,10 @@ export default function BillingStatusPage() {
       record.updated_at || '',
     ]);
 
-    const csvContent = [headers.join(','), ...csvData.map((row) => row.join(','))].join('\n');
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map((row) => row.join(',')),
+    ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -414,6 +473,9 @@ export default function BillingStatusPage() {
     comparator: getComparator(order, orderBy),
     filterStatus,
     filterMonth,
+    filterName,
+    filterAmountOperator,
+    filterAmountValue,
   });
 
   const dataInPage = dataFiltered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -423,6 +485,12 @@ export default function BillingStatusPage() {
   const uniqueMonths = Array.from(new Set(tableData.map((row) => row.billing_month))).sort((a, b) =>
     b.localeCompare(a)
   );
+
+  const isFiltered =
+    filterStatus !== 'all' ||
+    filterMonth !== '' ||
+    filterName !== '' ||
+    filterAmountOperator !== '';
 
   const statusColor = (status: string) => {
     switch (status) {
@@ -473,6 +541,15 @@ export default function BillingStatusPage() {
         <title>Billing Status | Tiffin Management</title>
       </Head>
 
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
       <Container maxWidth={themeStretch ? false : 'xl'}>
         <CustomBreadcrumbs
           heading="Billing Status"
@@ -483,7 +560,64 @@ export default function BillingStatusPage() {
           ]}
         />
 
+        {/* Analytics Cards */}
+        <Card sx={{ mb: 5 }}>
+          <Scrollbar>
+            <Stack
+              direction="row"
+              divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+              sx={{ py: 2 }}
+            >
+              <BillingStatusAnalytic
+                title="Total"
+                total={tableData.length}
+                percent={100}
+                price={getTotalAmountByStatus('all')}
+                icon="ic:round-receipt"
+                color={theme.palette.info.main}
+              />
+
+              <BillingStatusAnalytic
+                title="Calculating"
+                total={getStatusCount('calculating')}
+                percent={getPercentByStatus('calculating')}
+                price={getTotalAmountByStatus('calculating')}
+                icon="eva:refresh-outline"
+                color={theme.palette.text.secondary}
+              />
+
+              <BillingStatusAnalytic
+                title="Pending"
+                total={getStatusCount('pending')}
+                percent={getPercentByStatus('pending')}
+                price={getTotalAmountByStatus('pending')}
+                icon="eva:clock-fill"
+                color={theme.palette.warning.main}
+              />
+
+              <BillingStatusAnalytic
+                title="Finalized"
+                total={getStatusCount('finalized')}
+                percent={getPercentByStatus('finalized')}
+                price={getTotalAmountByStatus('finalized')}
+                icon="eva:checkmark-circle-2-fill"
+                color={theme.palette.info.main}
+              />
+
+              <BillingStatusAnalytic
+                title="Paid"
+                total={getStatusCount('paid')}
+                percent={getPercentByStatus('paid')}
+                price={getTotalAmountByStatus('paid')}
+                icon="eva:checkmark-circle-2-fill"
+                color={theme.palette.success.main}
+              />
+            </Stack>
+          </Scrollbar>
+        </Card>
+
         <Card>
+          {/* Status Tabs */}
           <Tabs
             value={filterStatus}
             onChange={handleFilterStatus}
@@ -493,43 +627,33 @@ export default function BillingStatusPage() {
             }}
           >
             {STATUS_OPTIONS.map((tab) => (
-              <Tab key={tab} label={tab === 'all' ? 'All' : getStatusLabel(tab)} value={tab} />
+              <Tab
+                key={tab}
+                label={tab === 'all' ? 'All' : getStatusLabel(tab)}
+                value={tab}
+              />
             ))}
           </Tabs>
 
           <Divider />
 
-          {/* Filters */}
-          <Stack
-            spacing={2}
-            direction={{ xs: 'column', sm: 'row' }}
-            sx={{ p: 2.5, bgcolor: 'background.neutral' }}
-          >
-            <TextField
-              select
-              fullWidth
-              label="Filter by Month"
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              SelectProps={{
-                MenuProps: {
-                  PaperProps: {
-                    sx: { maxHeight: 240 },
-                  },
-                },
-              }}
-              sx={{ maxWidth: { sm: 240 } }}
-            >
-              <MenuItem value="">All Months</MenuItem>
-              {uniqueMonths.map((month) => (
-                <MenuItem key={month} value={month}>
-                  {month}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack>
-
-          <Divider />
+          {/* Toolbar */}
+          <BillingStatusTableToolbar
+            isFiltered={isFiltered}
+            filterName={filterName}
+            filterMonth={filterMonth}
+            filterAmountOperator={filterAmountOperator}
+            filterAmountValue={filterAmountValue}
+            monthOptions={uniqueMonths}
+            onFilterName={handleFilterName}
+            onFilterMonth={handleFilterMonth}
+            onFilterAmountOperator={handleFilterAmountOperator}
+            onFilterAmountValue={handleFilterAmountValue}
+            onResetFilter={handleResetFilter}
+            onPrint={handlePrint}
+            onImport={handleImport}
+            onExport={handleExport}
+          />
 
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <Scrollbar>
@@ -572,13 +696,12 @@ export default function BillingStatusPage() {
                           <TableRow hover>
                             <TableCell sx={{ width: 40 }}>
                               {hasOrders && (
-                                <IconButton size="small" onClick={() => handleToggleExpand(row.id)}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleToggleExpand(row.id)}
+                                >
                                   <Iconify
-                                    icon={
-                                      isExpanded
-                                        ? 'eva:arrow-ios-downward-fill'
-                                        : 'eva:arrow-ios-forward-fill'
-                                    }
+                                    icon={isExpanded ? 'eva:arrow-ios-downward-fill' : 'eva:arrow-ios-forward-fill'}
                                     width={18}
                                   />
                                 </IconButton>
@@ -656,9 +779,7 @@ export default function BillingStatusPage() {
                                           size="small"
                                           onClick={() =>
                                             router.push(
-                                              `/dashboard/tiffin/order-invoice-details?orderId=${
-                                                row.orders![0].order_id
-                                              }&month=${row.billing_month}`
+                                              `/dashboard/tiffin/order-invoice-details?orderId=${row.orders![0].order_id}&month=${row.billing_month}`
                                             )
                                           }
                                         >
@@ -671,11 +792,7 @@ export default function BillingStatusPage() {
                                         size="small"
                                         onClick={() =>
                                           router.push(
-                                            `/dashboard/tiffin/combined-invoice?customerId=${
-                                              row.customer_id
-                                            }&customerName=${encodeURIComponent(
-                                              row.customer_name
-                                            )}&month=${row.billing_month}`
+                                            `/dashboard/tiffin/combined-invoice?customerId=${row.customer_id}&customerName=${encodeURIComponent(row.customer_name)}&month=${row.billing_month}`
                                           )
                                         }
                                       >
@@ -719,11 +836,7 @@ export default function BillingStatusPage() {
                                         {row.orders!.map((orderItem) => (
                                           <TableRow key={orderItem.id} hover>
                                             <TableCell sx={{ pl: 4 }}>
-                                              <Stack
-                                                direction="row"
-                                                alignItems="center"
-                                                spacing={1}
-                                              >
+                                              <Stack direction="row" alignItems="center" spacing={1}>
                                                 <Iconify
                                                   icon="eva:corner-down-right-outline"
                                                   width={16}
@@ -736,21 +849,12 @@ export default function BillingStatusPage() {
                                             </TableCell>
                                             <TableCell>
                                               <Typography variant="caption">
-                                                {formatDateRange(
-                                                  orderItem.start_date,
-                                                  orderItem.end_date
-                                                )}
+                                                {formatDateRange(orderItem.start_date, orderItem.end_date)}
                                               </Typography>
                                             </TableCell>
-                                            <TableCell align="center">
-                                              {orderItem.total_delivered}
-                                            </TableCell>
-                                            <TableCell align="center">
-                                              {orderItem.total_absent}
-                                            </TableCell>
-                                            <TableCell align="center">
-                                              {orderItem.total_extra}
-                                            </TableCell>
+                                            <TableCell align="center">{orderItem.total_delivered}</TableCell>
+                                            <TableCell align="center">{orderItem.total_absent}</TableCell>
+                                            <TableCell align="center">{orderItem.total_extra}</TableCell>
                                             <TableCell align="right">
                                               {fCurrency(orderItem.total_amount)}
                                             </TableCell>
@@ -802,11 +906,17 @@ function applyFilter({
   comparator,
   filterStatus,
   filterMonth,
+  filterName,
+  filterAmountOperator,
+  filterAmountValue,
 }: {
   inputData: BillingRecord[];
   comparator: (a: any, b: any) => number;
   filterStatus: string;
   filterMonth: string;
+  filterName: string;
+  filterAmountOperator: string;
+  filterAmountValue: string;
 }) {
   const stabilizedThis = inputData.map((el, index) => [el, index] as const);
 
@@ -818,6 +928,7 @@ function applyFilter({
 
   let data = stabilizedThis.map((el) => el[0]);
 
+  // Filter by status
   if (filterStatus !== 'all') {
     data = data.filter((row) => {
       const displayStatus = row.effective_status || row.status;
@@ -825,8 +936,43 @@ function applyFilter({
     });
   }
 
+  // Filter by month
   if (filterMonth) {
     data = data.filter((row) => row.billing_month === filterMonth);
+  }
+
+  // Filter by name/phone search
+  if (filterName) {
+    const searchLower = filterName.toLowerCase();
+    data = data.filter(
+      (row) =>
+        row.customer_name.toLowerCase().includes(searchLower) ||
+        (row.customer_phone && row.customer_phone.toLowerCase().includes(searchLower))
+    );
+  }
+
+  // Filter by amount
+  if (filterAmountOperator && filterAmountValue) {
+    const amountValue = parseFloat(filterAmountValue);
+    if (!isNaN(amountValue)) {
+      data = data.filter((row) => {
+        const amount = Number(row.total_amount);
+        switch (filterAmountOperator) {
+          case '>':
+            return amount > amountValue;
+          case '>=':
+            return amount >= amountValue;
+          case '<':
+            return amount < amountValue;
+          case '<=':
+            return amount <= amountValue;
+          case '==':
+            return amount === amountValue;
+          default:
+            return true;
+        }
+      });
+    }
   }
 
   return data;
