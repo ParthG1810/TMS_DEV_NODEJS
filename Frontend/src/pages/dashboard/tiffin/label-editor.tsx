@@ -319,10 +319,6 @@ export default function LabelEditorPage() {
           ]}
         />
 
-        <Alert severity="info" sx={{ mb: 3 }}>
-          Keyboard shortcuts: Ctrl+S (Save), Escape (Cancel)
-        </Alert>
-
         <Grid container spacing={3}>
           {/* Left Column - Editor */}
           <Grid item xs={12} md={8}>
@@ -412,8 +408,11 @@ export default function LabelEditorPage() {
             <Card sx={{ mb: 3 }}>
               <CardHeader title="Template Editor" />
               <CardContent>
-                <Alert severity="warning" sx={{ mb: 2 }}>
+                <Alert severity="warning" sx={{ mb: 1 }}>
                   Design your label within the blue bordered area. Content outside this area will be clipped during printing.
+                </Alert>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Keyboard shortcuts: Ctrl+S (Save), Escape (Cancel)
                 </Alert>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
                   Fixed canvas: {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
