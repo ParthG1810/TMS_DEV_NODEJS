@@ -492,28 +492,41 @@ export default function LabelEditorPage() {
                     maxHeight: 400,
                   }}
                 >
+                  {/* Outer container to match .ql-container */}
                   <Box
                     sx={{
                       width: inchesToPixels(widthInches),
                       height: inchesToPixels(heightInches),
-                      border: '1px solid',
-                      borderColor: 'grey.400',
+                      border: '2px solid #1976d2',
+                      borderRadius: '8px',
                       bgcolor: 'white',
                       transform: `scale(${previewZoom / 100})`,
                       transformOrigin: 'top left',
-                      padding: '8px',
                       overflow: 'hidden',
-                      // Match Quill editor paragraph styling
-                      '& p': {
-                        margin: 0,
-                        padding: 0,
-                      },
-                      '& img': {
-                        maxWidth: '100%',
-                      },
+                      boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
+                      boxSizing: 'border-box',
                     }}
-                    dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
-                  />
+                  >
+                    {/* Inner container to match .ql-editor */}
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        padding: '8px',
+                        overflow: 'hidden',
+                        boxSizing: 'border-box',
+                        // Match Quill editor paragraph styling
+                        '& p': {
+                          margin: 0,
+                          padding: 0,
+                        },
+                        '& img': {
+                          maxWidth: '100%',
+                        },
+                      }}
+                      dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
+                    />
+                  </Box>
                 </Paper>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   Preview shows sample data. Actual values will be replaced during printing.
