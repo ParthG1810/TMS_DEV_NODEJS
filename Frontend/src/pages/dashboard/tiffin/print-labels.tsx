@@ -143,18 +143,18 @@ export default function PrintLabelsPage() {
     const widthPx = Math.round(widthIn * 96);
     const heightPx = Math.round(heightIn * 96);
 
-    // Generate HTML for each label
+    // Generate HTML for each label using ql-editor class for Quill styling
     const labelsHtml = labels
       .map(
         (html) => `
       <div class="label">
-        <div class="label-content">${html}</div>
+        <div class="ql-editor">${html}</div>
       </div>
     `
       )
       .join('');
 
-    // Full HTML document
+    // Full HTML document with Quill styles for consistency
     const printDocument = `
 <!DOCTYPE html>
 <html>
@@ -188,7 +188,8 @@ export default function PrintLabelsPage() {
     .label:last-child {
       page-break-after: auto;
     }
-    .label-content {
+    /* Quill editor styles for consistency */
+    .ql-editor {
       position: absolute;
       top: 0;
       left: 0;
@@ -196,17 +197,37 @@ export default function PrintLabelsPage() {
       height: ${heightPx}px;
       padding: 8px;
       overflow: hidden;
-      line-height: 1.2;
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.42;
+      tab-size: 4;
     }
-    .label-content p {
+    .ql-editor p {
       margin: 0;
       padding: 0;
-      line-height: 1.2;
     }
-    .label-content img {
+    .ql-editor img {
       max-width: 100%;
-      display: block;
-      margin: 0 auto;
+    }
+    /* Quill alignment classes */
+    .ql-align-center {
+      text-align: center;
+    }
+    .ql-align-right {
+      text-align: right;
+    }
+    .ql-align-justify {
+      text-align: justify;
+    }
+    /* Quill font sizes */
+    .ql-size-small {
+      font-size: 0.75em;
+    }
+    .ql-size-large {
+      font-size: 1.5em;
+    }
+    .ql-size-huge {
+      font-size: 2.5em;
     }
   </style>
 </head>
