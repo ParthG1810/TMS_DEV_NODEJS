@@ -412,9 +412,12 @@ export default function LabelEditorPage() {
             <Card sx={{ mb: 3 }}>
               <CardHeader title="Template Editor" />
               <CardContent>
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  Design your label within the blue bordered area. Content outside this area will be clipped during printing.
+                </Alert>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
                   Fixed canvas: {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
-                  {inchesToPixels(heightInches)}px) — Content must fit within this area
+                  {inchesToPixels(heightInches)}px)
                 </Typography>
                 <Box
                   sx={{
@@ -457,9 +460,6 @@ export default function LabelEditorPage() {
                     formats={quillFormats}
                   />
                 </Box>
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  Design your label within the blue bordered area. Content outside this area will be clipped during printing.
-                </Alert>
               </CardContent>
             </Card>
 
