@@ -10,6 +10,7 @@ import { LoadingButton } from '@mui/lab';
 import { useAuthContext } from '../../../../auth/useAuthContext';
 // utils
 import { fData } from '../../../../utils/formatNumber';
+import axios from '../../../../utils/axios';
 // assets
 import { countries } from '../../../../assets/data';
 // components
@@ -46,14 +47,14 @@ export default function AccountGeneral() {
   const UpdateUserSchema = Yup.object().shape({
     displayName: Yup.string().required('Name is required'),
     email: Yup.string().required('Email is required').email('Email must be a valid email address'),
-    photoURL: Yup.string().required('Avatar is required').nullable(true),
-    phoneNumber: Yup.string().required('Phone number is required'),
-    country: Yup.string().required('Country is required'),
-    address: Yup.string().required('Address is required'),
-    state: Yup.string().required('State is required'),
-    city: Yup.string().required('City is required'),
-    zipCode: Yup.string().required('Zip code is required'),
-    about: Yup.string().required('About is required'),
+    photoURL: Yup.mixed().nullable(true),
+    phoneNumber: Yup.string().nullable(true),
+    country: Yup.string().nullable(true),
+    address: Yup.string().nullable(true),
+    state: Yup.string().nullable(true),
+    city: Yup.string().nullable(true),
+    zipCode: Yup.string().nullable(true),
+    about: Yup.string().nullable(true),
   });
 
   const defaultValues = {
@@ -77,17 +78,40 @@ export default function AccountGeneral() {
 
   const {
     setValue,
+    setError,
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
 
   const onSubmit = async (data: FormValuesProps) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      enqueueSnackbar('Update success!');
-      console.log('DATA', data);
+      // Handle photoURL - if it's a File object, we need to upload it first
+      let photoURL = data.photoURL;
+      if (photoURL && typeof photoURL !== 'string') {
+        // For now, just use the preview URL
+        // In production, you would upload to a storage service
+        photoURL = (photoURL as CustomFile).preview || null;
+      }
+
+      await axios.put('/api/account/update-profile', {
+        displayName: data.displayName,
+        email: data.email,
+        phoneNumber: data.phoneNumber || null,
+        country: data.country || null,
+        address: data.address || null,
+        state: data.state || null,
+        city: data.city || null,
+        zipCode: data.zipCode || null,
+        about: data.about || null,
+        photoURL: photoURL || null,
+        isPublic: data.isPublic,
+      });
+      enqueueSnackbar('Profile updated successfully!');
     } catch (error) {
       console.error(error);
+      const message = error?.message || 'Failed to update profile';
+      setError('email', { message });
+      enqueueSnackbar(message, { variant: 'error' });
     }
   };
 

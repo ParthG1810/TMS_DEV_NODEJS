@@ -7,6 +7,8 @@ import { Stack, Card } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 // @types
 import { IUserAccountChangePassword } from '../../../../@types/user';
+// utils
+import axios from '../../../../utils/axios';
 // components
 import Iconify from '../../../../components/iconify';
 import { useSnackbar } from '../../../../components/snackbar';
@@ -40,18 +42,25 @@ export default function AccountChangePassword() {
 
   const {
     reset,
+    setError,
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
 
   const onSubmit = async (data: FormValuesProps) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await axios.post('/api/account/change-password', {
+        oldPassword: data.oldPassword,
+        newPassword: data.newPassword,
+        confirmNewPassword: data.confirmNewPassword,
+      });
       reset();
-      enqueueSnackbar('Update success!');
-      console.log('DATA', data);
+      enqueueSnackbar('Password changed successfully!');
     } catch (error) {
       console.error(error);
+      const message = error?.message || 'Failed to change password';
+      setError('oldPassword', { message });
+      enqueueSnackbar(message, { variant: 'error' });
     }
   };
 

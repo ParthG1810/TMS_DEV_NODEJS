@@ -35,8 +35,8 @@ export default function AuthLoginForm() {
   });
 
   const defaultValues = {
-    email: 'demo@minimals.cc',
-    password: 'demo1234',
+    email: 'admin@tms.com',
+    password: 'Admin@123',
   };
 
   const methods = useForm<FormValuesProps>({
