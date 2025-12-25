@@ -10,6 +10,7 @@ import {
   TableCell,
   IconButton,
   Typography,
+  Tooltip,
 } from '@mui/material';
 // components
 import Label from '../../../../components/label';
@@ -33,6 +34,7 @@ type Props = {
   onEditRow: VoidFunction;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
+  isProtected?: boolean;
 };
 
 export default function UserTableRow({
@@ -41,6 +43,7 @@ export default function UserTableRow({
   onEditRow,
   onSelectRow,
   onDeleteRow,
+  isProtected = false,
 }: Props) {
   const { name, avatarUrl, email, role } = row;
 
@@ -83,16 +86,31 @@ export default function UserTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          {isProtected ? (
+            <Tooltip title="This user cannot be deleted">
+              <span>
+                <Checkbox disabled checked={false} />
+              </span>
+            </Tooltip>
+          ) : (
+            <Checkbox checked={selected} onClick={onSelectRow} />
+          )}
         </TableCell>
 
         <TableCell>
           <Stack direction="row" alignItems="center" spacing={2}>
             <Avatar alt={name} src={avatarUrl} />
 
-            <Typography variant="subtitle2" noWrap>
-              {name}
-            </Typography>
+            <Stack>
+              <Typography variant="subtitle2" noWrap>
+                {name}
+              </Typography>
+              {isProtected && (
+                <Label variant="soft" color="warning" sx={{ fontSize: '10px' }}>
+                  Protected
+                </Label>
+              )}
+            </Stack>
           </Stack>
         </TableCell>
 
@@ -121,16 +139,18 @@ export default function UserTableRow({
         arrow="right-top"
         sx={{ width: 140 }}
       >
-        <MenuItem
-          onClick={() => {
-            handleOpenConfirm();
-            handleClosePopover();
-          }}
-          sx={{ color: 'error.main' }}
-        >
-          <Iconify icon="eva:trash-2-outline" />
-          Delete
-        </MenuItem>
+        {!isProtected && (
+          <MenuItem
+            onClick={() => {
+              handleOpenConfirm();
+              handleClosePopover();
+            }}
+            sx={{ color: 'error.main' }}
+          >
+            <Iconify icon="eva:trash-2-outline" />
+            Delete
+          </MenuItem>
+        )}
 
         <MenuItem
           onClick={() => {
