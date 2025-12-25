@@ -130,27 +130,29 @@ async function handleGet(
       // Determine effective status based on order statuses (priority order: top to bottom)
       // 1. Calculating - if ANY order is still calculating
       // 2. Pending - if ANY order is pending approval
-      // 3. Finalized - if ALL orders are finalized (invoiced, waiting for payment)
-      // 4. Partial Paid - if SOME orders are paid but not ALL
-      // 5. Paid - if ALL orders are paid
+      // 3. Paid - if ALL orders are paid
+      // 4. Finalized/Invoiced - if ALL orders are finalized, invoiced, or approved
+      // 5. Partial Paid - if SOME orders are paid and SOME are finalized/invoiced/approved
       let effectiveStatus = billing.status;
       if (orders.length > 0) {
         const hasCalculating = orders.some((o: any) => o.status === 'calculating');
         const hasPending = orders.some((o: any) => o.status === 'pending');
-        const allFinalized = orders.every((o: any) => o.status === 'finalized');
         const allPaid = orders.every((o: any) => o.status === 'paid');
+        // Consider finalized, invoiced, and approved as equivalent for "Invoiced" status
+        const invoicedStatuses = ['finalized', 'invoiced', 'approved'];
+        const allInvoiced = orders.every((o: any) => invoicedStatuses.includes(o.status));
         const somePaid = orders.some((o: any) => o.status === 'paid');
-        const someFinalized = orders.some((o: any) => o.status === 'finalized');
+        const someInvoiced = orders.some((o: any) => invoicedStatuses.includes(o.status));
 
         if (hasCalculating) {
           effectiveStatus = 'calculating';
         } else if (hasPending) {
           effectiveStatus = 'pending';
-        } else if (allFinalized) {
-          effectiveStatus = 'finalized';
         } else if (allPaid) {
           effectiveStatus = 'paid';
-        } else if (somePaid && someFinalized) {
+        } else if (allInvoiced) {
+          effectiveStatus = 'finalized';
+        } else if (somePaid && someInvoiced) {
           effectiveStatus = 'partial_paid';
         }
       }
