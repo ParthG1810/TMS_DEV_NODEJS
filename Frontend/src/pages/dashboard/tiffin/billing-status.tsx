@@ -24,7 +24,6 @@ import {
   Box,
   Typography,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import Scrollbar from '../../../components/scrollbar';
@@ -467,7 +466,10 @@ export default function BillingStatusPage() {
                                     sx={{
                                       py: 1,
                                       px: 2,
-                                      bgcolor: (theme) => alpha(theme.palette.primary.lighter, 0.3),
+                                      border: (theme) => `1px solid ${theme.palette.divider}`,
+                                      borderRadius: 1,
+                                      mx: 1,
+                                      my: 0.5,
                                     }}
                                   >
                                     <Table size="small">
