@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 // next
 import Head from 'next/head';
 import NextLink from 'next/link';
 import { useRouter } from 'next/router';
 // @mui
+import { useTheme } from '@mui/material/styles';
 import {
   Card,
   Table,
@@ -13,6 +14,10 @@ import {
   Container,
   IconButton,
   TableContainer,
+  Tabs,
+  Tab,
+  Divider,
+  Stack,
 } from '@mui/material';
 // routes
 import { PATH_DASHBOARD } from '../../../routes/paths';
@@ -29,6 +34,7 @@ import ConfirmDialog from '../../../components/confirm-dialog';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import { useSettingsContext } from '../../../components/settings';
 import { useSnackbar } from '../../../components/snackbar';
+import Label from '../../../components/label';
 import {
   useTable,
   getComparator,
@@ -41,14 +47,12 @@ import {
   TableSkeleton,
 } from '../../../components/table';
 // sections
-import { UserTableToolbar, UserTableRow } from '../../../sections/@dashboard/user/list';
+import { UserTableToolbar, UserTableRow, UserAnalytic } from '../../../sections/@dashboard/user/list';
 
 // ----------------------------------------------------------------------
 
 // Default admin email that cannot be deleted
 const PROTECTED_ADMIN_EMAIL = 'admin@tms.com';
-
-const ROLE_OPTIONS = ['all', 'admin', 'manager', 'staff', 'tester', 'user'];
 
 const TABLE_HEAD = [
   { id: 'name', label: 'Name', align: 'left' },
@@ -82,6 +86,8 @@ const transformUser = (apiUser: any): UserData => ({
 });
 
 export default function UserListPage() {
+  const theme = useTheme();
+
   const {
     dense,
     page,
@@ -106,11 +112,14 @@ export default function UserListPage() {
   const { user: currentUser } = useAuthContext();
   const { push } = useRouter();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [tableData, setTableData] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterName, setFilterName] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [openConfirm, setOpenConfirm] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   // Check if current user can manage users
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'manager';
@@ -168,6 +177,26 @@ export default function UserListPage() {
     (!dataFiltered.length && !!filterName) ||
     (!dataFiltered.length && !!filterRole);
 
+  // Calculate role counts
+  const getRoleCount = (role: string) => {
+    if (role === 'all') return tableData.length;
+    return tableData.filter((user) => user.role === role).length;
+  };
+
+  const getPercentByRole = (role: string) => {
+    if (tableData.length === 0) return 0;
+    return (getRoleCount(role) / tableData.length) * 100;
+  };
+
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: tableData.length },
+    { value: 'admin', label: 'Admin', color: 'error', count: getRoleCount('admin') },
+    { value: 'manager', label: 'Manager', color: 'warning', count: getRoleCount('manager') },
+    { value: 'staff', label: 'Staff', color: 'success', count: getRoleCount('staff') },
+    { value: 'tester', label: 'Tester', color: 'secondary', count: getRoleCount('tester') },
+    { value: 'user', label: 'User', color: 'default', count: getRoleCount('user') },
+  ] as const;
+
   const handleOpenConfirm = () => {
     setOpenConfirm(true);
   };
@@ -181,9 +210,9 @@ export default function UserListPage() {
     setFilterName(event.target.value);
   };
 
-  const handleFilterRole = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilterRole = (event: React.SyntheticEvent, newValue: string) => {
     setPage(0);
-    setFilterRole(event.target.value);
+    setFilterRole(newValue);
   };
 
   const handleDeleteRow = async (id: string) => {
@@ -258,6 +287,164 @@ export default function UserListPage() {
     setFilterRole('all');
   };
 
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>User List</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { text-align: center; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .role-admin { color: #d32f2f; }
+            .role-manager { color: #ed6c02; }
+            .role-staff { color: #2e7d32; }
+            .role-tester { color: #9c27b0; }
+            .role-user { color: #757575; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>User List</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dataFiltered.map((user) => `
+                <tr>
+                  <td>${user.name}</td>
+                  <td>${user.email}</td>
+                  <td class="role-${user.role}">${user.role}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    event.target.value = '';
+
+    if (!file.name.endsWith('.csv')) {
+      enqueueSnackbar('Please select a CSV file', { variant: 'error' });
+      return;
+    }
+
+    setImporting(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        enqueueSnackbar('CSV file is empty', { variant: 'error' });
+        setImporting(false);
+        return;
+      }
+
+      const dataLines = lines.slice(1);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const line of dataLines) {
+        try {
+          const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+          const cleanValues = values.map((v) => v.replace(/^"|"$/g, '').trim());
+
+          if (cleanValues.length < 4) {
+            errorCount++;
+            continue;
+          }
+
+          const userData = {
+            displayName: cleanValues[0],
+            email: cleanValues[1],
+            password: cleanValues[2],
+            role: cleanValues[3] || 'user',
+          };
+
+          if (!userData.displayName || !userData.email || !userData.password) {
+            errorCount++;
+            continue;
+          }
+
+          await axios.post('/api/users', userData);
+          successCount++;
+        } catch (error: any) {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        enqueueSnackbar(`Imported ${successCount} user(s) successfully`, { variant: 'success' });
+        fetchUsers();
+      }
+
+      if (errorCount > 0) {
+        enqueueSnackbar(`${errorCount} user(s) failed to import`, { variant: 'warning' });
+      }
+    } catch (error: any) {
+      console.error('Import error:', error);
+      enqueueSnackbar('Failed to import users', { variant: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExport = () => {
+    const headers = ['Name', 'Email', 'Role'];
+    const csvData = dataFiltered.map((user) => [
+      `"${user.name}"`,
+      `"${user.email}"`,
+      user.role,
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map((row) => row.join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `users-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    enqueueSnackbar('Users exported successfully', { variant: 'success' });
+  };
+
   // Custom select all handler that excludes protected users
   const handleSelectAllRows = (checked: boolean) => {
     const selectableIds = getSelectableUsers().map((user) => user.id);
@@ -304,6 +491,15 @@ export default function UserListPage() {
         <title>User: List | TMS</title>
       </Head>
 
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
       <Container maxWidth={themeStretch ? false : 'lg'}>
         <CustomBreadcrumbs
           heading="User List"
@@ -326,15 +522,99 @@ export default function UserListPage() {
           }
         />
 
+        {/* Analytics Cards */}
+        <Card sx={{ mb: 5 }}>
+          <Scrollbar>
+            <Stack
+              direction="row"
+              divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+              sx={{ py: 2 }}
+            >
+              <UserAnalytic
+                title="Total"
+                total={tableData.length}
+                percent={100}
+                icon="ic:round-people"
+                color={theme.palette.info.main}
+              />
+
+              <UserAnalytic
+                title="Admin"
+                total={getRoleCount('admin')}
+                percent={getPercentByRole('admin')}
+                icon="ic:round-admin-panel-settings"
+                color={theme.palette.error.main}
+              />
+
+              <UserAnalytic
+                title="Manager"
+                total={getRoleCount('manager')}
+                percent={getPercentByRole('manager')}
+                icon="ic:round-supervisor-account"
+                color={theme.palette.warning.main}
+              />
+
+              <UserAnalytic
+                title="Staff"
+                total={getRoleCount('staff')}
+                percent={getPercentByRole('staff')}
+                icon="ic:round-badge"
+                color={theme.palette.success.main}
+              />
+
+              <UserAnalytic
+                title="Tester"
+                total={getRoleCount('tester')}
+                percent={getPercentByRole('tester')}
+                icon="ic:round-bug-report"
+                color={theme.palette.secondary.main}
+              />
+
+              <UserAnalytic
+                title="User"
+                total={getRoleCount('user')}
+                percent={getPercentByRole('user')}
+                icon="ic:round-person"
+                color={theme.palette.text.secondary}
+              />
+            </Stack>
+          </Scrollbar>
+        </Card>
+
         <Card>
+          {/* Role Tabs */}
+          <Tabs
+            value={filterRole}
+            onChange={handleFilterRole}
+            sx={{
+              px: 2,
+              bgcolor: 'background.neutral',
+            }}
+          >
+            {TABS.map((tab) => (
+              <Tab
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                icon={
+                  <Label color={tab.color} sx={{ mr: 1 }}>
+                    {tab.count}
+                  </Label>
+                }
+              />
+            ))}
+          </Tabs>
+
+          <Divider />
+
           <UserTableToolbar
             isFiltered={isFiltered}
             filterName={filterName}
-            filterRole={filterRole}
-            optionsRole={ROLE_OPTIONS}
             onFilterName={handleFilterName}
-            onFilterRole={handleFilterRole}
             onResetFilter={handleResetFilter}
+            onPrint={handlePrint}
+            onImport={currentUser?.role === 'admin' ? handleImport : undefined}
+            onExport={handleExport}
           />
 
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
