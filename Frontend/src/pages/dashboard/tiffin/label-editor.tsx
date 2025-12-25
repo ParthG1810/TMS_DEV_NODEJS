@@ -486,14 +486,23 @@ export default function LabelEditorPage() {
                       mt: 2,
                       overflow: 'hidden',
                       boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
+                      position: 'relative',
                     },
                     '& .ql-editor': {
                       width: '100%',
-                      height: '100%',
-                      padding: '8px',
-                      overflow: 'hidden',
-                      // Prevent content from expanding beyond label size
-                      maxHeight: '100%',
+                      height: '100% !important',
+                      padding: '8px !important',
+                      overflow: 'hidden !important',
+                      boxSizing: 'border-box',
+                      maxHeight: '100% !important',
+                      // Reset paragraph margins to match preview exactly
+                      '& p': {
+                        margin: '0 !important',
+                        padding: '0 !important',
+                      },
+                      '& img': {
+                        maxWidth: '100%',
+                      },
                     },
                   }}
                 >
