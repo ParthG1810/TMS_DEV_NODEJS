@@ -36,12 +36,13 @@ const ICONS = {
 };
 
 const navConfig = [
-
   // Surti-Fusion
   //------------------------------------------------------------------------
-    {
+
+  {
     subheader: 'SURTI FUSION',
     items: [
+      { title: 'app', path: PATH_DASHBOARD.general.app, icon: ICONS.dashboard },
       // INGREDIENT MANAGEMENT
       {
         title: 'Ingredient Management',
@@ -70,6 +71,7 @@ const navConfig = [
         path: PATH_DASHBOARD.tiffin.root,
         icon: ICONS.menuItem,
         children: [
+          { title: 'Dashboard', path: PATH_DASHBOARD.tiffin.root },
           { title: 'Meal Plans', path: PATH_DASHBOARD.tiffin.mealPlans },
           { title: 'Customers', path: PATH_DASHBOARD.tiffin.customers },
           { title: 'Tiffin Orders', path: PATH_DASHBOARD.tiffin.orders },
@@ -98,9 +100,19 @@ const navConfig = [
           { title: 'Gmail Settings', path: PATH_DASHBOARD.payments.settings },
         ],
       },
+      // USER
+      {
+        title: 'user',
+        path: PATH_DASHBOARD.user.root,
+        icon: ICONS.user,
+        children: [
+          { title: 'account', path: PATH_DASHBOARD.user.account },
+          { title: 'list', path: PATH_DASHBOARD.user.list, roles: ['admin', 'manager'] },
+          { title: 'create', path: PATH_DASHBOARD.user.new, roles: ['admin', 'manager'] },
+        ],
+      },
     ],
   },
-
 
   // GENERAL
   // ----------------------------------------------------------------------
@@ -128,10 +140,15 @@ const navConfig = [
         icon: ICONS.user,
         children: [
           { title: 'profile', path: PATH_DASHBOARD.user.profile },
+
           { title: 'cards', path: PATH_DASHBOARD.user.cards },
+
           { title: 'list', path: PATH_DASHBOARD.user.list },
+
           { title: 'create', path: PATH_DASHBOARD.user.new },
+
           { title: 'edit', path: PATH_DASHBOARD.user.demoEdit },
+
           { title: 'account', path: PATH_DASHBOARD.user.account },
         ],
       },
@@ -179,63 +196,6 @@ const navConfig = [
         title: 'File manager',
         path: PATH_DASHBOARD.fileManager,
         icon: ICONS.folder,
-      },
-
-      // INGREDIENT MANAGEMENT
-      {
-        title: 'Ingredient Management',
-        path: PATH_DASHBOARD.ingredient.root,
-        icon: ICONS.cart,
-        children: [
-          { title: 'list', path: PATH_DASHBOARD.ingredient.list },
-          { title: 'create', path: PATH_DASHBOARD.ingredient.new },
-        ],
-      },
-
-      // RECIPE MANAGEMENT
-      {
-        title: 'Recipe Management',
-        path: PATH_DASHBOARD.recipe.root,
-        icon: ICONS.booking,
-        children: [
-          { title: 'list', path: PATH_DASHBOARD.recipe.list },
-          { title: 'create', path: PATH_DASHBOARD.recipe.new },
-        ],
-      },
-
-      // TIFFIN MANAGEMENT
-      {
-        title: 'Tiffin Management',
-        path: PATH_DASHBOARD.tiffin.root,
-        icon: ICONS.menuItem,
-        children: [
-          { title: 'Meal Plans', path: PATH_DASHBOARD.tiffin.mealPlans },
-          { title: 'Customers', path: PATH_DASHBOARD.tiffin.customers },
-          { title: 'Tiffin Orders', path: PATH_DASHBOARD.tiffin.orders },
-          { title: 'Billing Calendar', path: PATH_DASHBOARD.tiffin.billingCalendar },
-          { title: 'Billing Status', path: PATH_DASHBOARD.tiffin.billingStatus },
-          { title: 'Invoices', path: PATH_DASHBOARD.tiffin.invoices },
-          { title: 'Daily Count', path: PATH_DASHBOARD.tiffin.dailyCount },
-          { title: 'Monthly List', path: PATH_DASHBOARD.tiffin.monthlyList },
-          { title: 'Complete List', path: PATH_DASHBOARD.tiffin.completeList },
-          { title: 'Settings', path: PATH_DASHBOARD.tiffin.settings },
-        ],
-      },
-
-      // PAYMENTS
-      {
-        title: 'Payments',
-        path: PATH_DASHBOARD.payments.root,
-        icon: ICONS.banking,
-        children: [
-          { title: 'Dashboard', path: PATH_DASHBOARD.payments.root },
-          { title: 'Interac Transactions', path: PATH_DASHBOARD.payments.interac },
-          { title: 'Record Cash Payment', path: PATH_DASHBOARD.payments.cashPayment },
-          { title: 'Payment History', path: PATH_DASHBOARD.payments.history },
-          { title: 'Customer Credit', path: PATH_DASHBOARD.payments.credit },
-          { title: 'Refunds', path: PATH_DASHBOARD.payments.refunds },
-          { title: 'Gmail Settings', path: PATH_DASHBOARD.payments.settings },
-        ],
       },
     ],
   },

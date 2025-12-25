@@ -10,9 +10,8 @@ import {
   TableCell,
   IconButton,
   Typography,
+  Tooltip,
 } from '@mui/material';
-// @types
-import { IUserAccountGeneral } from '../../../../@types/user';
 // components
 import Label from '../../../../components/label';
 import Iconify from '../../../../components/iconify';
@@ -21,12 +20,21 @@ import ConfirmDialog from '../../../../components/confirm-dialog';
 
 // ----------------------------------------------------------------------
 
+type UserRowData = {
+  id: string;
+  avatarUrl: string;
+  name: string;
+  email: string;
+  role: string;
+};
+
 type Props = {
-  row: IUserAccountGeneral;
+  row: UserRowData;
   selected: boolean;
   onEditRow: VoidFunction;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
+  isProtected?: boolean;
 };
 
 export default function UserTableRow({
@@ -35,8 +43,9 @@ export default function UserTableRow({
   onEditRow,
   onSelectRow,
   onDeleteRow,
+  isProtected = false,
 }: Props) {
-  const { name, avatarUrl, company, role, isVerified, status } = row;
+  const { name, avatarUrl, email, role } = row;
 
   const [openConfirm, setOpenConfirm] = useState(false);
 
@@ -58,48 +67,62 @@ export default function UserTableRow({
     setOpenPopover(null);
   };
 
+  const getRoleColor = (userRole: string) => {
+    switch (userRole) {
+      case 'admin':
+        return 'error';
+      case 'manager':
+        return 'warning';
+      case 'staff':
+        return 'info';
+      case 'tester':
+        return 'secondary';
+      default:
+        return 'success';
+    }
+  };
+
   return (
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          {isProtected ? (
+            <Tooltip title="This user cannot be deleted">
+              <span>
+                <Checkbox disabled checked={false} />
+              </span>
+            </Tooltip>
+          ) : (
+            <Checkbox checked={selected} onClick={onSelectRow} />
+          )}
         </TableCell>
 
         <TableCell>
           <Stack direction="row" alignItems="center" spacing={2}>
             <Avatar alt={name} src={avatarUrl} />
 
-            <Typography variant="subtitle2" noWrap>
-              {name}
-            </Typography>
+            <Stack>
+              <Typography variant="subtitle2" noWrap>
+                {name}
+              </Typography>
+              {isProtected && (
+                <Label variant="soft" color="warning" sx={{ fontSize: '10px' }}>
+                  Protected
+                </Label>
+              )}
+            </Stack>
           </Stack>
         </TableCell>
 
-        <TableCell align="left">{company}</TableCell>
-
-        <TableCell align="left" sx={{ textTransform: 'capitalize' }}>
-          {role}
-        </TableCell>
-
-        <TableCell align="center">
-          <Iconify
-            icon={isVerified ? 'eva:checkmark-circle-fill' : 'eva:clock-outline'}
-            sx={{
-              width: 20,
-              height: 20,
-              color: 'success.main',
-              ...(!isVerified && { color: 'warning.main' }),
-            }}
-          />
-        </TableCell>
+        <TableCell align="left">{email}</TableCell>
 
         <TableCell align="left">
           <Label
             variant="soft"
-            color={(status === 'banned' && 'error') || 'success'}
+            color={getRoleColor(role)}
             sx={{ textTransform: 'capitalize' }}
           >
-            {status}
+            {role}
           </Label>
         </TableCell>
 
@@ -116,16 +139,18 @@ export default function UserTableRow({
         arrow="right-top"
         sx={{ width: 140 }}
       >
-        <MenuItem
-          onClick={() => {
-            handleOpenConfirm();
-            handleClosePopover();
-          }}
-          sx={{ color: 'error.main' }}
-        >
-          <Iconify icon="eva:trash-2-outline" />
-          Delete
-        </MenuItem>
+        {!isProtected && (
+          <MenuItem
+            onClick={() => {
+              handleOpenConfirm();
+              handleClosePopover();
+            }}
+            sx={{ color: 'error.main' }}
+          >
+            <Iconify icon="eva:trash-2-outline" />
+            Delete
+          </MenuItem>
+        )}
 
         <MenuItem
           onClick={() => {
