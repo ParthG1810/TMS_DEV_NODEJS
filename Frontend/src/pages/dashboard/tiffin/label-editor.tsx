@@ -65,14 +65,14 @@ const ReactQuill = dynamic(
     // Register image resize module
     Quill.register('modules/imageResize', ImageResize);
 
-    // Register custom font sizes
+    // Register custom font sizes (null = Normal/default size)
     const Size = Quill.import('attributors/style/size');
-    Size.whitelist = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'];
+    Size.whitelist = [null, '10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'];
     Quill.register(Size, true);
 
-    // Register custom fonts
+    // Register custom fonts (null = default font)
     const Font = Quill.import('attributors/style/font');
-    Font.whitelist = ['arial', 'helvetica', 'times-new-roman', 'georgia', 'verdana', 'courier'];
+    Font.whitelist = [null, 'arial', 'helvetica', 'times-new-roman', 'georgia', 'verdana', 'courier'];
     Quill.register(Font, true);
 
     return RQ;
@@ -331,8 +331,7 @@ export default function LabelEditorPage() {
     toolbar: [
       [{ header: [1, 2, 3, 4, 5, 6, false] }], // Headers
       [{ font: [] }],
-      [{ size: ['small', 'medium', 'large', 'huge', false] }],
-      [{ sizes: [{ size: ['10px', '12px', '14px', '16px', '18px', '24px'] }] }], // Font and size
+      [{ size: [false, '10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'] }], // Custom pixel sizes (false = Normal)
       ['bold', 'italic', 'underline', 'strike'], // Text styling
       ['blockquote', 'code-block'], // Block quotes and code
       [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }], // Lists
@@ -610,6 +609,59 @@ export default function LabelEditorPage() {
                       backgroundColor: '#f5f5f5',
                       borderColor: 'grey.300',
                       border: '1px solid #ccc',
+                    },
+                    // Size dropdown label styling
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label::before, & .ql-snow .ql-picker.ql-size .ql-picker-item::before': {
+                      content: '"Normal"',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="10px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="10px"]::before': {
+                      content: '"10px"',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="12px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before': {
+                      content: '"12px"',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="14px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before': {
+                      content: '"14px"',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="16px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before': {
+                      content: '"16px"',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="18px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before': {
+                      content: '"18px"',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="20px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before': {
+                      content: '"20px"',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="24px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before': {
+                      content: '"24px"',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="32px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="32px"]::before': {
+                      content: '"32px"',
+                    },
+                    // Make dropdown items show their actual size
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="10px"]::before': {
+                      fontSize: '10px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before': {
+                      fontSize: '12px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before': {
+                      fontSize: '14px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before': {
+                      fontSize: '16px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before': {
+                      fontSize: '18px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before': {
+                      fontSize: '20px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before': {
+                      fontSize: '24px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="32px"]::before': {
+                      fontSize: '32px',
                     },
                     '& .ql-container': {
                       width: inchesToPixels(widthInches),
