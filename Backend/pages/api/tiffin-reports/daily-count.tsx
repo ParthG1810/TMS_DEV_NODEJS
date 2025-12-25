@@ -66,18 +66,24 @@ async function handleGetDailyTiffinCount(
     const currentDayName = dayNames[dayOfWeek];
 
     // Fetch orders that are active on the target date and include the current day
+    // Sort by print_order from customer_print_order table
     const orders = (await query(
       `
       SELECT
+        c.id as customer_id,
         c.name as customer_name,
+        c.phone as customer_phone,
+        c.address as customer_address,
         co.quantity,
         mp.meal_name as meal_plan_name,
-        co.selected_days
+        co.selected_days,
+        COALESCE(cpo.print_order, 999999) as print_order
       FROM customer_orders co
       INNER JOIN customers c ON co.customer_id = c.id
       INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
+      LEFT JOIN customer_print_order cpo ON c.id = cpo.customer_id
       WHERE co.start_date <= ? AND co.end_date >= ?
-      ORDER BY c.name ASC
+      ORDER BY COALESCE(cpo.print_order, 999999) ASC, c.name ASC
       `,
       [targetDate, targetDate]
     )) as any[];
@@ -105,9 +111,13 @@ async function handleGetDailyTiffinCount(
         return selectedDays.length === 0 || selectedDays.includes(currentDayName);
       })
       .map((order) => ({
+        customer_id: order.customer_id,
         customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        customer_address: order.customer_address,
         quantity: order.quantity,
         meal_plan_name: order.meal_plan_name,
+        print_order: order.print_order,
       }));
 
     // Calculate total count

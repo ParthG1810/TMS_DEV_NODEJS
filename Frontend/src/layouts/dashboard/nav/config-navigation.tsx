@@ -78,10 +78,22 @@ const navConfig = [
           { title: 'Billing Calendar', path: PATH_DASHBOARD.tiffin.billingCalendar },
           { title: 'Billing Status', path: PATH_DASHBOARD.tiffin.billingStatus },
           { title: 'Invoices', path: PATH_DASHBOARD.tiffin.invoices },
+          { title: 'Settings', path: PATH_DASHBOARD.tiffin.settings },
+        ],
+      },
+
+      // LABEL PRINT
+      {
+        title: 'Label Print',
+        path: PATH_DASHBOARD.tiffin.labelTemplates,
+        icon: ICONS.label,
+        children: [
+          { title: 'Label Templates', path: PATH_DASHBOARD.tiffin.labelTemplates },
+          { title: 'New Template', path: PATH_DASHBOARD.tiffin.labelEditor },
+          { title: 'Customer Print Order', path: PATH_DASHBOARD.tiffin.customerPrintOrder },
+          { title: 'Print Labels', path: PATH_DASHBOARD.tiffin.printLabels },
           { title: 'Daily Count', path: PATH_DASHBOARD.tiffin.dailyCount },
           { title: 'Monthly List', path: PATH_DASHBOARD.tiffin.monthlyList },
-          { title: 'Complete List', path: PATH_DASHBOARD.tiffin.completeList },
-          { title: 'Settings', path: PATH_DASHBOARD.tiffin.settings },
         ],
       },
 
