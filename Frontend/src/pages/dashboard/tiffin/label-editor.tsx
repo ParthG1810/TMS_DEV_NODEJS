@@ -413,8 +413,8 @@ export default function LabelEditorPage() {
               <CardHeader title="Template Editor" />
               <CardContent>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                  {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
-                  {inchesToPixels(heightInches)}px at 96 DPI)
+                  Fixed canvas: {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
+                  {inchesToPixels(heightInches)}px) — Content must fit within this area
                 </Typography>
                 <Box
                   sx={{
@@ -426,22 +426,25 @@ export default function LabelEditorPage() {
                       borderRadius: '8px 8px 0 0',
                       backgroundColor: '#f5f5f5',
                       borderColor: 'grey.300',
+                      border: '1px solid #ccc',
                     },
                     '& .ql-container': {
                       width: inchesToPixels(widthInches),
                       height: inchesToPixels(heightInches),
-                      border: '2px dashed',
-                      borderColor: 'grey.400',
+                      border: '2px solid #1976d2',
                       borderRadius: '0 0 8px 8px',
                       backgroundColor: 'white',
                       mx: 'auto',
                       overflow: 'hidden',
+                      boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
                     },
                     '& .ql-editor': {
                       width: '100%',
                       height: '100%',
                       padding: '8px',
-                      overflow: 'auto',
+                      overflow: 'hidden',
+                      // Prevent content from expanding beyond label size
+                      maxHeight: '100%',
                     },
                   }}
                 >
@@ -454,92 +457,65 @@ export default function LabelEditorPage() {
                     formats={quillFormats}
                   />
                 </Box>
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  Design your label within the blue bordered area. Content outside this area will be clipped during printing.
+                </Alert>
               </CardContent>
             </Card>
 
-            {/* Print Settings */}
+            {/* Live Preview - Moved here from right column */}
             <Card sx={{ mb: 3 }}>
-              <CardHeader title="Print Settings (Zebra GX430d)" />
+              <CardHeader
+                title="Live Preview"
+                action={
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography variant="caption">Zoom:</Typography>
+                    <Slider
+                      value={previewZoom}
+                      onChange={(e, v) => setPreviewZoom(v as number)}
+                      min={50}
+                      max={200}
+                      step={10}
+                      sx={{ width: 100 }}
+                      size="small"
+                    />
+                    <Typography variant="caption">{previewZoom}%</Typography>
+                  </Stack>
+                }
+              />
               <CardContent>
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={3}>
-                    <TextField
-                      fullWidth
-                      label="Darkness"
-                      type="number"
-                      value={printSettings.darkness}
-                      onChange={(e) =>
-                        setPrintSettings((prev) => ({
-                          ...prev,
-                          darkness: parseInt(e.target.value) || 15,
-                        }))
-                      }
-                      InputProps={{
-                        inputProps: { min: 0, max: 30 },
-                      }}
-                      helperText="0-30"
-                    />
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <TextField
-                      fullWidth
-                      label="Print Speed"
-                      type="number"
-                      value={printSettings.printSpeed}
-                      onChange={(e) =>
-                        setPrintSettings((prev) => ({
-                          ...prev,
-                          printSpeed: parseInt(e.target.value) || 4,
-                        }))
-                      }
-                      InputProps={{
-                        endAdornment: <InputAdornment position="end">in/s</InputAdornment>,
-                        inputProps: { min: 1, max: 4 },
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <FormControl fullWidth>
-                      <InputLabel>Print Method</InputLabel>
-                      <Select
-                        label="Print Method"
-                        value={printSettings.printMethod}
-                        onChange={(e) =>
-                          setPrintSettings((prev) => ({
-                            ...prev,
-                            printMethod: e.target.value as 'native' | 'usb-direct',
-                          }))
-                        }
-                      >
-                        <MenuItem value="native">Windows Driver</MenuItem>
-                        <MenuItem value="usb-direct">Direct USB</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <FormControl fullWidth>
-                      <InputLabel>Media Type</InputLabel>
-                      <Select
-                        label="Media Type"
-                        value={printSettings.mediaType}
-                        onChange={(e) =>
-                          setPrintSettings((prev) => ({
-                            ...prev,
-                            mediaType: e.target.value as 'direct-thermal' | 'thermal-transfer',
-                          }))
-                        }
-                      >
-                        <MenuItem value="direct-thermal">Direct Thermal</MenuItem>
-                        <MenuItem value="thermal-transfer">Thermal Transfer</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                </Grid>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    bgcolor: 'grey.50',
+                    overflow: 'auto',
+                    maxHeight: 400,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: inchesToPixels(widthInches),
+                      height: inchesToPixels(heightInches),
+                      border: '1px solid',
+                      borderColor: 'grey.400',
+                      bgcolor: 'white',
+                      transform: `scale(${previewZoom / 100})`,
+                      transformOrigin: 'top left',
+                      p: 1,
+                      overflow: 'hidden',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
+                  />
+                </Paper>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  Preview shows sample data. Actual values will be replaced during printing.
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Right Column - Placeholders & Preview */}
+          {/* Right Column - Placeholders & Settings */}
           <Grid item xs={12} md={4}>
             {/* Placeholders */}
             <Card sx={{ mb: 3 }}>
@@ -641,53 +617,78 @@ export default function LabelEditorPage() {
               </CardContent>
             </Card>
 
-            {/* Live Preview */}
+            {/* Print Settings - Moved from left column */}
             <Card sx={{ mb: 3 }}>
-              <CardHeader
-                title="Live Preview"
-                action={
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <Typography variant="caption">Zoom:</Typography>
-                    <Slider
-                      value={previewZoom}
-                      onChange={(e, v) => setPreviewZoom(v as number)}
-                      min={50}
-                      max={200}
-                      step={10}
-                      sx={{ width: 100 }}
-                      size="small"
-                    />
-                    <Typography variant="caption">{previewZoom}%</Typography>
-                  </Stack>
-                }
-              />
+              <CardHeader title="Print Settings (Zebra GX430d)" />
               <CardContent>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    bgcolor: 'grey.50',
-                    overflow: 'auto',
-                    maxHeight: 400,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: inchesToPixels(widthInches),
-                      minHeight: inchesToPixels(heightInches),
-                      border: '1px solid',
-                      borderColor: 'grey.400',
-                      bgcolor: 'white',
-                      transform: `scale(${previewZoom / 100})`,
-                      transformOrigin: 'top left',
-                      p: 1,
+                <Stack spacing={2}>
+                  <TextField
+                    fullWidth
+                    label="Darkness"
+                    type="number"
+                    size="small"
+                    value={printSettings.darkness}
+                    onChange={(e) =>
+                      setPrintSettings((prev) => ({
+                        ...prev,
+                        darkness: parseInt(e.target.value) || 15,
+                      }))
+                    }
+                    InputProps={{
+                      inputProps: { min: 0, max: 30 },
                     }}
-                    dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
+                    helperText="0-30"
                   />
-                </Paper>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  Preview shows sample data. Actual values will be replaced during printing.
-                </Typography>
+                  <TextField
+                    fullWidth
+                    label="Print Speed"
+                    type="number"
+                    size="small"
+                    value={printSettings.printSpeed}
+                    onChange={(e) =>
+                      setPrintSettings((prev) => ({
+                        ...prev,
+                        printSpeed: parseInt(e.target.value) || 4,
+                      }))
+                    }
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">in/s</InputAdornment>,
+                      inputProps: { min: 1, max: 4 },
+                    }}
+                  />
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Print Method</InputLabel>
+                    <Select
+                      label="Print Method"
+                      value={printSettings.printMethod}
+                      onChange={(e) =>
+                        setPrintSettings((prev) => ({
+                          ...prev,
+                          printMethod: e.target.value as 'native' | 'usb-direct',
+                        }))
+                      }
+                    >
+                      <MenuItem value="native">Windows Driver</MenuItem>
+                      <MenuItem value="usb-direct">Direct USB</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Media Type</InputLabel>
+                    <Select
+                      label="Media Type"
+                      value={printSettings.mediaType}
+                      onChange={(e) =>
+                        setPrintSettings((prev) => ({
+                          ...prev,
+                          mediaType: e.target.value as 'direct-thermal' | 'thermal-transfer',
+                        }))
+                      }
+                    >
+                      <MenuItem value="direct-thermal">Direct Thermal</MenuItem>
+                      <MenuItem value="thermal-transfer">Thermal Transfer</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Stack>
               </CardContent>
             </Card>
 
