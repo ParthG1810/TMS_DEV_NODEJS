@@ -535,7 +535,15 @@ export default function LabelEditorPage() {
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                   System Placeholders
                 </Typography>
-                <Stack spacing={1} sx={{ mb: 2 }}>
+                <Stack
+                  spacing={1}
+                  sx={{
+                    mb: 2,
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                    pr: 1,
+                  }}
+                >
                   {SYSTEM_PLACEHOLDERS.map((p) => (
                     <Box
                       key={p.key}
