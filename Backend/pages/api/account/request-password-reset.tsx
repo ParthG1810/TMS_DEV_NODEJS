@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import cors from 'src/utils/cors';
-import { query } from 'src/lib/db';
+import cors from '../../../src/utils/cors';
+import { query } from '../../../src/config/database';
 import { RowDataPacket } from 'mysql2';
 
 // ----------------------------------------------------------------------
