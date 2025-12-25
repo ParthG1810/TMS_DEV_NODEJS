@@ -38,13 +38,11 @@ const ICONS = {
 const navConfig = [
   // Surti-Fusion
   //------------------------------------------------------------------------
-  {
-    subheader: 'general',
-    items: [{ title: 'app', path: PATH_DASHBOARD.general.app, icon: ICONS.dashboard }],
-  },
+
   {
     subheader: 'SURTI FUSION',
     items: [
+      { title: 'app', path: PATH_DASHBOARD.general.app, icon: ICONS.dashboard },
       // INGREDIENT MANAGEMENT
       {
         title: 'Ingredient Management',
