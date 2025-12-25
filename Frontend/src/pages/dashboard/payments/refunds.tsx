@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
@@ -24,9 +24,9 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Grid,
   Alert,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import { PATH_DASHBOARD } from '../../../routes/paths';
@@ -47,6 +47,14 @@ import {
 } from '../../../components/table';
 import { fCurrency } from '../../../utils/formatNumber';
 import { fDate, fDateTime } from '../../../utils/formatTime';
+import { RefundAnalytic, RefundTableToolbar } from '../../../sections/@dashboard/payments/refund/list';
+
+// ----------------------------------------------------------------------
+
+// Helper function for sumBy
+function sumBy<T>(array: T[], iteratee: (item: T) => number): number {
+  return array.reduce((sum, item) => sum + iteratee(item), 0);
+}
 
 // ----------------------------------------------------------------------
 
@@ -79,13 +87,6 @@ const TABLE_HEAD = [
   { id: 'actions', label: '', align: 'right' },
 ];
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
 // ----------------------------------------------------------------------
 
 RefundsPage.getLayout = (page: React.ReactElement) => (
@@ -95,9 +96,11 @@ RefundsPage.getLayout = (page: React.ReactElement) => (
 // ----------------------------------------------------------------------
 
 export default function RefundsPage() {
+  const theme = useTheme();
   const { themeStretch } = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     dense,
@@ -112,8 +115,14 @@ export default function RefundsPage() {
   } = useTable({ defaultOrderBy: 'created_at', defaultOrder: 'desc' });
 
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [refunds, setRefunds] = useState<RefundRecord[]>([]);
-  const [filterStatus, setFilterStatus] = useState('pending');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
+  const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
+  const [filterName, setFilterName] = useState('');
+  const [filterAmountOperator, setFilterAmountOperator] = useState('');
+  const [filterAmountValue, setFilterAmountValue] = useState('');
   const [openApprove, setOpenApprove] = useState(false);
   const [openCancel, setOpenCancel] = useState(false);
   const [selectedRefund, setSelectedRefund] = useState<RefundRecord | null>(null);
@@ -123,11 +132,7 @@ export default function RefundsPage() {
   const fetchRefunds = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = {};
-      if (filterStatus !== 'all') {
-        params.status = filterStatus;
-      }
-      const response = await axios.get('/api/refunds', { params });
+      const response = await axios.get('/api/refunds');
       if (response.data.success) {
         setRefunds(response.data.data);
       }
@@ -137,16 +142,83 @@ export default function RefundsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, enqueueSnackbar]);
+  }, [enqueueSnackbar]);
 
   useEffect(() => {
     fetchRefunds();
   }, [fetchRefunds]);
 
+  // Calculate status counts
+  const getStatusCount = (status: string) => {
+    if (status === 'all') return refunds.length;
+    return refunds.filter((refund) => refund.status === status).length;
+  };
+
+  const getTotalAmountByStatus = (status: string) => {
+    if (status === 'all') return sumBy(refunds, (refund) => Number(refund.refund_amount) || 0);
+    return sumBy(
+      refunds.filter((refund) => refund.status === status),
+      (refund) => Number(refund.refund_amount) || 0
+    );
+  };
+
+  const getPercentByStatus = (status: string) => {
+    if (refunds.length === 0) return 0;
+    return (getStatusCount(status) / refunds.length) * 100;
+  };
+
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: refunds.length },
+    { value: 'pending', label: 'Pending', color: 'warning', count: getStatusCount('pending') },
+    { value: 'completed', label: 'Completed', color: 'success', count: getStatusCount('completed') },
+    { value: 'cancelled', label: 'Cancelled', color: 'error', count: getStatusCount('cancelled') },
+  ] as const;
+
   const handleFilterStatus = (_event: React.SyntheticEvent, newValue: string) => {
     setPage(0);
     setFilterStatus(newValue);
   };
+
+  const handleFilterName = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterName(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterStartDate = (date: Date | null) => {
+    setFilterStartDate(date);
+    setPage(0);
+  };
+
+  const handleFilterEndDate = (date: Date | null) => {
+    setFilterEndDate(date);
+    setPage(0);
+  };
+
+  const handleFilterAmountOperator = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterAmountOperator(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterAmountValue = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterAmountValue(event.target.value);
+    setPage(0);
+  };
+
+  const handleResetFilter = () => {
+    setFilterStatus('all');
+    setFilterStartDate(null);
+    setFilterEndDate(null);
+    setFilterName('');
+    setFilterAmountOperator('');
+    setFilterAmountValue('');
+  };
+
+  const isFiltered =
+    filterStatus !== 'all' ||
+    filterStartDate !== null ||
+    filterEndDate !== null ||
+    filterName !== '' ||
+    filterAmountOperator !== '';
 
   const handleApprove = async () => {
     if (!selectedRefund) return;
@@ -155,7 +227,7 @@ export default function RefundsPage() {
       setProcessing(true);
       const response = await axios.put(`/api/refunds/${selectedRefund.id}`, {
         action: 'approve',
-        approved_by: 1, // TODO: Get actual user ID
+        approved_by: 1,
         reference_number: referenceNumber || undefined,
       });
 
@@ -225,15 +297,235 @@ export default function RefundsPage() {
     }
   };
 
-  // Calculate pending totals
-  const pendingTotal = refunds
-    .filter(r => r.status === 'pending')
-    .reduce((sum, r) => sum + r.refund_amount, 0);
+  // Print handler
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-  const pendingCount = refunds.filter(r => r.status === 'pending').length;
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Refunds Report</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20px;
+            }
+            h1 {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .text-right {
+              text-align: right;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Refunds Report</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Requested</th>
+                <th>Customer</th>
+                <th class="text-right">Amount</th>
+                <th>Method</th>
+                <th>Reason</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredRefunds.map((refund) => `
+                <tr>
+                  <td>${new Date(refund.created_at).toLocaleDateString()}</td>
+                  <td>${refund.customer_name}</td>
+                  <td class="text-right">$${Number(refund.refund_amount).toFixed(2)}</td>
+                  <td>${getMethodLabel(refund.refund_method)}</td>
+                  <td>${refund.reason}</td>
+                  <td>${refund.status}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
 
-  const dataInPage = refunds.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  const isNotFound = !loading && refunds.length === 0;
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  // Import handler
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    event.target.value = '';
+
+    if (!file.name.endsWith('.csv')) {
+      enqueueSnackbar('Please select a CSV file', { variant: 'error' });
+      return;
+    }
+
+    setImporting(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        enqueueSnackbar('CSV file is empty', { variant: 'error' });
+        setImporting(false);
+        return;
+      }
+
+      enqueueSnackbar('CSV import for refunds is not supported', { variant: 'info' });
+    } catch (error: any) {
+      console.error('Import error:', error);
+      enqueueSnackbar('Failed to import refunds', { variant: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Export handler
+  const handleExport = () => {
+    const headers = [
+      'ID',
+      'Customer ID',
+      'Customer Name',
+      'Refund Amount',
+      'Refund Method',
+      'Refund Date',
+      'Reference Number',
+      'Reason',
+      'Status',
+      'Created At',
+      'Approved At',
+    ];
+
+    const csvData = filteredRefunds.map((refund) => [
+      refund.id,
+      refund.customer_id,
+      `"${refund.customer_name || ''}"`,
+      refund.refund_amount,
+      refund.refund_method,
+      refund.refund_date,
+      `"${refund.reference_number || ''}"`,
+      `"${refund.reason || ''}"`,
+      refund.status,
+      refund.created_at || '',
+      refund.approved_at || '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map((row) => row.join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `refunds-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    enqueueSnackbar('Refunds exported successfully', { variant: 'success' });
+  };
+
+  // Filter refunds
+  const filteredRefunds = refunds.filter((refund) => {
+    // Status filter
+    if (filterStatus !== 'all' && refund.status !== filterStatus) return false;
+
+    // Date range filter
+    if (filterStartDate || filterEndDate) {
+      const refundDate = new Date(refund.created_at);
+      if (filterStartDate && refundDate < filterStartDate) return false;
+      if (filterEndDate) {
+        const endDatePlusOne = new Date(filterEndDate);
+        endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+        if (refundDate >= endDatePlusOne) return false;
+      }
+    }
+
+    // Search filter
+    if (filterName) {
+      const query = filterName.toLowerCase();
+      const matchesSearch =
+        refund.customer_name.toLowerCase().includes(query) ||
+        refund.reason.toLowerCase().includes(query) ||
+        (refund.reference_number && refund.reference_number.toLowerCase().includes(query));
+      if (!matchesSearch) return false;
+    }
+
+    // Amount filter
+    if (filterAmountOperator && filterAmountValue) {
+      const amountValue = parseFloat(filterAmountValue);
+      if (!isNaN(amountValue)) {
+        const amount = Number(refund.refund_amount);
+        switch (filterAmountOperator) {
+          case '>':
+            if (!(amount > amountValue)) return false;
+            break;
+          case '>=':
+            if (!(amount >= amountValue)) return false;
+            break;
+          case '<':
+            if (!(amount < amountValue)) return false;
+            break;
+          case '<=':
+            if (!(amount <= amountValue)) return false;
+            break;
+          case '==':
+            if (!(amount === amountValue)) return false;
+            break;
+        }
+      }
+    }
+
+    return true;
+  });
+
+  const dataInPage = filteredRefunds.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const isNotFound = !loading && filteredRefunds.length === 0;
 
   return (
     <>
@@ -241,7 +533,16 @@ export default function RefundsPage() {
         <title>Refunds | Tiffin Management</title>
       </Head>
 
-      <Container maxWidth={themeStretch ? false : 'lg'}>
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
+      <Container maxWidth={themeStretch ? false : 'xl'}>
         <CustomBreadcrumbs
           heading="Refunds Management"
           links={[
@@ -260,48 +561,55 @@ export default function RefundsPage() {
           }
         />
 
-        {/* Summary Card */}
-        {pendingCount > 0 && (
-          <Card sx={{ p: 3, mb: 3 }}>
-            <Grid container spacing={3} alignItems="center">
-              <Grid item xs={12} md={6}>
-                <Stack direction="row" spacing={3} alignItems="center">
-                  <Box
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: 2,
-                      bgcolor: 'warning.lighter',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Iconify icon="mdi:clock-outline" width={32} color="warning.main" />
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Pending Refunds
-                    </Typography>
-                    <Typography variant="h4">
-                      {pendingCount} requests
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total: {fCurrency(pendingTotal)}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Alert severity="warning">
-                  You have {pendingCount} pending refund request{pendingCount > 1 ? 's' : ''} awaiting approval.
-                </Alert>
-              </Grid>
-            </Grid>
-          </Card>
-        )}
+        {/* Analytics Cards */}
+        <Card sx={{ mb: 5 }}>
+          <Scrollbar>
+            <Stack
+              direction="row"
+              divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+              sx={{ py: 2 }}
+            >
+              <RefundAnalytic
+                title="Total"
+                total={refunds.length}
+                percent={100}
+                price={sumBy(refunds, (r) => Number(r.refund_amount) || 0)}
+                icon="ic:round-receipt"
+                color={theme.palette.info.main}
+              />
+
+              <RefundAnalytic
+                title="Pending"
+                total={getStatusCount('pending')}
+                percent={getPercentByStatus('pending')}
+                price={getTotalAmountByStatus('pending')}
+                icon="eva:clock-fill"
+                color={theme.palette.warning.main}
+              />
+
+              <RefundAnalytic
+                title="Completed"
+                total={getStatusCount('completed')}
+                percent={getPercentByStatus('completed')}
+                price={getTotalAmountByStatus('completed')}
+                icon="eva:checkmark-circle-2-fill"
+                color={theme.palette.success.main}
+              />
+
+              <RefundAnalytic
+                title="Cancelled"
+                total={getStatusCount('cancelled')}
+                percent={getPercentByStatus('cancelled')}
+                price={getTotalAmountByStatus('cancelled')}
+                icon="eva:close-circle-fill"
+                color={theme.palette.error.main}
+              />
+            </Stack>
+          </Scrollbar>
+        </Card>
 
         <Card>
+          {/* Status Tabs */}
           <Tabs
             value={filterStatus}
             onChange={handleFilterStatus}
@@ -310,12 +618,40 @@ export default function RefundsPage() {
               bgcolor: 'background.neutral',
             }}
           >
-            {STATUS_OPTIONS.map((tab) => (
-              <Tab key={tab.value} value={tab.value} label={tab.label} />
+            {TABS.map((tab) => (
+              <Tab
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                icon={
+                  <Label color={tab.color} sx={{ mr: 1 }}>
+                    {tab.count}
+                  </Label>
+                }
+              />
             ))}
           </Tabs>
 
           <Divider />
+
+          {/* Toolbar */}
+          <RefundTableToolbar
+            isFiltered={isFiltered}
+            filterName={filterName}
+            filterStartDate={filterStartDate}
+            filterEndDate={filterEndDate}
+            filterAmountOperator={filterAmountOperator}
+            filterAmountValue={filterAmountValue}
+            onFilterName={handleFilterName}
+            onFilterStartDate={handleFilterStartDate}
+            onFilterEndDate={handleFilterEndDate}
+            onFilterAmountOperator={handleFilterAmountOperator}
+            onFilterAmountValue={handleFilterAmountValue}
+            onResetFilter={handleResetFilter}
+            onPrint={handlePrint}
+            onImport={handleImport}
+            onExport={handleExport}
+          />
 
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
@@ -409,7 +745,7 @@ export default function RefundsPage() {
 
                       <TableEmptyRows
                         height={dense ? 52 : 72}
-                        emptyRows={emptyRows(page, rowsPerPage, refunds.length)}
+                        emptyRows={emptyRows(page, rowsPerPage, filteredRefunds.length)}
                       />
 
                       <TableNoData isNotFound={isNotFound} />
@@ -419,7 +755,7 @@ export default function RefundsPage() {
               </TableContainer>
 
               <TablePaginationCustom
-                count={refunds.length}
+                count={filteredRefunds.length}
                 page={page}
                 rowsPerPage={rowsPerPage}
                 onPageChange={onChangePage}
