@@ -331,7 +331,7 @@ export default function LabelEditorPage() {
     toolbar: [
       [{ header: [1, 2, 3, 4, 5, 6, false] }], // Headers
       [{ font: [] }],
-      [{ size: ['small', 'medium', 'large', 'huge', false] }],
+      [{ size: ['small', false, 'large', 'huge'] }],
       [{ sizes: [{ size: ['10px', '12px', '14px', '16px', '18px', '24px'] }] }], // Font and size
       ['bold', 'italic', 'underline', 'strike'], // Text styling
       ['blockquote', 'code-block'], // Block quotes and code
