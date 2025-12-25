@@ -209,10 +209,6 @@ export default function BillingStatusPage() {
     });
   };
 
-  const handleViewDetails = (billingId: number) => {
-    router.push(PATH_DASHBOARD.tiffin.billingDetails(billingId.toString()));
-  };
-
   const handleApprove = async (billing: BillingRecord) => {
     try {
       const response = await axios.put(`/api/monthly-billing/${billing.id}`, {
@@ -238,20 +234,6 @@ export default function BillingStatusPage() {
       }
     } catch (error: any) {
       enqueueSnackbar(error.message || 'Failed to reject billing', { variant: 'error' });
-    }
-  };
-
-  const handleMarkAsPaid = async (billing: BillingRecord) => {
-    try {
-      const response = await axios.put(`/api/monthly-billing/${billing.id}`, {
-        status: 'paid',
-      });
-      if (response.data.success) {
-        enqueueSnackbar('Billing marked as paid', { variant: 'success' });
-        fetchBillingRecords();
-      }
-    } catch (error: any) {
-      enqueueSnackbar(error.message || 'Failed to mark as paid', { variant: 'error' });
     }
   };
 
@@ -751,15 +733,6 @@ export default function BillingStatusPage() {
                             </TableCell>
                             <TableCell align="right">
                               <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                <Tooltip title="View Details">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleViewDetails(row.id)}
-                                  >
-                                    <Iconify icon="eva:eye-outline" />
-                                  </IconButton>
-                                </Tooltip>
-
                                 {displayStatus === 'pending' && (
                                   <>
                                     <Tooltip title="Approve">
@@ -781,18 +754,6 @@ export default function BillingStatusPage() {
                                       </IconButton>
                                     </Tooltip>
                                   </>
-                                )}
-
-                                {displayStatus === 'finalized' && (
-                                  <Tooltip title="Mark as Paid">
-                                    <IconButton
-                                      size="small"
-                                      color="primary"
-                                      onClick={() => handleMarkAsPaid(row)}
-                                    >
-                                      <Iconify icon="eva:credit-card-outline" />
-                                    </IconButton>
-                                  </Tooltip>
                                 )}
 
                                 {displayStatus === 'calculating' && (
