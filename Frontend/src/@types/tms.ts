@@ -204,9 +204,13 @@ export type ICustomerOrderFormValues = {
 
 // Daily Tiffin Count
 export type IDailyTiffinCount = {
+  customer_id: number;
   customer_name: string;
+  customer_phone?: string;
+  customer_address?: string;
   quantity: number;
   meal_plan_name: string;
+  print_order: number;
 };
 
 export type IDailyTiffinSummary = {
