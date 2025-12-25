@@ -147,36 +147,53 @@ export default function PrintLabelsPage() {
   const getQuillPrintStyles = (widthIn: number, heightIn: number) => `
     @page {
       size: ${widthIn}in ${heightIn}in;
-      margin: 0;
+      margin: 0 !important;
+      padding: 0 !important;
     }
     @media print {
+      /* Reset everything */
+      *, *::before, *::after {
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
       html, body {
-        margin: 0;
-        padding: 0;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: ${widthIn}in !important;
+        height: ${heightIn}in !important;
+        overflow: hidden !important;
+      }
+      body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
       /* Outer container - matches editor .ql-container */
       .print-label-container {
-        width: ${widthIn}in;
-        height: ${heightIn}in;
-        overflow: hidden;
-        position: relative;
-        box-sizing: border-box;
+        width: ${widthIn}in !important;
+        height: ${heightIn}in !important;
+        overflow: hidden !important;
+        position: relative !important;
+        box-sizing: border-box !important;
         page-break-after: always;
         page-break-inside: avoid;
+        margin: 0 !important;
+        padding: 0 !important;
       }
       .print-label-container:last-child {
         page-break-after: avoid;
       }
       /* Inner content - matches editor .ql-editor with position absolute */
       .print-label-content {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
         padding: 8px !important;
-        box-sizing: border-box;
-        overflow: hidden;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        margin: 0 !important;
       }
       /* Reset paragraph margins - matches editor exactly */
       .print-label-content p {
@@ -184,7 +201,7 @@ export default function PrintLabelsPage() {
         padding: 0 !important;
       }
       .print-label-content img {
-        max-width: 100%;
+        max-width: 100% !important;
       }
     }
   `;
