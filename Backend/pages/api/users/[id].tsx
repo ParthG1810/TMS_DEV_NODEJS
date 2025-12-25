@@ -9,6 +9,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await cors(req, res);
 
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
     const { id } = req.query;
 
     if (!id || typeof id !== 'string') {
