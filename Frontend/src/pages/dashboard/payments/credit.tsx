@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
@@ -19,7 +19,6 @@ import {
   Tab,
   Box,
   CircularProgress,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -29,6 +28,7 @@ import {
   Alert,
   MenuItem,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { DatePicker } from '@mui/x-date-pickers';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
@@ -49,6 +49,14 @@ import {
 } from '../../../components/table';
 import { fCurrency } from '../../../utils/formatNumber';
 import { fDate, fDateTime } from '../../../utils/formatTime';
+import { CreditAnalytic, CreditTableToolbar } from '../../../sections/@dashboard/payments/credit/list';
+
+// ----------------------------------------------------------------------
+
+// Helper function for sumBy
+function sumBy<T>(array: T[], iteratee: (item: T) => number): number {
+  return array.reduce((sum, item) => sum + iteratee(item), 0);
+}
 
 // ----------------------------------------------------------------------
 
@@ -106,13 +114,6 @@ const TABLE_HEAD = [
   { id: 'actions', label: '', align: 'right' },
 ];
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'available', label: 'Available' },
-  { value: 'used', label: 'Used' },
-  { value: 'refunded', label: 'Refunded' },
-];
-
 const REFUND_METHODS = [
   { value: 'cash', label: 'Cash' },
   { value: 'interac', label: 'Interac e-Transfer' },
@@ -128,9 +129,11 @@ CustomerCreditPage.getLayout = (page: React.ReactElement) => (
 // ----------------------------------------------------------------------
 
 export default function CustomerCreditPage() {
+  const theme = useTheme();
   const { themeStretch } = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     dense,
@@ -145,8 +148,14 @@ export default function CustomerCreditPage() {
   } = useTable({ defaultOrderBy: 'created_at', defaultOrder: 'desc' });
 
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [credits, setCredits] = useState<CustomerCredit[]>([]);
-  const [filterStatus, setFilterStatus] = useState('available');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
+  const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
+  const [filterName, setFilterName] = useState('');
+  const [filterAmountOperator, setFilterAmountOperator] = useState('');
+  const [filterAmountValue, setFilterAmountValue] = useState('');
   const [openRefund, setOpenRefund] = useState(false);
   const [selectedCredit, setSelectedCredit] = useState<CustomerCredit | null>(null);
   const [refundAmount, setRefundAmount] = useState<string>('');
@@ -163,11 +172,7 @@ export default function CustomerCreditPage() {
   const fetchCredits = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = {};
-      if (filterStatus !== 'all') {
-        params.status = filterStatus;
-      }
-      const response = await axios.get('/api/customer-credit', { params });
+      const response = await axios.get('/api/customer-credit');
       if (response.data.success) {
         setCredits(response.data.data);
       }
@@ -177,16 +182,83 @@ export default function CustomerCreditPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, enqueueSnackbar]);
+  }, [enqueueSnackbar]);
 
   useEffect(() => {
     fetchCredits();
   }, [fetchCredits]);
 
+  // Calculate status counts
+  const getStatusCount = (status: string) => {
+    if (status === 'all') return credits.length;
+    return credits.filter((credit) => credit.status === status).length;
+  };
+
+  const getTotalAmountByStatus = (status: string) => {
+    if (status === 'all') return sumBy(credits, (credit) => Number(credit.current_balance) || 0);
+    return sumBy(
+      credits.filter((credit) => credit.status === status),
+      (credit) => Number(credit.current_balance) || 0
+    );
+  };
+
+  const getPercentByStatus = (status: string) => {
+    if (credits.length === 0) return 0;
+    return (getStatusCount(status) / credits.length) * 100;
+  };
+
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: credits.length },
+    { value: 'available', label: 'Available', color: 'success', count: getStatusCount('available') },
+    { value: 'used', label: 'Used', color: 'default', count: getStatusCount('used') },
+    { value: 'refunded', label: 'Refunded', color: 'warning', count: getStatusCount('refunded') },
+  ] as const;
+
   const handleFilterStatus = (_event: React.SyntheticEvent, newValue: string) => {
     setPage(0);
     setFilterStatus(newValue);
   };
+
+  const handleFilterName = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterName(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterStartDate = (date: Date | null) => {
+    setFilterStartDate(date);
+    setPage(0);
+  };
+
+  const handleFilterEndDate = (date: Date | null) => {
+    setFilterEndDate(date);
+    setPage(0);
+  };
+
+  const handleFilterAmountOperator = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterAmountOperator(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterAmountValue = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterAmountValue(event.target.value);
+    setPage(0);
+  };
+
+  const handleResetFilter = () => {
+    setFilterStatus('all');
+    setFilterStartDate(null);
+    setFilterEndDate(null);
+    setFilterName('');
+    setFilterAmountOperator('');
+    setFilterAmountValue('');
+  };
+
+  const isFiltered =
+    filterStatus !== 'all' ||
+    filterStartDate !== null ||
+    filterEndDate !== null ||
+    filterName !== '' ||
+    filterAmountOperator !== '';
 
   const handleOpenRefund = (credit: CustomerCredit) => {
     setSelectedCredit(credit);
@@ -226,7 +298,7 @@ export default function CustomerCreditPage() {
         refund_method: refundMethod,
         refund_date: refundDate.toISOString().split('T')[0],
         reason: refundReason,
-        requested_by: 1, // TODO: Get actual user ID
+        requested_by: 1,
       });
 
       if (response.data.success) {
@@ -296,13 +368,224 @@ export default function CustomerCreditPage() {
     }
   };
 
-  // Calculate totals
-  const totalAvailable = credits
-    .filter(c => c.status === 'available')
-    .reduce((sum, c) => sum + c.current_balance, 0);
+  // Print handler
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-  const dataInPage = credits.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  const isNotFound = !loading && credits.length === 0;
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Customer Credit Report</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20px;
+            }
+            h1 {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .text-right {
+              text-align: right;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Customer Credit Report</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Date Created</th>
+                <th>Customer</th>
+                <th class="text-right">Original</th>
+                <th class="text-right">Balance</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredCredits.map((credit) => `
+                <tr>
+                  <td>${new Date(credit.created_at).toLocaleDateString()}</td>
+                  <td>${credit.customer_name}</td>
+                  <td class="text-right">$${Number(credit.original_amount).toFixed(2)}</td>
+                  <td class="text-right">$${Number(credit.current_balance).toFixed(2)}</td>
+                  <td>${credit.status}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  // Import handler
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    event.target.value = '';
+
+    if (!file.name.endsWith('.csv')) {
+      enqueueSnackbar('Please select a CSV file', { variant: 'error' });
+      return;
+    }
+
+    setImporting(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        enqueueSnackbar('CSV file is empty', { variant: 'error' });
+        setImporting(false);
+        return;
+      }
+
+      enqueueSnackbar('CSV import for credits is not supported', { variant: 'info' });
+    } catch (error: any) {
+      console.error('Import error:', error);
+      enqueueSnackbar('Failed to import credits', { variant: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Export handler
+  const handleExport = () => {
+    const headers = [
+      'ID',
+      'Customer ID',
+      'Customer Name',
+      'Original Amount',
+      'Current Balance',
+      'Status',
+      'Payment Date',
+      'Created At',
+    ];
+
+    const csvData = filteredCredits.map((credit) => [
+      credit.id,
+      credit.customer_id,
+      `"${credit.customer_name || ''}"`,
+      credit.original_amount,
+      credit.current_balance,
+      credit.status,
+      credit.payment_date,
+      credit.created_at || '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map((row) => row.join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `customer-credits-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    enqueueSnackbar('Credits exported successfully', { variant: 'success' });
+  };
+
+  // Filter credits
+  const filteredCredits = credits.filter((credit) => {
+    // Status filter
+    if (filterStatus !== 'all' && credit.status !== filterStatus) return false;
+
+    // Date range filter
+    if (filterStartDate || filterEndDate) {
+      const creditDate = new Date(credit.created_at);
+      if (filterStartDate && creditDate < filterStartDate) return false;
+      if (filterEndDate) {
+        const endDatePlusOne = new Date(filterEndDate);
+        endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+        if (creditDate >= endDatePlusOne) return false;
+      }
+    }
+
+    // Search filter
+    if (filterName) {
+      const query = filterName.toLowerCase();
+      const matchesSearch = credit.customer_name.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+    }
+
+    // Amount filter (on current_balance)
+    if (filterAmountOperator && filterAmountValue) {
+      const amountValue = parseFloat(filterAmountValue);
+      if (!isNaN(amountValue)) {
+        const balance = Number(credit.current_balance);
+        switch (filterAmountOperator) {
+          case '>':
+            if (!(balance > amountValue)) return false;
+            break;
+          case '>=':
+            if (!(balance >= amountValue)) return false;
+            break;
+          case '<':
+            if (!(balance < amountValue)) return false;
+            break;
+          case '<=':
+            if (!(balance <= amountValue)) return false;
+            break;
+          case '==':
+            if (!(balance === amountValue)) return false;
+            break;
+        }
+      }
+    }
+
+    return true;
+  });
+
+  const dataInPage = filteredCredits.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const isNotFound = !loading && filteredCredits.length === 0;
 
   return (
     <>
@@ -310,7 +593,16 @@ export default function CustomerCreditPage() {
         <title>Customer Credit | Tiffin Management</title>
       </Head>
 
-      <Container maxWidth={themeStretch ? false : 'lg'}>
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
+      <Container maxWidth={themeStretch ? false : 'xl'}>
         <CustomBreadcrumbs
           heading="Customer Credit"
           links={[
@@ -329,29 +621,55 @@ export default function CustomerCreditPage() {
           }
         />
 
-        {/* Summary Card */}
-        <Card sx={{ p: 3, mb: 3 }}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Total Available Credit
-                </Typography>
-                <Typography variant="h3" color="success.main">
-                  {fCurrency(totalAvailable)}
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={8}>
-              <Alert severity="info">
-                Customer credits are automatically created when a payment exceeds the total invoice amount.
-                Credits can be applied to future invoices or refunded to the customer.
-              </Alert>
-            </Grid>
-          </Grid>
+        {/* Analytics Cards */}
+        <Card sx={{ mb: 5 }}>
+          <Scrollbar>
+            <Stack
+              direction="row"
+              divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+              sx={{ py: 2 }}
+            >
+              <CreditAnalytic
+                title="Total"
+                total={credits.length}
+                percent={100}
+                price={sumBy(credits, (c) => Number(c.current_balance) || 0)}
+                icon="ic:round-receipt"
+                color={theme.palette.info.main}
+              />
+
+              <CreditAnalytic
+                title="Available"
+                total={getStatusCount('available')}
+                percent={getPercentByStatus('available')}
+                price={getTotalAmountByStatus('available')}
+                icon="eva:checkmark-circle-2-fill"
+                color={theme.palette.success.main}
+              />
+
+              <CreditAnalytic
+                title="Used"
+                total={getStatusCount('used')}
+                percent={getPercentByStatus('used')}
+                price={getTotalAmountByStatus('used')}
+                icon="eva:shopping-cart-fill"
+                color={theme.palette.grey[500]}
+              />
+
+              <CreditAnalytic
+                title="Refunded"
+                total={getStatusCount('refunded')}
+                percent={getPercentByStatus('refunded')}
+                price={getTotalAmountByStatus('refunded')}
+                icon="mdi:cash-refund"
+                color={theme.palette.warning.main}
+              />
+            </Stack>
+          </Scrollbar>
         </Card>
 
         <Card>
+          {/* Status Tabs */}
           <Tabs
             value={filterStatus}
             onChange={handleFilterStatus}
@@ -360,12 +678,40 @@ export default function CustomerCreditPage() {
               bgcolor: 'background.neutral',
             }}
           >
-            {STATUS_OPTIONS.map((tab) => (
-              <Tab key={tab.value} value={tab.value} label={tab.label} />
+            {TABS.map((tab) => (
+              <Tab
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                icon={
+                  <Label color={tab.color} sx={{ mr: 1 }}>
+                    {tab.count}
+                  </Label>
+                }
+              />
             ))}
           </Tabs>
 
           <Divider />
+
+          {/* Toolbar */}
+          <CreditTableToolbar
+            isFiltered={isFiltered}
+            filterName={filterName}
+            filterStartDate={filterStartDate}
+            filterEndDate={filterEndDate}
+            filterAmountOperator={filterAmountOperator}
+            filterAmountValue={filterAmountValue}
+            onFilterName={handleFilterName}
+            onFilterStartDate={handleFilterStartDate}
+            onFilterEndDate={handleFilterEndDate}
+            onFilterAmountOperator={handleFilterAmountOperator}
+            onFilterAmountValue={handleFilterAmountValue}
+            onResetFilter={handleResetFilter}
+            onPrint={handlePrint}
+            onImport={handleImport}
+            onExport={handleExport}
+          />
 
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
@@ -435,7 +781,7 @@ export default function CustomerCreditPage() {
 
                       <TableEmptyRows
                         height={dense ? 52 : 72}
-                        emptyRows={emptyRows(page, rowsPerPage, credits.length)}
+                        emptyRows={emptyRows(page, rowsPerPage, filteredCredits.length)}
                       />
 
                       <TableNoData isNotFound={isNotFound} />
@@ -445,7 +791,7 @@ export default function CustomerCreditPage() {
               </TableContainer>
 
               <TablePaginationCustom
-                count={credits.length}
+                count={filteredCredits.length}
                 page={page}
                 rowsPerPage={rowsPerPage}
                 onPageChange={onChangePage}
