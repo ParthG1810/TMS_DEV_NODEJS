@@ -143,7 +143,7 @@ export default function PrintLabelsPage() {
     []
   );
 
-  // Print styles - uses .ql-editor class to inherit all Quill styles automatically
+  // Print styles - EXACTLY matches editor/preview structure
   const getQuillPrintStyles = (widthIn: number, heightIn: number) => `
     @page {
       size: ${widthIn}in ${heightIn}in;
@@ -154,26 +154,37 @@ export default function PrintLabelsPage() {
         margin: 0;
         padding: 0;
       }
-      .print-label {
-        width: ${widthIn}in !important;
-        height: ${heightIn}in !important;
-        max-height: ${heightIn}in !important;
-        padding: 8px !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
+      /* Outer container - matches editor .ql-container */
+      .print-label-container {
+        width: ${widthIn}in;
+        height: ${heightIn}in;
+        overflow: hidden;
+        position: relative;
+        box-sizing: border-box;
         page-break-after: always;
         page-break-inside: avoid;
       }
-      /* Reset all paragraph margins to match editor */
-      .print-label p {
+      .print-label-container:last-child {
+        page-break-after: avoid;
+      }
+      /* Inner content - matches editor .ql-editor with position absolute */
+      .print-label-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        padding: 8px !important;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+      /* Reset paragraph margins - matches editor exactly */
+      .print-label-content p {
         margin: 0 !important;
         padding: 0 !important;
       }
-      .print-label img {
+      .print-label-content img {
         max-width: 100%;
-      }
-      .print-label:last-child {
-        page-break-after: avoid;
       }
     }
   `;
@@ -530,15 +541,16 @@ export default function PrintLabelsPage() {
         </Card>
       </Container>
 
-      {/* Hidden print area */}
+      {/* Hidden print area - structure matches editor exactly */}
       <Box sx={{ display: 'none' }}>
         <Box ref={printRef}>
           {printContent.map((html, index) => (
-            <div
-              key={index}
-              className="print-label ql-editor"
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
+            <div key={index} className="print-label-container">
+              <div
+                className="print-label-content ql-editor"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            </div>
           ))}
         </Box>
       </Box>
