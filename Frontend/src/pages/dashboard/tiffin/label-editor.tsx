@@ -64,6 +64,16 @@ const ReactQuill = dynamic(
     // Register image resize module
     Quill.register('modules/imageResize', ImageResize);
 
+    // Register custom font sizes
+    const Size = Quill.import('attributors/style/size');
+    Size.whitelist = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'];
+    Quill.register(Size, true);
+
+    // Register custom fonts
+    const Font = Quill.import('attributors/style/font');
+    Font.whitelist = ['arial', 'helvetica', 'times-new-roman', 'georgia', 'verdana', 'courier'];
+    Quill.register(Font, true);
+
     return RQ;
   },
   {
@@ -311,12 +321,16 @@ export default function LabelEditorPage() {
   // Quill modules configuration
   const quillModules = {
     toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      [{ size: ['8pt', '10pt', '12pt', '14pt', '18pt', '24pt'] }],
+      [{ header: [1, 2, 3, 4, 5, 6, false] }],
+      [{ font: [] }],
+      [{ size: ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'] }],
       ['bold', 'italic', 'underline', 'strike'],
+      [{ script: 'sub' }, { script: 'super' }],
       [{ color: [] }, { background: [] }],
       [{ align: [] }],
-      ['image'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      [{ indent: '-1' }, { indent: '+1' }],
+      ['link', 'image'],
       ['clean'],
     ],
     history: {
@@ -331,14 +345,20 @@ export default function LabelEditorPage() {
 
   const quillFormats = [
     'header',
+    'font',
     'size',
     'bold',
     'italic',
     'underline',
     'strike',
+    'script',
     'color',
     'background',
     'align',
+    'list',
+    'bullet',
+    'indent',
+    'link',
     'image',
   ];
 
