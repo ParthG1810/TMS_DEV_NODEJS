@@ -69,6 +69,7 @@ const navConfig = [
         path: PATH_DASHBOARD.tiffin.root,
         icon: ICONS.menuItem,
         children: [
+          { title: 'Dashboard', path: PATH_DASHBOARD.tiffin.root },
           { title: 'Meal Plans', path: PATH_DASHBOARD.tiffin.mealPlans },
           { title: 'Customers', path: PATH_DASHBOARD.tiffin.customers },
           { title: 'Tiffin Orders', path: PATH_DASHBOARD.tiffin.orders },
@@ -223,6 +224,7 @@ const navConfig = [
         path: PATH_DASHBOARD.tiffin.root,
         icon: ICONS.menuItem,
         children: [
+          { title: 'Dashboard', path: PATH_DASHBOARD.tiffin.root },
           { title: 'Meal Plans', path: PATH_DASHBOARD.tiffin.mealPlans },
           { title: 'Customers', path: PATH_DASHBOARD.tiffin.customers },
           { title: 'Tiffin Orders', path: PATH_DASHBOARD.tiffin.orders },
