@@ -4,8 +4,11 @@
 -- with extended roles (admin, manager, staff, tester, user)
 -- ============================================================
 
--- Drop existing users table if it exists (be careful in production!)
--- For development, we'll recreate it with proper structure
+-- Drop existing tables if they exist (be careful in production!)
+-- For development, we'll recreate them with proper structure
+-- Drop dependent tables first to avoid foreign key constraint errors
+DROP TABLE IF EXISTS password_reset_tokens;
+DROP TABLE IF EXISTS login_audit_log;
 DROP TABLE IF EXISTS users;
 
 -- Create users table with extended roles
