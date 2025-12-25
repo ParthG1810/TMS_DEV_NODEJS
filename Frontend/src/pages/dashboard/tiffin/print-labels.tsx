@@ -143,7 +143,7 @@ export default function PrintLabelsPage() {
     []
   );
 
-  // Quill editor CSS - must match exactly for print to look like editor
+  // Print styles - uses .ql-editor class to inherit all Quill styles automatically
   const getQuillPrintStyles = (widthIn: number, heightIn: number) => `
     @page {
       size: ${widthIn}in ${heightIn}in;
@@ -157,32 +157,10 @@ export default function PrintLabelsPage() {
       .print-label {
         width: ${widthIn}in;
         height: ${heightIn}in;
-        padding: 8px;
+        padding: 8px !important;
         box-sizing: border-box;
         overflow: hidden;
         page-break-after: always;
-        /* Quill editor defaults */
-        font-family: Helvetica, Arial, sans-serif;
-        font-size: 13px;
-        line-height: 1.42;
-        text-align: left;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-      }
-      /* Reset all block elements like Quill does */
-      .print-label p,
-      .print-label ol,
-      .print-label ul,
-      .print-label pre,
-      .print-label blockquote,
-      .print-label h1,
-      .print-label h2,
-      .print-label h3,
-      .print-label h4,
-      .print-label h5,
-      .print-label h6 {
-        margin: 0;
-        padding: 0;
       }
       .print-label img {
         max-width: 100%;
@@ -551,7 +529,7 @@ export default function PrintLabelsPage() {
           {printContent.map((html, index) => (
             <div
               key={index}
-              className="print-label"
+              className="print-label ql-editor"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ))}
