@@ -164,6 +164,15 @@ export default function BillingStatusPage() {
     return (getStatusCount(status) / tableData.length) * 100;
   };
 
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: tableData.length },
+    { value: 'calculating', label: 'Calculating', color: 'default', count: getStatusCount('calculating') },
+    { value: 'pending_approval', label: 'Pending Approval', color: 'warning', count: getStatusCount('pending_approval') },
+    { value: 'invoiced', label: 'Invoiced', color: 'info', count: getStatusCount('invoiced') },
+    { value: 'partial_paid', label: 'Partial Paid', color: 'secondary', count: getStatusCount('partial_paid') },
+    { value: 'paid', label: 'Paid', color: 'success', count: getStatusCount('paid') },
+  ] as const;
+
   const handleFilterStatus = (event: React.SyntheticEvent<Element, Event>, newValue: string) => {
     setFilterStatus(newValue);
     setPage(0);
@@ -494,13 +503,13 @@ export default function BillingStatusPage() {
   const statusColor = (status: string) => {
     switch (status) {
       case 'calculating':
+        return 'default';
+      case 'pending_approval':
         return 'warning';
-      case 'pending':
+      case 'invoiced':
         return 'info';
-      case 'finalized':
-        return 'success';
       case 'partial_paid':
-        return 'primary';
+        return 'secondary';
       case 'paid':
         return 'success';
       default:
@@ -586,21 +595,30 @@ export default function BillingStatusPage() {
               />
 
               <BillingStatusAnalytic
-                title="Pending"
-                total={getStatusCount('pending')}
-                percent={getPercentByStatus('pending')}
-                price={getTotalAmountByStatus('pending')}
+                title="Pending Approval"
+                total={getStatusCount('pending_approval')}
+                percent={getPercentByStatus('pending_approval')}
+                price={getTotalAmountByStatus('pending_approval')}
                 icon="eva:clock-fill"
                 color={theme.palette.warning.main}
               />
 
               <BillingStatusAnalytic
-                title="Finalized"
-                total={getStatusCount('finalized')}
-                percent={getPercentByStatus('finalized')}
-                price={getTotalAmountByStatus('finalized')}
-                icon="eva:checkmark-circle-2-fill"
+                title="Invoiced"
+                total={getStatusCount('invoiced')}
+                percent={getPercentByStatus('invoiced')}
+                price={getTotalAmountByStatus('invoiced')}
+                icon="eva:file-text-fill"
                 color={theme.palette.info.main}
+              />
+
+              <BillingStatusAnalytic
+                title="Partial Paid"
+                total={getStatusCount('partial_paid')}
+                percent={getPercentByStatus('partial_paid')}
+                price={getTotalAmountByStatus('partial_paid')}
+                icon="eva:checkmark-outline"
+                color={theme.palette.secondary.main}
               />
 
               <BillingStatusAnalytic
@@ -627,9 +645,15 @@ export default function BillingStatusPage() {
           >
             {STATUS_OPTIONS.map((tab) => (
               <Tab
-                key={tab}
-                label={tab === 'all' ? 'All' : getStatusLabel(tab)}
-                value={tab}
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                iconPosition="start"
+                icon={
+                  <Label color={tab.color} sx={{ mr: 1 }}>
+                    {tab.count}
+                  </Label>
+                }
               />
             ))}
           </Tabs>
