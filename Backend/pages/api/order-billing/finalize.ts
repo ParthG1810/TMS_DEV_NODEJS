@@ -183,7 +183,9 @@ export default async function handler(
       [billing_month, billing.customer_id, billing_month, billing_month]
     );
 
-    const allFinalized = customerOrders.every(o => o.status === 'finalized');
+    // Consider finalized, invoiced, and approved as equivalent for "all finalized" check
+    const invoicedStatuses = ['finalized', 'invoiced', 'approved'];
+    const allFinalized = customerOrders.every(o => invoicedStatuses.includes(o.status));
 
     // Get updated billing details
     const updatedBillings = await query<any[]>(
@@ -200,7 +202,7 @@ export default async function handler(
       [orderIdNum, billing_month]
     );
 
-    const finalizedCount = customerOrders.filter(o => o.status === 'finalized').length;
+    const finalizedCount = customerOrders.filter(o => invoicedStatuses.includes(o.status)).length;
 
     console.log(`[Finalize] Summary: ${finalizedCount}/${customerOrders.length} orders finalized for customer ${billing.customer_id}`);
 
