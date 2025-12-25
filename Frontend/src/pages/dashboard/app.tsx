@@ -1,6 +1,6 @@
 // next
 import Head from 'next/head';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 // @mui
 import { useTheme } from '@mui/material/styles';
 import {
@@ -14,6 +14,7 @@ import {
   Typography,
   Box,
   alpha,
+  Divider,
 } from '@mui/material';
 // auth
 import { useAuthContext } from '../../auth/useAuthContext';
@@ -24,14 +25,9 @@ import { useDispatch, useSelector } from '../../redux/store';
 import { getMealPlans } from '../../redux/slices/mealPlan';
 import { getCustomers } from '../../redux/slices/customer';
 import { getCustomerOrders, getDailyTiffinCount } from '../../redux/slices/customerOrder';
-// _mock_
-import {
-  _appFeatured,
-  _appAuthors,
-  _appInstalled,
-  _appRelated,
-  _appInvoices,
-} from '../../_mock/arrays';
+import { getTMSIngredients } from '../../redux/slices/tmsIngredient';
+import { getTMSRecipes } from '../../redux/slices/tmsRecipe';
+import { getMonthlyBillings } from '../../redux/slices/payment';
 // components
 import { useSettingsContext } from '../../components/settings';
 import Iconify from '../../components/iconify';
@@ -39,14 +35,8 @@ import Iconify from '../../components/iconify';
 import {
   AppWidget,
   AppWelcome,
-  AppFeatured,
-  AppNewInvoice,
-  AppTopAuthors,
-  AppTopRelated,
-  AppAreaInstalled,
   AppWidgetSummary,
-  AppCurrentDownload,
-  AppTopInstalledCountries,
+  AppPendingPayments,
 } from '../../sections/@dashboard/general/app';
 // assets
 import { SeoIllustration } from '../../assets/illustrations';
@@ -67,28 +57,66 @@ export default function GeneralAppPage() {
   const theme = useTheme();
   const { themeStretch } = useSettingsContext();
 
-  // Fetch tiffin management data
+  // Redux state
   const { mealPlans } = useSelector((state) => state.mealPlan);
   const { customers } = useSelector((state) => state.customer);
   const { customerOrders, dailySummary } = useSelector((state) => state.customerOrder);
+  const { ingredients } = useSelector((state) => state.tmsIngredient);
+  const { recipes } = useSelector((state) => state.tmsRecipe);
+  const { monthlyBillings } = useSelector((state) => state.payment);
 
+  // Fetch all data on mount
   useEffect(() => {
     dispatch(getMealPlans());
     dispatch(getCustomers());
     dispatch(getCustomerOrders());
     dispatch(getDailyTiffinCount());
+    dispatch(getTMSIngredients());
+    dispatch(getTMSRecipes());
+    dispatch(getMonthlyBillings());
   }, [dispatch]);
 
   // Calculate statistics
-  const totalMealPlans = mealPlans?.length || 0;
-  const totalCustomers = customers?.length || 0;
-  const activeOrders = customerOrders
-    ? customerOrders.filter((order) => {
-        const endDate = new Date(order.end_date);
-        return endDate >= new Date();
-      }).length
-    : 0;
-  const todayTiffinCount = dailySummary?.total_count || 0;
+  const stats = useMemo(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+
+    const totalIngredients = ingredients?.length || 0;
+    const totalRecipes = recipes?.length || 0;
+    const totalMealPlans = mealPlans?.length || 0;
+    const totalCustomers = customers?.length || 0;
+
+    const activeOrders = customerOrders
+      ? customerOrders.filter((order) => {
+          const endDate = new Date(order.end_date);
+          return endDate >= new Date();
+        }).length
+      : 0;
+
+    const todayTiffinCount = dailySummary?.total_count || 0;
+
+    // Payment statistics
+    const unpaidBillings = monthlyBillings?.filter(
+      (b) => b.status !== 'paid'
+    ) || [];
+
+    const pendingPaymentsCount = unpaidBillings.length;
+
+    const thisMonthRevenue = monthlyBillings
+      ?.filter((b) => b.status === 'paid' && b.billing_month === currentMonth)
+      .reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
+
+    return {
+      totalIngredients,
+      totalRecipes,
+      totalMealPlans,
+      totalCustomers,
+      activeOrders,
+      todayTiffinCount,
+      pendingPaymentsCount,
+      thisMonthRevenue,
+      unpaidBillings,
+    };
+  }, [ingredients, recipes, mealPlans, customers, customerOrders, dailySummary, monthlyBillings]);
 
   return (
     <>
@@ -98,10 +126,11 @@ export default function GeneralAppPage() {
 
       <Container maxWidth={themeStretch ? false : 'xl'}>
         <Grid container spacing={3}>
+          {/* ROW 1: Welcome Banner + Today's Widget */}
           <Grid item xs={12} md={8}>
             <AppWelcome
               title={`Welcome back! \n ${user?.displayName}`}
-              description="Manage your tiffin service with ease. Track meal plans, customers, and daily operations."
+              description="Manage your tiffin service with ease. Track ingredients, recipes, meal plans, and daily operations."
               img={
                 <SeoIllustration
                   sx={{
@@ -123,24 +152,23 @@ export default function GeneralAppPage() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <Stack spacing={3}>
-              <AppWidget
-                title="Today's Tiffin Count"
-                total={todayTiffinCount}
-                icon="eva:shopping-bag-fill"
-                color="success"
-                chart={{
-                  series: 100,
-                }}
-              />
-            </Stack>
+            <AppWidget
+              title="Today's Tiffin Count"
+              total={stats.todayTiffinCount}
+              icon="eva:shopping-bag-fill"
+              color="success"
+              chart={{
+                series: stats.todayTiffinCount > 0 ? 100 : 0,
+              }}
+            />
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          {/* ROW 2: Key Metrics (4 cards) */}
+          <Grid item xs={12} sm={6} md={3}>
             <AppWidgetSummary
-              title="Total Meal Plans"
+              title="Total Ingredients"
               percent={0}
-              total={totalMealPlans}
+              total={stats.totalIngredients}
               chart={{
                 colors: [theme.palette.primary.main],
                 series: [5, 18, 12, 51, 68, 11, 39, 37, 27, 20],
@@ -148,11 +176,11 @@ export default function GeneralAppPage() {
             />
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} sm={6} md={3}>
             <AppWidgetSummary
-              title="Total Customers"
+              title="Total Recipes"
               percent={0}
-              total={totalCustomers}
+              total={stats.totalRecipes}
               chart={{
                 colors: [theme.palette.info.main],
                 series: [20, 41, 63, 33, 28, 35, 50, 46, 11, 26],
@@ -160,298 +188,471 @@ export default function GeneralAppPage() {
             />
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} sm={6} md={3}>
             <AppWidgetSummary
-              title="Active Orders"
+              title="This Month Revenue"
               percent={0}
-              total={activeOrders}
+              total={stats.thisMonthRevenue}
               chart={{
-                colors: [theme.palette.warning.main],
+                colors: [theme.palette.success.main],
                 series: [8, 9, 31, 8, 16, 37, 8, 33, 46, 31],
               }}
             />
           </Grid>
 
-          {/* Tiffin Management Quick Actions */}
+          <Grid item xs={12} sm={6} md={3}>
+            <AppWidgetSummary
+              title="Pending Payments"
+              percent={0}
+              total={stats.pendingPaymentsCount}
+              chart={{
+                colors: [theme.palette.error.main],
+                series: [15, 25, 35, 20, 30, 25, 20, 15, 25, 30],
+              }}
+            />
+          </Grid>
+
+          {/* ROW 3: Tiffin Management - PROMINENT SECTION */}
           <Grid item xs={12}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
+            <Divider sx={{ my: 1 }} />
+            <Typography variant="h5" sx={{ mb: 2, mt: 2 }}>
               Tiffin Management
             </Typography>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={6} sm={4} md={2}>
             <Card
               sx={{
                 bgcolor: alpha(theme.palette.primary.main, 0.08),
                 '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.16) },
+                height: '100%',
               }}
             >
-              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.mealPlans)}>
+              <CardActionArea
+                onClick={() => router.push(PATH_DASHBOARD.tiffin.mealPlans)}
+                sx={{ height: '100%' }}
+              >
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ textAlign: 'center' }}>
                     <Box
                       sx={{
-                        width: 64,
-                        height: 64,
+                        width: 56,
+                        height: 56,
                         borderRadius: 2,
                         bgcolor: alpha(theme.palette.primary.main, 0.24),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        mx: 'auto',
+                        mb: 1,
                       }}
                     >
-                      <Iconify icon="eva:menu-fill" width={32} color={theme.palette.primary.main} />
+                      <Iconify icon="eva:menu-fill" width={28} color={theme.palette.primary.main} />
                     </Box>
-                    <Box>
-                      <Typography variant="h4">{totalMealPlans}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Meal Plans
-                      </Typography>
-                    </Box>
+                    <Typography variant="h4">{stats.totalMealPlans}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Meal Plans
+                    </Typography>
                   </Box>
                 </CardContent>
               </CardActionArea>
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={6} sm={4} md={2}>
             <Card
               sx={{
                 bgcolor: alpha(theme.palette.info.main, 0.08),
                 '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.16) },
+                height: '100%',
               }}
             >
-              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.customers)}>
+              <CardActionArea
+                onClick={() => router.push(PATH_DASHBOARD.tiffin.customers)}
+                sx={{ height: '100%' }}
+              >
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ textAlign: 'center' }}>
                     <Box
                       sx={{
-                        width: 64,
-                        height: 64,
+                        width: 56,
+                        height: 56,
                         borderRadius: 2,
                         bgcolor: alpha(theme.palette.info.main, 0.24),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        mx: 'auto',
+                        mb: 1,
                       }}
                     >
-                      <Iconify icon="eva:people-fill" width={32} color={theme.palette.info.main} />
+                      <Iconify icon="eva:people-fill" width={28} color={theme.palette.info.main} />
                     </Box>
-                    <Box>
-                      <Typography variant="h4">{totalCustomers}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Customers
-                      </Typography>
-                    </Box>
+                    <Typography variant="h4">{stats.totalCustomers}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Customers
+                    </Typography>
                   </Box>
                 </CardContent>
               </CardActionArea>
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={6} sm={4} md={2}>
             <Card
               sx={{
                 bgcolor: alpha(theme.palette.success.main, 0.08),
                 '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.16) },
+                height: '100%',
               }}
             >
-              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.orders)}>
+              <CardActionArea
+                onClick={() => router.push(PATH_DASHBOARD.tiffin.orders)}
+                sx={{ height: '100%' }}
+              >
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ textAlign: 'center' }}>
                     <Box
                       sx={{
-                        width: 64,
-                        height: 64,
+                        width: 56,
+                        height: 56,
                         borderRadius: 2,
                         bgcolor: alpha(theme.palette.success.main, 0.24),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        mx: 'auto',
+                        mb: 1,
                       }}
                     >
                       <Iconify
                         icon="eva:shopping-cart-fill"
-                        width={32}
+                        width={28}
                         color={theme.palette.success.main}
                       />
                     </Box>
-                    <Box>
-                      <Typography variant="h4">{activeOrders}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Active Orders
-                      </Typography>
-                    </Box>
+                    <Typography variant="h4">{stats.activeOrders}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Active Orders
+                    </Typography>
                   </Box>
                 </CardContent>
               </CardActionArea>
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={6} sm={4} md={2}>
             <Card
               sx={{
                 bgcolor: alpha(theme.palette.warning.main, 0.08),
                 '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.16) },
+                height: '100%',
               }}
             >
-              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.dailyCount)}>
+              <CardActionArea
+                onClick={() => router.push(PATH_DASHBOARD.tiffin.dailyCount)}
+                sx={{ height: '100%' }}
+              >
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ textAlign: 'center' }}>
                     <Box
                       sx={{
-                        width: 64,
-                        height: 64,
+                        width: 56,
+                        height: 56,
                         borderRadius: 2,
                         bgcolor: alpha(theme.palette.warning.main, 0.24),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        mx: 'auto',
+                        mb: 1,
                       }}
                     >
                       <Iconify
                         icon="eva:calendar-fill"
-                        width={32}
+                        width={28}
                         color={theme.palette.warning.main}
                       />
                     </Box>
-                    <Box>
-                      <Typography variant="h4">{todayTiffinCount}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Today's Count
-                      </Typography>
-                    </Box>
+                    <Typography variant="h4">{stats.todayTiffinCount}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Today's Count
+                    </Typography>
                   </Box>
                 </CardContent>
               </CardActionArea>
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={6} sm={4} md={2}>
             <Card
               sx={{
                 bgcolor: alpha(theme.palette.secondary.main, 0.08),
                 '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.16) },
+                height: '100%',
               }}
             >
-              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.monthlyList)}>
+              <CardActionArea
+                onClick={() => router.push(PATH_DASHBOARD.tiffin.monthlyList)}
+                sx={{ height: '100%' }}
+              >
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ textAlign: 'center' }}>
                     <Box
                       sx={{
-                        width: 64,
-                        height: 64,
+                        width: 56,
+                        height: 56,
                         borderRadius: 2,
                         bgcolor: alpha(theme.palette.secondary.main, 0.24),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        mx: 'auto',
+                        mb: 1,
                       }}
                     >
                       <Iconify
                         icon="eva:list-fill"
-                        width={32}
+                        width={28}
                         color={theme.palette.secondary.main}
                       />
                     </Box>
-                    <Box>
-                      <Typography variant="subtitle1">Monthly List</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        View this month
-                      </Typography>
-                    </Box>
+                    <Typography variant="subtitle1">Monthly</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      View List
+                    </Typography>
                   </Box>
                 </CardContent>
               </CardActionArea>
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={6} sm={4} md={2}>
             <Card
               sx={{
-                bgcolor: alpha(theme.palette.error.main, 0.08),
-                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.16) },
+                bgcolor: alpha(theme.palette.grey[500], 0.08),
+                '&:hover': { bgcolor: alpha(theme.palette.grey[500], 0.16) },
+                height: '100%',
               }}
             >
-              <CardActionArea onClick={() => router.push(PATH_DASHBOARD.tiffin.completeList)}>
+              <CardActionArea
+                onClick={() => router.push(PATH_DASHBOARD.tiffin.billingCalendar)}
+                sx={{ height: '100%' }}
+              >
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ textAlign: 'center' }}>
                     <Box
                       sx={{
-                        width: 64,
-                        height: 64,
+                        width: 56,
+                        height: 56,
                         borderRadius: 2,
-                        bgcolor: alpha(theme.palette.error.main, 0.24),
+                        bgcolor: alpha(theme.palette.grey[500], 0.24),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        mx: 'auto',
+                        mb: 1,
                       }}
                     >
                       <Iconify
-                        icon="eva:archive-fill"
-                        width={32}
-                        color={theme.palette.error.main}
+                        icon="eva:credit-card-fill"
+                        width={28}
+                        color={theme.palette.grey[600]}
                       />
                     </Box>
-                    <Box>
-                      <Typography variant="subtitle1">Complete List</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        All orders
-                      </Typography>
-                    </Box>
+                    <Typography variant="subtitle1">Billing</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Calendar
+                    </Typography>
                   </Box>
                 </CardContent>
               </CardActionArea>
             </Card>
           </Grid>
 
-          <Grid item xs={12} lg={8}>
-            <AppNewInvoice
-              title="New Invoice"
-              tableData={_appInvoices}
-              tableLabels={[
-                { id: 'id', label: 'Invoice ID' },
-                { id: 'category', label: 'Category' },
-                { id: 'price', label: 'Price' },
-                { id: 'status', label: 'Status' },
-                { id: '' },
-              ]}
+          {/* ROW 4: Other Modules (3 cards) */}
+          <Grid item xs={12}>
+            <Divider sx={{ my: 1 }} />
+            <Typography variant="h5" sx={{ mb: 2, mt: 2 }}>
+              Quick Access
+            </Typography>
+          </Grid>
+
+          {/* Ingredient Analysis Card */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.04),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+              }}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 1.5,
+                      bgcolor: alpha(theme.palette.primary.main, 0.16),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Iconify icon="eva:layers-fill" width={24} color={theme.palette.primary.main} />
+                  </Box>
+                  <Box>
+                    <Typography variant="h6">Ingredient Analysis</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {stats.totalIngredients} ingredients
+                    </Typography>
+                  </Box>
+                </Box>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => router.push(PATH_DASHBOARD.ingredient.list)}
+                    startIcon={<Iconify icon="eva:list-fill" />}
+                  >
+                    View List
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => router.push(PATH_DASHBOARD.ingredient.new)}
+                    startIcon={<Iconify icon="eva:plus-fill" />}
+                  >
+                    Add New
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Recipe Management Card */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.info.main, 0.04),
+                border: `1px solid ${alpha(theme.palette.info.main, 0.12)}`,
+              }}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 1.5,
+                      bgcolor: alpha(theme.palette.info.main, 0.16),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Iconify icon="eva:book-open-fill" width={24} color={theme.palette.info.main} />
+                  </Box>
+                  <Box>
+                    <Typography variant="h6">Recipe Management</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {stats.totalRecipes} recipes
+                    </Typography>
+                  </Box>
+                </Box>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => router.push(PATH_DASHBOARD.recipe.list)}
+                    startIcon={<Iconify icon="eva:list-fill" />}
+                  >
+                    View List
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => router.push(PATH_DASHBOARD.recipe.new)}
+                    startIcon={<Iconify icon="eva:plus-fill" />}
+                  >
+                    Create Recipe
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Payments Card */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{
+                bgcolor: alpha(theme.palette.warning.main, 0.04),
+                border: `1px solid ${alpha(theme.palette.warning.main, 0.12)}`,
+              }}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 1.5,
+                      bgcolor: alpha(theme.palette.warning.main, 0.16),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Iconify
+                      icon="eva:credit-card-fill"
+                      width={24}
+                      color={theme.palette.warning.main}
+                    />
+                  </Box>
+                  <Box>
+                    <Typography variant="h6">Payments</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {stats.pendingPaymentsCount} pending
+                    </Typography>
+                  </Box>
+                </Box>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => router.push(PATH_DASHBOARD.payments.history)}
+                    startIcon={<Iconify icon="eva:clock-fill" />}
+                  >
+                    History
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => router.push(PATH_DASHBOARD.payments.cashPayment)}
+                    startIcon={<Iconify icon="eva:plus-fill" />}
+                  >
+                    Record Payment
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* ROW 5: Pending Payments Table */}
+          <Grid item xs={12}>
+            <Divider sx={{ my: 1 }} />
+          </Grid>
+
+          <Grid item xs={12}>
+            <AppPendingPayments
+              title="Pending Payments"
+              subheader="Customers with unpaid bills"
+              tableData={stats.unpaidBillings}
+              onViewAll={() => router.push(PATH_DASHBOARD.tiffin.billingStatus)}
+              onViewBilling={(billing) =>
+                router.push(PATH_DASHBOARD.tiffin.billingDetails(billing.id.toString()))
+              }
             />
-          </Grid>
-
-          <Grid item xs={12} md={6} lg={4}>
-            <AppTopRelated title="Top Related Applications" list={_appRelated} />
-          </Grid>
-
-          <Grid item xs={12} md={6} lg={4}>
-            <AppTopInstalledCountries title="Top Installed Countries" list={_appInstalled} />
-          </Grid>
-
-          <Grid item xs={12} md={6} lg={4}>
-            <AppTopAuthors title="Top Authors" list={_appAuthors} />
-          </Grid>
-
-          <Grid item xs={12} md={6} lg={4}>
-            <Stack spacing={3}>
-              <AppWidget
-                title="Conversion"
-                total={38566}
-                icon="eva:person-fill"
-                chart={{
-                  series: 48,
-                }}
-              />
-
-              <AppWidget
-                title="Applications"
-                total={55566}
-                icon="eva:email-fill"
-                color="info"
-                chart={{
-                  series: 75,
-                }}
-              />
-            </Stack>
           </Grid>
         </Grid>
       </Container>
