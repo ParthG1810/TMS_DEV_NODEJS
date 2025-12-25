@@ -24,15 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const {
       displayName,
       email,
-      phoneNumber,
-      country,
-      address,
-      state,
-      city,
-      zipCode,
-      about,
       photoURL,
-      isPublic,
     } = req.body;
 
     // Validate email if being changed
@@ -55,15 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const updatedUser = await updateUser(user.id, {
       displayName,
       email,
-      phoneNumber,
-      country,
-      address,
-      state,
-      city,
-      zipCode,
-      about,
       photoURL,
-      isPublic,
     });
 
     if (!updatedUser) {
