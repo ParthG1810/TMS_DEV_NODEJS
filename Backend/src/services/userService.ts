@@ -232,8 +232,8 @@ export const getAllUsers = async (options?: {
   role?: string;
   search?: string;
 }): Promise<{ users: User[]; total: number }> => {
-  const page = options?.page || 1;
-  const limit = options?.limit || 10;
+  const page = Number(options?.page) || 1;
+  const limit = Number(options?.limit) || 10;
   const offset = (page - 1) * limit;
 
   let whereClause = '1=1';
@@ -257,10 +257,10 @@ export const getAllUsers = async (options?: {
   )) as RowDataPacket[];
   const total = countResult[0].total;
 
-  // Get paginated results
+  // Get paginated results - use string interpolation for LIMIT/OFFSET to avoid mysql2 prepared statement issues
   const rows = (await query(
-    `SELECT * FROM users WHERE ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
+    `SELECT * FROM users WHERE ${whereClause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+    params
   )) as RowDataPacket[];
 
   return {

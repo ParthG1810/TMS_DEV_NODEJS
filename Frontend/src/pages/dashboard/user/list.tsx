@@ -6,13 +6,10 @@ import NextLink from 'next/link';
 import { useRouter } from 'next/router';
 // @mui
 import {
-  Tab,
-  Tabs,
   Card,
   Table,
   Button,
   Tooltip,
-  Divider,
   TableBody,
   Container,
   IconButton,
@@ -20,8 +17,6 @@ import {
 } from '@mui/material';
 // routes
 import { PATH_DASHBOARD } from '../../../routes/paths';
-// @types
-import { IUserAccountGeneral } from '../../../@types/user';
 // utils
 import axios from '../../../utils/axios';
 // layouts
@@ -51,16 +46,12 @@ import { UserTableToolbar, UserTableRow } from '../../../sections/@dashboard/use
 
 // ----------------------------------------------------------------------
 
-const STATUS_OPTIONS = ['all', 'active', 'inactive', 'banned'];
-
 const ROLE_OPTIONS = ['all', 'admin', 'manager', 'staff', 'tester', 'user'];
 
 const TABLE_HEAD = [
   { id: 'name', label: 'Name', align: 'left' },
   { id: 'email', label: 'Email', align: 'left' },
   { id: 'role', label: 'Role', align: 'left' },
-  { id: 'isVerified', label: 'Verified', align: 'center' },
-  { id: 'status', label: 'Status', align: 'left' },
   { id: '' },
 ];
 
@@ -70,21 +61,21 @@ UserListPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page}</
 
 // ----------------------------------------------------------------------
 
+// User type for this page
+interface UserData {
+  id: string;
+  avatarUrl: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 // Transform API user to table format
-const transformUser = (apiUser: any): IUserAccountGeneral => ({
+const transformUser = (apiUser: any): UserData => ({
   id: apiUser.id,
   avatarUrl: apiUser.photoURL || '',
   name: apiUser.displayName,
   email: apiUser.email,
-  phoneNumber: apiUser.phoneNumber || '',
-  address: apiUser.address || '',
-  country: apiUser.country || '',
-  state: apiUser.state || '',
-  city: apiUser.city || '',
-  zipCode: apiUser.zipCode || '',
-  company: '', // Not applicable for this system
-  isVerified: apiUser.isVerified || false,
-  status: apiUser.status || 'active',
   role: apiUser.role,
 });
 
@@ -113,12 +104,11 @@ export default function UserListPage() {
   const { user: currentUser } = useAuthContext();
   const { push } = useRouter();
 
-  const [tableData, setTableData] = useState<IUserAccountGeneral[]>([]);
+  const [tableData, setTableData] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterName, setFilterName] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [openConfirm, setOpenConfirm] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('all');
 
   // Check if current user can manage users
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'manager';
@@ -154,19 +144,17 @@ export default function UserListPage() {
     comparator: getComparator(order, orderBy),
     filterName,
     filterRole,
-    filterStatus,
   });
 
   const dataInPage = dataFiltered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const denseHeight = dense ? 52 : 72;
 
-  const isFiltered = filterName !== '' || filterRole !== 'all' || filterStatus !== 'all';
+  const isFiltered = filterName !== '' || filterRole !== 'all';
 
   const isNotFound =
     (!dataFiltered.length && !!filterName) ||
-    (!dataFiltered.length && !!filterRole) ||
-    (!dataFiltered.length && !!filterStatus);
+    (!dataFiltered.length && !!filterRole);
 
   const handleOpenConfirm = () => {
     setOpenConfirm(true);
@@ -174,11 +162,6 @@ export default function UserListPage() {
 
   const handleCloseConfirm = () => {
     setOpenConfirm(false);
-  };
-
-  const handleFilterStatus = (event: React.SyntheticEvent<Element, Event>, newValue: string) => {
-    setPage(0);
-    setFilterStatus(newValue);
   };
 
   const handleFilterName = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,7 +226,6 @@ export default function UserListPage() {
   const handleResetFilter = () => {
     setFilterName('');
     setFilterRole('all');
-    setFilterStatus('all');
   };
 
   // Show permission denied for non-admin/manager users
@@ -300,21 +282,6 @@ export default function UserListPage() {
         />
 
         <Card>
-          <Tabs
-            value={filterStatus}
-            onChange={handleFilterStatus}
-            sx={{
-              px: 2,
-              bgcolor: 'background.neutral',
-            }}
-          >
-            {STATUS_OPTIONS.map((tab) => (
-              <Tab key={tab} label={tab} value={tab} sx={{ textTransform: 'capitalize' }} />
-            ))}
-          </Tabs>
-
-          <Divider />
-
           <UserTableToolbar
             isFiltered={isFiltered}
             filterName={filterName}
@@ -442,13 +409,11 @@ function applyFilter({
   inputData,
   comparator,
   filterName,
-  filterStatus,
   filterRole,
 }: {
-  inputData: IUserAccountGeneral[];
+  inputData: UserData[];
   comparator: (a: any, b: any) => number;
   filterName: string;
-  filterStatus: string;
   filterRole: string;
 }) {
   const stabilizedThis = inputData.map((el, index) => [el, index] as const);
@@ -467,10 +432,6 @@ function applyFilter({
         user.name.toLowerCase().indexOf(filterName.toLowerCase()) !== -1 ||
         user.email.toLowerCase().indexOf(filterName.toLowerCase()) !== -1
     );
-  }
-
-  if (filterStatus !== 'all') {
-    inputData = inputData.filter((user) => user.status === filterStatus);
   }
 
   if (filterRole !== 'all') {

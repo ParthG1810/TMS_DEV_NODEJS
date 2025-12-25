@@ -36,13 +36,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 // GET /api/users - List all users with pagination and filters
 async function handleGetUsers(req: NextApiRequest, res: NextApiResponse) {
-  const { page, limit, role, status, search } = req.query;
+  const { page, limit, role, search } = req.query;
 
   const result = await getAllUsers({
     page: page ? parseInt(page as string, 10) : 1,
     limit: limit ? parseInt(limit as string, 10) : 10,
     role: role as string,
-    status: status as string,
     search: search as string,
   });
 
@@ -55,8 +54,7 @@ async function handleCreateUser(
   res: NextApiResponse,
   currentUser: { role: string }
 ) {
-  // Only admin can create users with elevated roles
-  const { email, password, displayName, role, phoneNumber, country, address, state, city, zipCode, about, photoURL, isPublic } = req.body;
+  const { email, password, displayName, role, photoURL } = req.body;
 
   if (!email || !password || !displayName) {
     return res.status(400).json({
@@ -100,15 +98,7 @@ async function handleCreateUser(
     password,
     displayName,
     role: assignedRole,
-    phoneNumber,
-    country,
-    address,
-    state,
-    city,
-    zipCode,
-    about,
     photoURL,
-    isPublic,
   });
 
   return res.status(201).json({
