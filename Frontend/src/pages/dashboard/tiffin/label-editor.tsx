@@ -508,40 +508,25 @@ export default function LabelEditorPage() {
                       position: 'relative',
                     }}
                   >
-                    {/* Inner container to match .ql-editor exactly */}
+                    {/* Inner container using .ql-editor class for exact styling match */}
                     <Box
+                      className="ql-editor"
                       sx={{
                         width: '100%',
                         height: '100%',
-                        padding: '8px',
-                        overflow: 'hidden',
+                        padding: '8px !important',
+                        overflow: 'hidden !important',
                         boxSizing: 'border-box',
                         position: 'absolute',
                         top: 0,
                         left: 0,
-                        // Match Quill editor default styles exactly
-                        fontFamily: 'Helvetica, Arial, sans-serif',
-                        fontSize: '13px',
-                        lineHeight: 1.42,
-                        tabSize: 4,
-                        textAlign: 'left',
-                        whiteSpace: 'pre-wrap',
-                        wordWrap: 'break-word',
-                        // Reset all nested element margins
+                        // Override only what's needed
                         '& p': {
-                          margin: 0,
-                          padding: 0,
-                        },
-                        '& h1, & h2, & h3, & h4, & h5, & h6': {
-                          margin: 0,
-                          padding: 0,
+                          margin: '0 !important',
+                          padding: '0 !important',
                         },
                         '& img': {
                           maxWidth: '100%',
-                          display: 'block',
-                        },
-                        '& *': {
-                          boxSizing: 'border-box',
                         },
                       }}
                       dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
