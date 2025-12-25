@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useTheme } from '@mui/material/styles';
@@ -18,8 +18,6 @@ import {
   Tooltip,
   Chip,
   Stack,
-  MenuItem,
-  TextField,
   Collapse,
   Box,
   Typography,
@@ -28,7 +26,6 @@ import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import Scrollbar from '../../../components/scrollbar';
 import Iconify from '../../../components/iconify';
-import Label from '../../../components/label';
 import { PATH_DASHBOARD } from '../../../routes/paths';
 import { useSettingsContext } from '../../../components/settings';
 import axios from '../../../utils/axios';
@@ -40,6 +37,13 @@ import {
   TablePaginationCustom,
 } from '../../../components/table';
 import { BillingStatusAnalytic, BillingStatusTableToolbar } from '../../../sections/@dashboard/tiffin/billing/list';
+
+// ----------------------------------------------------------------------
+
+// Helper function for sumBy
+function sumBy<T>(array: T[], iteratee: (item: T) => number): number {
+  return array.reduce((sum, item) => sum + iteratee(item), 0);
+}
 
 // ----------------------------------------------------------------------
 
@@ -94,6 +98,7 @@ export default function BillingStatusPage() {
   const theme = useTheme();
   const { themeStretch } = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     dense,
@@ -102,7 +107,6 @@ export default function BillingStatusPage() {
     orderBy,
     rowsPerPage,
     setPage,
-    onSort,
     onChangeDense,
     onChangePage,
     onChangeRowsPerPage,
@@ -110,8 +114,12 @@ export default function BillingStatusPage() {
 
   const [tableData, setTableData] = useState<BillingRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterMonth, setFilterMonth] = useState('');
+  const [filterName, setFilterName] = useState('');
+  const [filterAmountOperator, setFilterAmountOperator] = useState('');
+  const [filterAmountValue, setFilterAmountValue] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -155,14 +163,6 @@ export default function BillingStatusPage() {
     if (tableData.length === 0) return 0;
     return (getStatusCount(status) / tableData.length) * 100;
   };
-
-  const TABS = [
-    { value: 'all', label: 'All', color: 'info', count: tableData.length },
-    { value: 'calculating', label: 'Calculating', color: 'default', count: getStatusCount('calculating') },
-    { value: 'pending', label: 'Pending', color: 'warning', count: getStatusCount('pending') },
-    { value: 'finalized', label: 'Finalized', color: 'info', count: getStatusCount('finalized') },
-    { value: 'paid', label: 'Paid', color: 'success', count: getStatusCount('paid') },
-  ] as const;
 
   const handleFilterStatus = (event: React.SyntheticEvent<Element, Event>, newValue: string) => {
     setFilterStatus(newValue);
@@ -479,7 +479,6 @@ export default function BillingStatusPage() {
   });
 
   const dataInPage = dataFiltered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  const denseHeight = dense ? 52 : 72;
 
   // Get unique months for filter
   const uniqueMonths = Array.from(new Set(tableData.map((row) => row.billing_month))).sort((a, b) =>
