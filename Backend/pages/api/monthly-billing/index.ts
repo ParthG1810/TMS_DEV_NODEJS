@@ -76,9 +76,107 @@ async function handleGet(
 
     const billings = await query<MonthlyBillingWithDetails[]>(sql, params);
 
+    // Fetch order-level breakdown for each billing record
+    const billingIds = billings.map(b => b.id);
+    const customerIds = billings.map(b => b.customer_id);
+    const billingMonths = [...new Set(billings.map(b => b.billing_month))];
+
+    // Get order billing details for all relevant customers and months
+    let orderDetails: any[] = [];
+    if (billings.length > 0) {
+      const orderDetailsSql = `
+        SELECT
+          ob.id,
+          ob.order_id,
+          ob.customer_id,
+          ob.billing_month,
+          ob.total_delivered,
+          ob.total_absent,
+          ob.total_extra,
+          ob.total_plan_days,
+          ob.base_amount,
+          ob.extra_amount,
+          ob.total_amount,
+          ob.status,
+          ob.finalized_at,
+          co.start_date,
+          co.end_date,
+          mp.meal_name
+        FROM order_billing ob
+        INNER JOIN customer_orders co ON ob.order_id = co.id
+        LEFT JOIN meal_plans mp ON co.meal_plan_id = mp.id
+        WHERE ob.customer_id IN (${customerIds.map(() => '?').join(',')})
+        AND ob.billing_month IN (${billingMonths.map(() => '?').join(',')})
+        ORDER BY ob.customer_id, mp.meal_name
+      `;
+      orderDetails = await query<any[]>(orderDetailsSql, [...customerIds, ...billingMonths]);
+    }
+
+    // Group order details by customer_id and billing_month
+    const orderDetailsMap = new Map<string, any[]>();
+    orderDetails.forEach((od) => {
+      const key = `${od.customer_id}-${od.billing_month}`;
+      if (!orderDetailsMap.has(key)) {
+        orderDetailsMap.set(key, []);
+      }
+      orderDetailsMap.get(key)!.push(od);
+    });
+
+    // Attach order details to each billing record
+    const billingsWithOrders = billings.map((billing) => {
+      const key = `${billing.customer_id}-${billing.billing_month}`;
+      const orders = orderDetailsMap.get(key) || [];
+
+      // Determine effective status based on order statuses (priority order: top to bottom)
+      // 1. Calculating - if ANY order is still calculating
+      // 2. Pending - if ANY order is pending approval
+      // 3. Finalized - if ALL orders are finalized (invoiced, waiting for payment)
+      // 4. Partial Paid - if SOME orders are paid but not ALL
+      // 5. Paid - if ALL orders are paid
+      let effectiveStatus = billing.status;
+      if (orders.length > 0) {
+        const hasCalculating = orders.some((o: any) => o.status === 'calculating');
+        const hasPending = orders.some((o: any) => o.status === 'pending');
+        const allFinalized = orders.every((o: any) => o.status === 'finalized');
+        const allPaid = orders.every((o: any) => o.status === 'paid');
+        const somePaid = orders.some((o: any) => o.status === 'paid');
+        const someFinalized = orders.some((o: any) => o.status === 'finalized');
+
+        if (hasCalculating) {
+          effectiveStatus = 'calculating';
+        } else if (hasPending) {
+          effectiveStatus = 'pending';
+        } else if (allFinalized) {
+          effectiveStatus = 'finalized';
+        } else if (allPaid) {
+          effectiveStatus = 'paid';
+        } else if (somePaid && someFinalized) {
+          effectiveStatus = 'partial_paid';
+        }
+      }
+
+      return {
+        ...billing,
+        effective_status: effectiveStatus,
+        orders: orders.map((o: any) => ({
+          id: o.id,
+          order_id: o.order_id,
+          meal_plan_name: o.meal_name || 'Unknown Plan',
+          start_date: o.start_date,
+          end_date: o.end_date,
+          total_delivered: o.total_delivered,
+          total_absent: o.total_absent,
+          total_extra: o.total_extra,
+          total_amount: o.total_amount,
+          status: o.status,
+          finalized_at: o.finalized_at,
+        })),
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: billings,
+      data: billingsWithOrders,
     });
   } catch (error: any) {
     console.error('Error fetching monthly billing:', error);
