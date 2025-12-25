@@ -122,8 +122,8 @@ async function handleGet(
       orderDetailsMap.get(key)!.push(od);
     });
 
-    // Attach order details to each billing record
-    const billingsWithOrders = billings.map((billing) => {
+    // Attach order details to each billing record and sync status if needed
+    const billingsWithOrders = await Promise.all(billings.map(async (billing) => {
       const key = `${billing.customer_id}-${billing.billing_month}`;
       const orders = orderDetailsMap.get(key) || [];
 
@@ -155,10 +155,24 @@ async function handleGet(
         } else if (somePaid && someInvoiced) {
           effectiveStatus = 'partial_paid';
         }
+
+        // Sync the monthly_billing status in the database if it differs from effective status
+        if (effectiveStatus !== billing.status) {
+          try {
+            await query(
+              'UPDATE monthly_billing SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+              [effectiveStatus, billing.id]
+            );
+            console.log(`[Monthly Billing] Synced status for billing ${billing.id}: ${billing.status} -> ${effectiveStatus}`);
+          } catch (syncError) {
+            console.error(`[Monthly Billing] Failed to sync status for billing ${billing.id}:`, syncError);
+          }
+        }
       }
 
       return {
         ...billing,
+        status: effectiveStatus, // Use the effective status as the main status
         effective_status: effectiveStatus,
         orders: orders.map((o: any) => ({
           id: o.id,
@@ -174,7 +188,7 @@ async function handleGet(
           finalized_at: o.finalized_at,
         })),
       };
-    });
+    }));
 
     return res.status(200).json({
       success: true,

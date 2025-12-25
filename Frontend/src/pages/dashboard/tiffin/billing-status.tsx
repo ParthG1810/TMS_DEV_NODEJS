@@ -147,10 +147,6 @@ export default function BillingStatusPage() {
     });
   };
 
-  const handleViewDetails = (billingId: number) => {
-    router.push(PATH_DASHBOARD.tiffin.billingDetails(billingId.toString()));
-  };
-
   const handleApprove = async (billing: BillingRecord) => {
     try {
       const response = await axios.put(`/api/monthly-billing/${billing.id}`, {
@@ -179,18 +175,237 @@ export default function BillingStatusPage() {
     }
   };
 
-  const handleMarkAsPaid = async (billing: BillingRecord) => {
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Billing Status</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20px;
+            }
+            h1 {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .text-right {
+              text-align: right;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Billing Status Report</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Billing Month</th>
+                <th class="text-center">Delivered</th>
+                <th class="text-center">Absent</th>
+                <th class="text-center">Extra</th>
+                <th class="text-right">Total Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dataFiltered
+                .map(
+                  (record) => `
+                <tr>
+                  <td>${record.customer_name}</td>
+                  <td>${record.customer_phone || '-'}</td>
+                  <td>${record.billing_month}</td>
+                  <td class="text-center">${record.total_delivered}</td>
+                  <td class="text-center">${record.total_absent}</td>
+                  <td class="text-center">${record.total_extra}</td>
+                  <td class="text-right">$${Number(record.total_amount).toFixed(2)}</td>
+                  <td>${record.status}</td>
+                </tr>
+              `
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    event.target.value = '';
+
+    if (!file.name.endsWith('.csv')) {
+      enqueueSnackbar('Please select a CSV file', { variant: 'error' });
+      return;
+    }
+
+    setImporting(true);
+
     try {
-      const response = await axios.put(`/api/monthly-billing/${billing.id}`, {
-        status: 'paid',
-      });
-      if (response.data.success) {
-        enqueueSnackbar('Billing marked as paid', { variant: 'success' });
+      const text = await file.text();
+      const lines = text.split('\n').filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        enqueueSnackbar('CSV file is empty', { variant: 'error' });
+        setImporting(false);
+        return;
+      }
+
+      const dataLines = lines.slice(1);
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const line of dataLines) {
+        try {
+          const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+          const cleanValues = values.map((v) => v.replace(/^"|"$/g, '').trim());
+
+          if (cleanValues.length < 8) {
+            errorCount++;
+            errors.push(`Line skipped: insufficient columns`);
+            continue;
+          }
+
+          const billingData = {
+            customer_id: parseInt(cleanValues[1]) || 0,
+            billing_month: cleanValues[3] || '',
+            total_delivered: parseInt(cleanValues[4]) || 0,
+            total_absent: parseInt(cleanValues[5]) || 0,
+            total_extra: parseInt(cleanValues[6]) || 0,
+            total_amount: parseFloat(cleanValues[7]) || 0,
+            status: cleanValues[8] || 'calculating',
+          };
+
+          if (!billingData.customer_id || !billingData.billing_month) {
+            errorCount++;
+            errors.push(`Line skipped: missing required fields`);
+            continue;
+          }
+
+          await axios.post('/api/monthly-billing', billingData);
+          successCount++;
+        } catch (error: any) {
+          errorCount++;
+          errors.push(error.response?.data?.error || error.message || 'Unknown error');
+        }
+      }
+
+      if (successCount > 0) {
+        enqueueSnackbar(`Imported ${successCount} billing record(s) successfully`, {
+          variant: 'success',
+        });
         fetchBillingRecords();
       }
+
+      if (errorCount > 0) {
+        const errorMsg = `${errorCount} record(s) failed. ${errors.slice(0, 3).join(', ')}${
+          errors.length > 3 ? '...' : ''
+        }`;
+        enqueueSnackbar(errorMsg, { variant: 'warning' });
+      }
     } catch (error: any) {
-      enqueueSnackbar(error.message || 'Failed to mark as paid', { variant: 'error' });
+      console.error('Import error:', error);
+      enqueueSnackbar('Failed to import billing records', { variant: 'error' });
+    } finally {
+      setImporting(false);
     }
+  };
+
+  const handleExport = () => {
+    const headers = [
+      'ID',
+      'Customer ID',
+      'Customer Name',
+      'Billing Month',
+      'Total Delivered',
+      'Total Absent',
+      'Total Extra',
+      'Total Amount',
+      'Status',
+      'Finalized At',
+      'Paid At',
+      'Payment Method',
+      'Created At',
+      'Updated At',
+    ];
+
+    const csvData = dataFiltered.map((record) => [
+      record.id,
+      record.customer_id,
+      `"${record.customer_name || ''}"`,
+      record.billing_month,
+      record.total_delivered,
+      record.total_absent,
+      record.total_extra,
+      record.total_amount,
+      record.status,
+      record.finalized_at || '',
+      record.paid_at || '',
+      record.payment_method || '',
+      record.created_at || '',
+      record.updated_at || '',
+    ]);
+
+    const csvContent = [headers.join(','), ...csvData.map((row) => row.join(','))].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `billing-status-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    enqueueSnackbar('Billing records exported successfully', { variant: 'success' });
   };
 
   // Filter data
@@ -395,15 +610,6 @@ export default function BillingStatusPage() {
                             </TableCell>
                             <TableCell align="right">
                               <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                <Tooltip title="View Details">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleViewDetails(row.id)}
-                                  >
-                                    <Iconify icon="eva:eye-outline" />
-                                  </IconButton>
-                                </Tooltip>
-
                                 {displayStatus === 'pending' && (
                                   <>
                                     <Tooltip title="Approve">
@@ -425,18 +631,6 @@ export default function BillingStatusPage() {
                                       </IconButton>
                                     </Tooltip>
                                   </>
-                                )}
-
-                                {displayStatus === 'finalized' && (
-                                  <Tooltip title="Mark as Paid">
-                                    <IconButton
-                                      size="small"
-                                      color="primary"
-                                      onClick={() => handleMarkAsPaid(row)}
-                                    >
-                                      <Iconify icon="eva:credit-card-outline" />
-                                    </IconButton>
-                                  </Tooltip>
                                 )}
 
                                 {displayStatus === 'calculating' && (
@@ -462,7 +656,9 @@ export default function BillingStatusPage() {
                                           size="small"
                                           onClick={() =>
                                             router.push(
-                                              `/dashboard/tiffin/order-invoice-details?orderId=${row.orders![0].order_id}&month=${row.billing_month}`
+                                              `/dashboard/tiffin/order-invoice-details?orderId=${
+                                                row.orders![0].order_id
+                                              }&month=${row.billing_month}`
                                             )
                                           }
                                         >
@@ -475,7 +671,11 @@ export default function BillingStatusPage() {
                                         size="small"
                                         onClick={() =>
                                           router.push(
-                                            `/dashboard/tiffin/combined-invoice?customerId=${row.customer_id}&customerName=${encodeURIComponent(row.customer_name)}&month=${row.billing_month}`
+                                            `/dashboard/tiffin/combined-invoice?customerId=${
+                                              row.customer_id
+                                            }&customerName=${encodeURIComponent(
+                                              row.customer_name
+                                            )}&month=${row.billing_month}`
                                           )
                                         }
                                       >
