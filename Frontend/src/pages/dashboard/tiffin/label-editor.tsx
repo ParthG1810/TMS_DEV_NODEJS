@@ -83,6 +83,10 @@ export default function LabelEditorPage() {
   const [printSettings, setPrintSettings] = useState(DEFAULT_ZEBRA_PRINT_SETTINGS);
   const [isDefault, setIsDefault] = useState(false);
 
+  // Content overflow tracking
+  const [lastValidContent, setLastValidContent] = useState(templateHtml);
+  const [isOverflowWarningShown, setIsOverflowWarningShown] = useState(false);
+
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -109,6 +113,7 @@ export default function LabelEditorPage() {
         setWidthInches(template.width_inches);
         setHeightInches(template.height_inches);
         setTemplateHtml(template.template_html);
+        setLastValidContent(template.template_html); // Track loaded content as valid
         setCustomPlaceholders(template.custom_placeholders || []);
         setPrintSettings(template.print_settings || DEFAULT_ZEBRA_PRINT_SETTINGS);
         setIsDefault(template.is_default);
@@ -281,6 +286,49 @@ export default function LabelEditorPage() {
     'align',
     'image',
   ];
+
+  // Handle editor change with overflow detection
+  const handleEditorChange = useCallback((content: string) => {
+    // Temporarily set content to measure
+    setTemplateHtml(content);
+
+    // Use setTimeout to allow DOM to update, then check overflow
+    setTimeout(() => {
+      if (editorRef.current) {
+        const editor = editorRef.current.getEditor();
+        const editorElement = editor?.root;
+
+        if (editorElement) {
+          // Check if content overflows the container
+          const isOverflowing = editorElement.scrollHeight > editorElement.clientHeight;
+
+          if (isOverflowing) {
+            // Revert to last valid content
+            setTemplateHtml(lastValidContent);
+
+            // Show warning only once per overflow attempt
+            if (!isOverflowWarningShown) {
+              enqueueSnackbar('Content exceeds label size. Remove some content to add more.', {
+                variant: 'warning',
+                autoHideDuration: 3000,
+              });
+              setIsOverflowWarningShown(true);
+              // Reset warning flag after a short delay
+              setTimeout(() => setIsOverflowWarningShown(false), 1000);
+            }
+          } else {
+            // Content fits, update last valid content
+            setLastValidContent(content);
+          }
+        }
+      }
+    }, 0);
+  }, [lastValidContent, isOverflowWarningShown, enqueueSnackbar]);
+
+  // Update lastValidContent when template is loaded
+  useEffect(() => {
+    setLastValidContent(templateHtml);
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -455,7 +503,7 @@ export default function LabelEditorPage() {
                     ref={editorRef}
                     theme="snow"
                     value={templateHtml}
-                    onChange={setTemplateHtml}
+                    onChange={handleEditorChange}
                     modules={quillModules}
                     formats={quillFormats}
                   />
