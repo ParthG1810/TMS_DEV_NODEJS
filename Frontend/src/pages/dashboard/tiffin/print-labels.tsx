@@ -166,6 +166,7 @@ export default function PrintLabelsPage() {
             box-sizing: border-box;
             overflow: hidden;
             page-break-after: always;
+            padding: 8px !important;
             font-family: Helvetica, Arial, sans-serif;
             font-size: 13px;
             line-height: 1.42;
@@ -217,6 +218,7 @@ export default function PrintLabelsPage() {
             box-sizing: border-box;
             overflow: hidden;
             page-break-after: always;
+            padding: 8px !important;
             font-family: Helvetica, Arial, sans-serif;
             font-size: 13px;
             line-height: 1.42;
