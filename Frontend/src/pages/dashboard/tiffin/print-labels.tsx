@@ -148,23 +148,30 @@ export default function PrintLabelsPage() {
     @page {
       size: ${widthIn}in ${heightIn}in;
       margin: 0 !important;
-      padding: 0 !important;
     }
     @media print {
-      /* Reset everything */
-      *, *::before, *::after {
+      /* Hide everything by default */
+      body * {
+        visibility: hidden;
+      }
+      /* Show only print area */
+      .print-area, .print-area * {
+        visibility: visible;
+      }
+      .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: ${widthIn}in;
         margin: 0 !important;
         padding: 0 !important;
-        box-sizing: border-box !important;
       }
+      /* Reset base styles */
       html, body {
         margin: 0 !important;
         padding: 0 !important;
         width: ${widthIn}in !important;
         height: ${heightIn}in !important;
-        overflow: hidden !important;
-      }
-      body {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
@@ -559,8 +566,8 @@ export default function PrintLabelsPage() {
       </Container>
 
       {/* Hidden print area - structure matches editor exactly */}
-      <Box sx={{ display: 'none' }}>
-        <Box ref={printRef}>
+      <div style={{ display: 'none' }}>
+        <div ref={printRef} className="print-area">
           {printContent.map((html, index) => (
             <div key={index} className="print-label-container">
               <div
@@ -569,8 +576,8 @@ export default function PrintLabelsPage() {
               />
             </div>
           ))}
-        </Box>
-      </Box>
+        </div>
+      </div>
     </>
   );
 }
