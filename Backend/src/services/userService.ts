@@ -10,17 +10,7 @@ export interface User {
   displayName: string;
   email: string;
   photoURL: string | null;
-  phoneNumber: string | null;
-  country: string | null;
-  address: string | null;
-  state: string | null;
-  city: string | null;
-  zipCode: string | null;
-  about: string | null;
   role: 'admin' | 'manager' | 'staff' | 'tester' | 'user';
-  status: 'active' | 'inactive' | 'banned';
-  isPublic: boolean;
-  isVerified: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -35,31 +25,14 @@ export interface CreateUserInput {
   password: string;
   displayName: string;
   role?: 'admin' | 'manager' | 'staff' | 'tester' | 'user';
-  phoneNumber?: string;
-  country?: string;
-  address?: string;
-  state?: string;
-  city?: string;
-  zipCode?: string;
-  about?: string;
   photoURL?: string;
-  isPublic?: boolean;
 }
 
 export interface UpdateUserInput {
   displayName?: string;
   email?: string;
-  phoneNumber?: string;
-  country?: string;
-  address?: string;
-  state?: string;
-  city?: string;
-  zipCode?: string;
-  about?: string;
   photoURL?: string;
-  isPublic?: boolean;
   role?: 'admin' | 'manager' | 'staff' | 'tester' | 'user';
-  status?: 'active' | 'inactive' | 'banned';
 }
 
 // ----------------------------------------------------------------------
@@ -72,17 +45,7 @@ const rowToUser = (row: RowDataPacket): User => ({
   displayName: row.display_name,
   email: row.email,
   photoURL: row.photo_url,
-  phoneNumber: row.phone_number,
-  country: row.country,
-  address: row.address,
-  state: row.state,
-  city: row.city,
-  zipCode: row.zip_code,
-  about: row.about,
   role: row.role,
-  status: row.status,
-  isPublic: Boolean(row.is_public),
-  isVerified: Boolean(row.is_verified),
   lastLoginAt: row.last_login_at,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -136,25 +99,15 @@ export const createUser = async (input: CreateUserInput): Promise<User> => {
 
   await query(
     `INSERT INTO users (
-      id, display_name, email, password_hash, role,
-      phone_number, country, address, state, city,
-      zip_code, about, photo_url, is_public, status, is_verified
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', false)`,
+      id, display_name, email, password_hash, role, photo_url
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
     [
       id,
       input.displayName,
       input.email,
       passwordHash,
       input.role || 'user',
-      input.phoneNumber || null,
-      input.country || null,
-      input.address || null,
-      input.state || null,
-      input.city || null,
-      input.zipCode || null,
-      input.about || null,
       input.photoURL || null,
-      input.isPublic !== undefined ? input.isPublic : true,
     ]
   );
 
@@ -208,49 +161,13 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
     updates.push('email = ?');
     values.push(input.email);
   }
-  if (input.phoneNumber !== undefined) {
-    updates.push('phone_number = ?');
-    values.push(input.phoneNumber);
-  }
-  if (input.country !== undefined) {
-    updates.push('country = ?');
-    values.push(input.country);
-  }
-  if (input.address !== undefined) {
-    updates.push('address = ?');
-    values.push(input.address);
-  }
-  if (input.state !== undefined) {
-    updates.push('state = ?');
-    values.push(input.state);
-  }
-  if (input.city !== undefined) {
-    updates.push('city = ?');
-    values.push(input.city);
-  }
-  if (input.zipCode !== undefined) {
-    updates.push('zip_code = ?');
-    values.push(input.zipCode);
-  }
-  if (input.about !== undefined) {
-    updates.push('about = ?');
-    values.push(input.about);
-  }
   if (input.photoURL !== undefined) {
     updates.push('photo_url = ?');
     values.push(input.photoURL);
   }
-  if (input.isPublic !== undefined) {
-    updates.push('is_public = ?');
-    values.push(input.isPublic);
-  }
   if (input.role !== undefined) {
     updates.push('role = ?');
     values.push(input.role);
-  }
-  if (input.status !== undefined) {
-    updates.push('status = ?');
-    values.push(input.status);
   }
 
   if (updates.length === 0) {
@@ -313,7 +230,6 @@ export const getAllUsers = async (options?: {
   page?: number;
   limit?: number;
   role?: string;
-  status?: string;
   search?: string;
 }): Promise<{ users: User[]; total: number }> => {
   const page = options?.page || 1;
@@ -326,11 +242,6 @@ export const getAllUsers = async (options?: {
   if (options?.role && options.role !== 'all') {
     whereClause += ' AND role = ?';
     params.push(options.role);
-  }
-
-  if (options?.status && options.status !== 'all') {
-    whereClause += ' AND status = ?';
-    params.push(options.status);
   }
 
   if (options?.search) {
@@ -380,19 +291,4 @@ export const emailExists = async (email: string, excludeId?: string): Promise<bo
 
   const rows = (await query(sql, params)) as RowDataPacket[];
   return rows[0].count > 0;
-};
-
-/**
- * Update user status
- */
-export const updateUserStatus = async (
-  id: string,
-  status: 'active' | 'inactive' | 'banned'
-): Promise<boolean> => {
-  const result = (await query(
-    'UPDATE users SET status = ? WHERE id = ?',
-    [status, id]
-  )) as ResultSetHeader;
-
-  return result.affectedRows > 0;
 };

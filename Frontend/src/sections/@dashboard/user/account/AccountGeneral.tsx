@@ -11,14 +11,10 @@ import { useAuthContext } from '../../../../auth/useAuthContext';
 // utils
 import { fData } from '../../../../utils/formatNumber';
 import axios from '../../../../utils/axios';
-// assets
-import { countries } from '../../../../assets/data';
 // components
 import { CustomFile } from '../../../../components/upload';
 import { useSnackbar } from '../../../../components/snackbar';
 import FormProvider, {
-  RHFSwitch,
-  RHFSelect,
   RHFTextField,
   RHFUploadAvatar,
 } from '../../../../components/hook-form';
@@ -29,14 +25,6 @@ type FormValuesProps = {
   displayName: string;
   email: string;
   photoURL: CustomFile | string | null;
-  phoneNumber: string | null;
-  country: string | null;
-  address: string | null;
-  state: string | null;
-  city: string | null;
-  zipCode: string | null;
-  about: string | null;
-  isPublic: boolean;
 };
 
 export default function AccountGeneral() {
@@ -48,27 +36,12 @@ export default function AccountGeneral() {
     displayName: Yup.string().required('Name is required'),
     email: Yup.string().required('Email is required').email('Email must be a valid email address'),
     photoURL: Yup.mixed().nullable(true),
-    phoneNumber: Yup.string().nullable(true),
-    country: Yup.string().nullable(true),
-    address: Yup.string().nullable(true),
-    state: Yup.string().nullable(true),
-    city: Yup.string().nullable(true),
-    zipCode: Yup.string().nullable(true),
-    about: Yup.string().nullable(true),
   });
 
   const defaultValues = {
     displayName: user?.displayName || '',
     email: user?.email || '',
     photoURL: user?.photoURL || null,
-    phoneNumber: user?.phoneNumber || '',
-    country: user?.country || '',
-    address: user?.address || '',
-    state: user?.state || '',
-    city: user?.city || '',
-    zipCode: user?.zipCode || '',
-    about: user?.about || '',
-    isPublic: user?.isPublic || false,
   };
 
   const methods = useForm<FormValuesProps>({
@@ -96,15 +69,7 @@ export default function AccountGeneral() {
       await axios.put('/api/account/update-profile', {
         displayName: data.displayName,
         email: data.email,
-        phoneNumber: data.phoneNumber || null,
-        country: data.country || null,
-        address: data.address || null,
-        state: data.state || null,
-        city: data.city || null,
-        zipCode: data.zipCode || null,
-        about: data.about || null,
         photoURL: photoURL || null,
-        isPublic: data.isPublic,
       });
       enqueueSnackbar('Profile updated successfully!');
     } catch (error) {
@@ -155,13 +120,6 @@ export default function AccountGeneral() {
                 </Typography>
               }
             />
-
-            <RHFSwitch
-              name="isPublic"
-              labelPlacement="start"
-              label="Public Profile"
-              sx={{ mt: 5 }}
-            />
           </Card>
         </Grid>
 
@@ -179,30 +137,9 @@ export default function AccountGeneral() {
               <RHFTextField name="displayName" label="Name" />
 
               <RHFTextField name="email" label="Email Address" />
-
-              <RHFTextField name="phoneNumber" label="Phone Number" />
-
-              <RHFTextField name="address" label="Address" />
-
-              <RHFSelect native name="country" label="Country" placeholder="Country">
-                <option value="" />
-                {countries.map((country) => (
-                  <option key={country.code} value={country.label}>
-                    {country.label}
-                  </option>
-                ))}
-              </RHFSelect>
-
-              <RHFTextField name="state" label="State/Region" />
-
-              <RHFTextField name="city" label="City" />
-
-              <RHFTextField name="zipCode" label="Zip/Code" />
             </Box>
 
             <Stack spacing={3} alignItems="flex-end" sx={{ mt: 3 }}>
-              <RHFTextField name="about" multiline rows={4} label="About" />
-
               <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
                 Save Changes
               </LoadingButton>
