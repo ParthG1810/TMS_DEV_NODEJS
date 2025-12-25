@@ -144,65 +144,60 @@ export default function PrintLabelsPage() {
   );
 
   // Print styles - EXACTLY matches editor/preview structure
-  const getQuillPrintStyles = (widthIn: number, heightIn: number) => `
+  const getQuillPrintStyles = (widthIn: number, heightIn: number) => {
+    const widthPx = Math.round(widthIn * 96);
+    const heightPx = Math.round(heightIn * 96);
+    return `
     @page {
       size: ${widthIn}in ${heightIn}in;
-      margin: 0 !important;
+      margin: 0;
     }
     @media print {
-      /* Hide everything by default */
-      body * {
-        visibility: hidden;
-      }
-      /* Show only print area */
-      .print-area, .print-area * {
-        visibility: visible;
-      }
-      .print-area {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: ${widthIn}in;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      /* Reset base styles */
       html, body {
         margin: 0 !important;
         padding: 0 !important;
         width: ${widthIn}in !important;
         height: ${heightIn}in !important;
+        overflow: hidden !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      /* Outer container - matches editor .ql-container */
-      .print-label-container {
+      .print-area {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
         width: ${widthIn}in !important;
         height: ${heightIn}in !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+      }
+      .print-label-container {
+        width: ${widthPx}px !important;
+        height: ${heightPx}px !important;
+        max-width: ${widthPx}px !important;
+        max-height: ${heightPx}px !important;
         overflow: hidden !important;
         position: relative !important;
         box-sizing: border-box !important;
-        page-break-after: always;
-        page-break-inside: avoid;
         margin: 0 !important;
         padding: 0 !important;
+        page-break-inside: avoid;
       }
-      .print-label-container:last-child {
-        page-break-after: avoid;
-      }
-      /* Inner content - matches editor .ql-editor with position absolute */
       .print-label-content {
         position: absolute !important;
         top: 0 !important;
         left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
+        width: ${widthPx}px !important;
+        height: ${heightPx}px !important;
+        max-width: ${widthPx}px !important;
+        max-height: ${heightPx}px !important;
         padding: 8px !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
         margin: 0 !important;
+        clip: rect(0, ${widthPx}px, ${heightPx}px, 0) !important;
       }
-      /* Reset paragraph margins - matches editor exactly */
       .print-label-content p {
         margin: 0 !important;
         padding: 0 !important;
@@ -212,6 +207,7 @@ export default function PrintLabelsPage() {
       }
     }
   `;
+  };
 
   // Handle single print
   const handleSinglePrint = useReactToPrint({
