@@ -395,9 +395,13 @@ export interface CustomerOrderWithDetails extends CustomerOrder {
  * Daily tiffin count item
  */
 export interface DailyTiffinCount {
+  customer_id: number;
   customer_name: string;
+  customer_phone?: string;
+  customer_address?: string;
   quantity: number;
   meal_plan_name: string;
+  print_order: number;
 }
 
 /**
