@@ -518,12 +518,15 @@ export default function LabelEditorPage() {
                       position: 'relative',
                     },
                     '& .ql-editor': {
+                      // MUST match preview structure exactly - position absolute clips content
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
                       width: '100%',
-                      height: '100% !important',
+                      height: '100%',
                       padding: '8px !important',
                       overflow: 'hidden !important',
                       boxSizing: 'border-box',
-                      maxHeight: '100% !important',
                       // Reset paragraph margins to match preview exactly
                       '& p': {
                         margin: '0 !important',
