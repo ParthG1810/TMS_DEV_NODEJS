@@ -319,28 +319,34 @@ export default function LabelEditorPage() {
   // Quill modules configuration
   const quillModules = {
     toolbar: [
-      [{ header: [1, 2, 3, 4, 5, 6, false] }],
-      [{ size: ['small', 'medium', 'large', 'huge', false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      ['blockquote', 'code-block'],
-      ['link', 'image', 'video', 'formula'],
-      [{ script: 'sub' }, { script: 'super' }],
-      [{ indent: '-1' }, { indent: '+1' }],
-      [{ direction: 'rtl' }],
-      [{ color: [] }, { background: [] }],
+      [{ header: [1, 2, 3, 4, 5, 6, false] }], // Headers
       [{ font: [] }],
-      [{ align: [] }],
-      [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
-      ['clean'],
-      [{ size: ['8pt', '10pt', '12pt', '14pt', '18pt', '24pt'] }],
+      [{ size: ['small', 'medium', 'large', 'huge', false] }],
+      [{ sizes: [{ size: ['10px', '12px', '14px', '16px', '18px', '24px'] }] }], // Font and size
+      ['bold', 'italic', 'underline', 'strike'], // Text styling
+      ['blockquote', 'code-block'], // Block quotes and code
+      [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }], // Lists
+      [{ script: 'sub' }, { script: 'super' }], // Subscript/superscript
+      [{ indent: '-1' }, { indent: '+1' }], // Indentation
+      [{ color: [] }, { background: [] }], // Colors
+      [{ direction: 'rtl' }], // Text direction
+      [{ align: [] }], // Alignment
+      ['link', 'image', 'video', 'formula'], // Media
+      ['clean'], // Clean formatting
     ],
+    // History (undo/redo)
     history: {
       delay: 500,
       maxStack: 100,
       userOnly: true,
     },
+    // Clipboard (paste handling)
+    clipboard: {
+      matchVisual: false, // Don't match visual formatting on paste
+    },
+    // Image resize (with quill-image-resize-module-react)
     imageResize: {
-      modules: ['Resize', 'DisplaySize'],
+      modules: ['Resize', 'DisplaySize', 'Toolbar'],
     },
   };
 
@@ -351,14 +357,23 @@ export default function LabelEditorPage() {
     'italic',
     'underline',
     'strike',
+    'script',
     'color',
     'background',
     'align',
     'image',
     'font',
+    'size',
     'list',
     'bullet',
     'link',
+    'code',
+    'indent',
+    'blockquote',
+    'direction', // Text direction (RTL)
+    'code-block',
+    'formula',
+    'video',
   ];
 
   // Handle editor change with overflow detection
