@@ -155,12 +155,19 @@ export default function PrintLabelsPage() {
         padding: 0;
       }
       .print-label {
-        width: ${widthIn}in;
-        height: ${heightIn}in;
+        width: ${widthIn}in !important;
+        height: ${heightIn}in !important;
+        max-height: ${heightIn}in !important;
         padding: 8px !important;
-        box-sizing: border-box;
-        overflow: hidden;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
         page-break-after: always;
+        page-break-inside: avoid;
+      }
+      /* Reset all paragraph margins to match editor */
+      .print-label p {
+        margin: 0 !important;
+        padding: 0 !important;
       }
       .print-label img {
         max-width: 100%;
