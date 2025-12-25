@@ -60,6 +60,7 @@ async function handleGetMonthlyTiffinList(
     }
 
     // Fetch orders that are active during the target month
+    // Sort by print_order from customer_print_order table
     const orders = (await query(
       `
       SELECT
@@ -70,12 +71,14 @@ async function handleGetMonthlyTiffinList(
         mp.meal_name as meal_plan_name,
         mp.description as meal_plan_description,
         mp.frequency as meal_plan_frequency,
-        mp.days as meal_plan_days
+        mp.days as meal_plan_days,
+        COALESCE(cpo.print_order, 999999) as print_order
       FROM customer_orders co
       INNER JOIN customers c ON co.customer_id = c.id
       INNER JOIN meal_plans mp ON co.meal_plan_id = mp.id
+      LEFT JOIN customer_print_order cpo ON c.id = cpo.customer_id
       WHERE DATE_FORMAT(co.start_date, '%Y-%m') <= ? AND DATE_FORMAT(co.end_date, '%Y-%m') >= ?
-      ORDER BY co.created_at DESC
+      ORDER BY COALESCE(cpo.print_order, 999999) ASC, c.name ASC
       `,
       [targetMonth, targetMonth]
     )) as any[];
