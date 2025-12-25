@@ -155,13 +155,17 @@ export default function PrintLabelsPage() {
           margin: 0;
         }
         @media print {
-          body { margin: 0; padding: 0; }
+          html, body {
+            margin: 0;
+            padding: 0;
+          }
           .print-label {
             width: ${template.width_inches}in;
             height: ${template.height_inches}in;
-            page-break-after: always;
+            padding: 8px;
             box-sizing: border-box;
             overflow: hidden;
+            page-break-after: always;
             padding: 8px !important;
             font-family: Helvetica, Arial, sans-serif;
             font-size: 13px;
@@ -169,6 +173,7 @@ export default function PrintLabelsPage() {
           }
           .print-label p {
             margin: 0;
+            padding: 0;
           }
           .print-label img {
             max-width: 100%;
@@ -202,13 +207,17 @@ export default function PrintLabelsPage() {
           margin: 0;
         }
         @media print {
-          body { margin: 0; padding: 0; }
+          html, body {
+            margin: 0;
+            padding: 0;
+          }
           .print-label {
             width: ${template.width_inches}in;
             height: ${template.height_inches}in;
-            page-break-after: always;
+            padding: 8px;
             box-sizing: border-box;
             overflow: hidden;
+            page-break-after: always;
             padding: 8px !important;
             font-family: Helvetica, Arial, sans-serif;
             font-size: 13px;
@@ -216,6 +225,7 @@ export default function PrintLabelsPage() {
           }
           .print-label p {
             margin: 0;
+            padding: 0;
           }
           .print-label img {
             max-width: 100%;
