@@ -162,6 +162,14 @@ export default function PrintLabelsPage() {
             page-break-after: always;
             box-sizing: border-box;
             overflow: hidden;
+            padding: 8px !important;
+          }
+          .print-label.ql-editor {
+            padding: 8px !important;
+          }
+          .print-label p {
+            margin: 0 !important;
+            padding: 0 !important;
           }
           .print-label:last-child {
             page-break-after: avoid;
@@ -199,6 +207,14 @@ export default function PrintLabelsPage() {
             page-break-after: always;
             box-sizing: border-box;
             overflow: hidden;
+            padding: 8px !important;
+          }
+          .print-label.ql-editor {
+            padding: 8px !important;
+          }
+          .print-label p {
+            margin: 0 !important;
+            padding: 0 !important;
           }
           .print-label:last-child {
             page-break-after: avoid;
