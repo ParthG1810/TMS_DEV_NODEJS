@@ -453,6 +453,37 @@ export default function BillingStatusPage() {
                                     </IconButton>
                                   </Tooltip>
                                 )}
+
+                                {displayStatus !== 'calculating' && (
+                                  <>
+                                    {hasOrders && row.orders && row.orders.length > 0 && (
+                                      <Tooltip title="View Invoice">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() =>
+                                            router.push(
+                                              `/dashboard/tiffin/order-invoice-details?orderId=${row.orders![0].order_id}&month=${row.billing_month}`
+                                            )
+                                          }
+                                        >
+                                          <Iconify icon="eva:file-outline" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    )}
+                                    <Tooltip title="View Combined Invoice">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() =>
+                                          router.push(
+                                            `/dashboard/tiffin/combined-invoice?customerId=${row.customer_id}&customerName=${encodeURIComponent(row.customer_name)}&month=${row.billing_month}`
+                                          )
+                                        }
+                                      >
+                                        <Iconify icon="eva:layers-outline" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </>
+                                )}
                               </Stack>
                             </TableCell>
                           </TableRow>
