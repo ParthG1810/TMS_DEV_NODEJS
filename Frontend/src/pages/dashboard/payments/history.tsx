@@ -129,7 +129,8 @@ export default function PaymentHistoryPage() {
   const [importing, setImporting] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterMonth, setFilterMonth] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
+  const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
   const [filterName, setFilterName] = useState('');
   const [filterPaymentType, setFilterPaymentType] = useState('');
   const [filterAmountOperator, setFilterAmountOperator] = useState('');
@@ -199,8 +200,13 @@ export default function PaymentHistoryPage() {
     setPage(0);
   };
 
-  const handleFilterMonth = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFilterMonth(event.target.value);
+  const handleFilterStartDate = (date: Date | null) => {
+    setFilterStartDate(date);
+    setPage(0);
+  };
+
+  const handleFilterEndDate = (date: Date | null) => {
+    setFilterEndDate(date);
     setPage(0);
   };
 
@@ -221,7 +227,8 @@ export default function PaymentHistoryPage() {
 
   const handleResetFilter = () => {
     setFilterStatus('all');
-    setFilterMonth('');
+    setFilterStartDate(null);
+    setFilterEndDate(null);
     setFilterName('');
     setFilterPaymentType('');
     setFilterAmountOperator('');
@@ -230,7 +237,8 @@ export default function PaymentHistoryPage() {
 
   const isFiltered =
     filterStatus !== 'all' ||
-    filterMonth !== '' ||
+    filterStartDate !== null ||
+    filterEndDate !== null ||
     filterName !== '' ||
     filterPaymentType !== '' ||
     filterAmountOperator !== '';
@@ -527,26 +535,20 @@ export default function PaymentHistoryPage() {
     enqueueSnackbar('Payments exported successfully', { variant: 'success' });
   };
 
-  // Get unique months for filter
-  const uniqueMonths = Array.from(
-    new Set(
-      payments.map((row) => {
-        const date = new Date(row.payment_date);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      })
-    )
-  ).sort((a, b) => b.localeCompare(a));
-
   // Filter payments
   const filteredPayments = payments.filter((payment) => {
     // Status filter
     if (filterStatus !== 'all' && payment.allocation_status !== filterStatus) return false;
 
-    // Month filter
-    if (filterMonth) {
-      const paymentMonth = new Date(payment.payment_date);
-      const monthStr = `${paymentMonth.getFullYear()}-${String(paymentMonth.getMonth() + 1).padStart(2, '0')}`;
-      if (monthStr !== filterMonth) return false;
+    // Date range filter
+    if (filterStartDate || filterEndDate) {
+      const paymentDate = new Date(payment.payment_date);
+      if (filterStartDate && paymentDate < filterStartDate) return false;
+      if (filterEndDate) {
+        const endDatePlusOne = new Date(filterEndDate);
+        endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+        if (paymentDate >= endDatePlusOne) return false;
+      }
     }
 
     // Payment type filter
@@ -721,13 +723,14 @@ export default function PaymentHistoryPage() {
           <PaymentTableToolbar
             isFiltered={isFiltered}
             filterName={filterName}
-            filterMonth={filterMonth}
+            filterStartDate={filterStartDate}
+            filterEndDate={filterEndDate}
             filterPaymentType={filterPaymentType}
             filterAmountOperator={filterAmountOperator}
             filterAmountValue={filterAmountValue}
-            monthOptions={uniqueMonths}
             onFilterName={handleFilterName}
-            onFilterMonth={handleFilterMonth}
+            onFilterStartDate={handleFilterStartDate}
+            onFilterEndDate={handleFilterEndDate}
             onFilterPaymentType={handleFilterPaymentType}
             onFilterAmountOperator={handleFilterAmountOperator}
             onFilterAmountValue={handleFilterAmountValue}
