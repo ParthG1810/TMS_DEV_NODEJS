@@ -516,6 +516,7 @@ export default function LabelEditorPage() {
                       overflow: 'hidden',
                       boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
                       position: 'relative',
+                      boxSizing: 'border-box', // Match preview - border included in dimensions
                     },
                     '& .ql-editor': {
                       // MUST match preview structure exactly - position absolute clips content
