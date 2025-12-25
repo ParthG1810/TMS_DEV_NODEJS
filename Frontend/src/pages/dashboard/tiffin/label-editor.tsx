@@ -412,25 +412,39 @@ export default function LabelEditorPage() {
             <Card sx={{ mb: 3 }}>
               <CardHeader title="Template Editor" />
               <CardContent>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                  {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
+                  {inchesToPixels(heightInches)}px at 96 DPI)
+                </Typography>
                 <Box
                   sx={{
-                    border: '2px dashed',
-                    borderColor: 'grey.300',
-                    borderRadius: 1,
-                    p: 2,
-                    mb: 2,
-                    width: inchesToPixels(widthInches),
-                    minHeight: inchesToPixels(heightInches),
-                    maxWidth: '100%',
-                    overflow: 'auto',
-                    bgcolor: 'white',
-                    mx: 'auto',
+                    '& .quill': {
+                      display: 'flex',
+                      flexDirection: 'column',
+                    },
+                    '& .ql-toolbar': {
+                      borderRadius: '8px 8px 0 0',
+                      backgroundColor: '#f5f5f5',
+                      borderColor: 'grey.300',
+                    },
+                    '& .ql-container': {
+                      width: inchesToPixels(widthInches),
+                      height: inchesToPixels(heightInches),
+                      border: '2px dashed',
+                      borderColor: 'grey.400',
+                      borderRadius: '0 0 8px 8px',
+                      backgroundColor: 'white',
+                      mx: 'auto',
+                      overflow: 'hidden',
+                    },
+                    '& .ql-editor': {
+                      width: '100%',
+                      height: '100%',
+                      padding: '8px',
+                      overflow: 'auto',
+                    },
                   }}
                 >
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                    {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
-                    {inchesToPixels(heightInches)}px at 96 DPI)
-                  </Typography>
                   <ReactQuill
                     ref={editorRef}
                     theme="snow"
@@ -438,9 +452,6 @@ export default function LabelEditorPage() {
                     onChange={setTemplateHtml}
                     modules={quillModules}
                     formats={quillFormats}
-                    style={{
-                      minHeight: inchesToPixels(heightInches) - 40,
-                    }}
                   />
                 </Box>
               </CardContent>
