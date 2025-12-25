@@ -61,6 +61,25 @@ const ReactQuill = dynamic(() => import('react-quill'), {
 });
 import 'react-quill/dist/quill.snow.css';
 
+// Helper to clean HTML from ReactQuill artifacts (empty paragraphs, trailing breaks)
+const cleanQuillHtml = (html: string): string => {
+  if (!html) return html;
+
+  let cleaned = html;
+
+  // Remove empty paragraphs: <p><br></p>, <p><br/></p>, <p></p>
+  cleaned = cleaned.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '');
+  cleaned = cleaned.replace(/<p>\s*<\/p>/gi, '');
+
+  // Remove trailing <br> inside last paragraph
+  cleaned = cleaned.replace(/<br\s*\/?>\s*(<\/p>\s*)$/gi, '$1');
+
+  // Trim whitespace
+  cleaned = cleaned.trim();
+
+  return cleaned;
+};
+
 // ----------------------------------------------------------------------
 
 LabelEditorPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page}</DashboardLayout>;
@@ -111,13 +130,16 @@ export default function LabelEditorPage() {
       const response = await axios.get(`/api/label-templates/${id}`);
       if (response.data.success) {
         const template = response.data.data;
+        // Clean HTML on load to remove any artifacts
+        const cleanedHtml = cleanQuillHtml(template.template_html);
+
         setName(template.name);
         setDescription(template.description || '');
         setWidthInches(template.width_inches);
         setHeightInches(template.height_inches);
-        setTemplateHtml(template.template_html);
-        setLastValidContent(template.template_html); // Track loaded content as valid
-        loadedContentRef.current = template.template_html; // Store for overflow comparison
+        setTemplateHtml(cleanedHtml);
+        setLastValidContent(cleanedHtml); // Track loaded content as valid
+        loadedContentRef.current = cleanedHtml; // Store for overflow comparison
         setCustomPlaceholders(template.custom_placeholders || []);
         setPrintSettings(template.print_settings || DEFAULT_ZEBRA_PRINT_SETTINGS);
         setIsDefault(template.is_default);
@@ -210,12 +232,15 @@ export default function LabelEditorPage() {
 
     setIsSaving(true);
     try {
+      // Clean HTML before saving to remove ReactQuill artifacts
+      const cleanedHtml = cleanQuillHtml(templateHtml);
+
       const data: CreateLabelTemplateRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
         width_inches: widthInches,
         height_inches: heightInches,
-        template_html: templateHtml,
+        template_html: cleanedHtml,
         custom_placeholders: customPlaceholders.length > 0 ? customPlaceholders : undefined,
         print_settings: printSettings,
         is_default: isDefault,
@@ -516,6 +541,7 @@ export default function LabelEditorPage() {
                       overflow: 'hidden',
                       boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
                       position: 'relative',
+                      boxSizing: 'border-box', // Match preview - border included in dimensions
                     },
                     '& .ql-editor': {
                       // MUST match preview structure exactly - position absolute clips content
