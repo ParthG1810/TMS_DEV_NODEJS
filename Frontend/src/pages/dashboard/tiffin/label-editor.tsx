@@ -340,7 +340,6 @@ export default function LabelEditorPage() {
       [{ header: [1, 2, 3, 4, 5, 6, false] }], // Headers
       [{ font: [] }],
       [{ size: [false, '10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'] }], // Custom pixel sizes (false = Normal)
-      [{ size: ['small', false, 'large', 'huge'] }],
       ['bold', 'italic', 'underline', 'strike'], // Text styling
       ['blockquote', 'code-block'], // Block quotes and code
       [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }], // Lists
