@@ -67,12 +67,18 @@ const cleanQuillHtml = (html: string): string => {
 
   let cleaned = html;
 
-  // Remove empty paragraphs: <p><br></p>, <p><br/></p>, <p></p>
-  cleaned = cleaned.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '');
-  cleaned = cleaned.replace(/<p>\s*<\/p>/gi, '');
+  // Remove empty paragraphs with any attributes: <p class="..."><br></p>, <p><br/></p>, <p></p>
+  cleaned = cleaned.replace(/<p[^>]*>\s*<br\s*\/?>\s*<\/p>/gi, '');
+  cleaned = cleaned.replace(/<p[^>]*>\s*<\/p>/gi, '');
 
-  // Remove trailing <br> inside last paragraph
-  cleaned = cleaned.replace(/<br\s*\/?>\s*(<\/p>\s*)$/gi, '$1');
+  // Remove paragraphs with only &nbsp;
+  cleaned = cleaned.replace(/<p[^>]*>\s*(&nbsp;|\u00A0)\s*<\/p>/gi, '');
+
+  // Remove trailing <br> inside paragraphs (before </p>)
+  cleaned = cleaned.replace(/<br\s*\/?>\s*<\/p>/gi, '</p>');
+
+  // Remove standalone <br> tags between paragraphs
+  cleaned = cleaned.replace(/<\/p>\s*<br\s*\/?>\s*<p/gi, '</p><p');
 
   // Trim whitespace
   cleaned = cleaned.trim();
@@ -323,33 +329,36 @@ export default function LabelEditorPage() {
 
   // Handle editor change with overflow detection
   const handleEditorChange = useCallback((content: string) => {
+    // Clean the HTML to remove ReactQuill artifacts (empty paragraphs, trailing breaks)
+    const cleanedContent = cleanQuillHtml(content);
+
     // Skip overflow check during template loading
     if (skipOverflowCheckRef.current) {
-      setTemplateHtml(content);
-      setLastValidContent(content);
+      setTemplateHtml(cleanedContent);
+      setLastValidContent(cleanedContent);
       return;
     }
 
     // Always allow the content change first
-    setTemplateHtml(content);
+    setTemplateHtml(cleanedContent);
 
     // Check if this is a deletion (content is shorter)
-    const isDeleting = content.length < lastValidContent.length;
+    const isDeleting = cleanedContent.length < lastValidContent.length;
 
     // Check if content matches the originally loaded content (always allow saved content)
-    const isLoadedContent = content === loadedContentRef.current;
+    const isLoadedContent = cleanedContent === loadedContentRef.current;
 
     // Use setTimeout to allow DOM to update, then check overflow
     setTimeout(() => {
       // Skip if still loading
       if (skipOverflowCheckRef.current) {
-        setLastValidContent(content);
+        setLastValidContent(cleanedContent);
         return;
       }
 
       // Always allow the originally loaded/saved content
       if (isLoadedContent) {
-        setLastValidContent(content);
+        setLastValidContent(cleanedContent);
         return;
       }
 
@@ -376,7 +385,7 @@ export default function LabelEditorPage() {
           }
         } else {
           // Content fits OR user is deleting (allow deletions even if still overflowing)
-          setLastValidContent(content);
+          setLastValidContent(cleanedContent);
         }
       }
     }, 0);
