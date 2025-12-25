@@ -155,37 +155,23 @@ export default function PrintLabelsPage() {
           margin: 0;
         }
         @media print {
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body {
-            margin: 0;
-            padding: 0;
-          }
+          body { margin: 0; padding: 0; }
           .print-label {
             width: ${template.width_inches}in;
             height: ${template.height_inches}in;
             page-break-after: always;
             box-sizing: border-box;
             overflow: hidden;
-            padding: 8px;
+            padding: 8px !important;
             font-family: Helvetica, Arial, sans-serif;
             font-size: 13px;
             line-height: 1.42;
           }
-          .print-label * {
-            margin: 0 !important;
-            padding: 0 !important;
-          }
           .print-label p {
-            margin: 0 !important;
-            padding: 0 !important;
+            margin: 0;
           }
           .print-label img {
             max-width: 100%;
-            display: block;
           }
           .print-label:last-child {
             page-break-after: avoid;
@@ -216,37 +202,23 @@ export default function PrintLabelsPage() {
           margin: 0;
         }
         @media print {
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body {
-            margin: 0;
-            padding: 0;
-          }
+          body { margin: 0; padding: 0; }
           .print-label {
             width: ${template.width_inches}in;
             height: ${template.height_inches}in;
             page-break-after: always;
             box-sizing: border-box;
             overflow: hidden;
-            padding: 8px;
+            padding: 8px !important;
             font-family: Helvetica, Arial, sans-serif;
             font-size: 13px;
             line-height: 1.42;
           }
-          .print-label * {
-            margin: 0 !important;
-            padding: 0 !important;
-          }
           .print-label p {
-            margin: 0 !important;
-            padding: 0 !important;
+            margin: 0;
           }
           .print-label img {
             max-width: 100%;
-            display: block;
           }
           .print-label:last-child {
             page-break-after: avoid;
