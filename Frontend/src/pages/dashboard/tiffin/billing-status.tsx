@@ -482,8 +482,8 @@ export default function BillingStatusPage() {
   const denseHeight = dense ? 52 : 72;
 
   // Get unique months for filter
-  const uniqueMonths = Array.from(new Set(tableData.map((row) => row.billing_month))).sort(
-    (a, b) => b.localeCompare(a)
+  const uniqueMonths = Array.from(new Set(tableData.map((row) => row.billing_month))).sort((a, b) =>
+    b.localeCompare(a)
   );
 
   const isFiltered =
