@@ -502,8 +502,16 @@ export default function LabelEditorPage() {
                       bgcolor: 'white',
                       transform: `scale(${previewZoom / 100})`,
                       transformOrigin: 'top left',
-                      p: 1,
+                      padding: '8px',
                       overflow: 'hidden',
+                      // Match Quill editor paragraph styling
+                      '& p': {
+                        margin: 0,
+                        padding: 0,
+                      },
+                      '& img': {
+                        maxWidth: '100%',
+                      },
                     }}
                     dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
                   />
