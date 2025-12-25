@@ -118,6 +118,10 @@ export default function BillingCalendarPage() {
     'December',
   ];
 
+  // Generate year options (current year - 5 to current year + 5)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
+
   const currentMonthName = monthNames[selectedMonth - 1];
 
   // Calculate summary stats
@@ -165,9 +169,33 @@ export default function BillingCalendarPage() {
                 <Iconify icon="eva:arrow-ios-back-fill" />
               </IconButton>
 
-              <Typography variant="h4" sx={{ minWidth: 200, textAlign: 'center' }}>
-                {currentMonthName} {selectedYear}
-              </Typography>
+              <TextField
+                select
+                size="small"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                sx={{ minWidth: 140 }}
+              >
+                {monthNames.map((month, index) => (
+                  <MenuItem key={month} value={index + 1}>
+                    {month}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                select
+                size="small"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                sx={{ minWidth: 100 }}
+              >
+                {yearOptions.map((year) => (
+                  <MenuItem key={year} value={year}>
+                    {year}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <IconButton onClick={() => handleMonthChange('next')} size="small">
                 <Iconify icon="eva:arrow-ios-forward-fill" />

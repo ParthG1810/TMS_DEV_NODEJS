@@ -6,6 +6,7 @@ import {
   TableCell,
   IconButton,
   MenuItem,
+  Tooltip,
 } from '@mui/material';
 // @types
 import { IMealPlan } from '../../../../../@types/tms';
@@ -22,6 +23,7 @@ type Props = {
   onEditRow: VoidFunction;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
+  hasOrders?: boolean;
 };
 
 export default function MealPlanTableRow({
@@ -30,6 +32,7 @@ export default function MealPlanTableRow({
   onEditRow,
   onSelectRow,
   onDeleteRow,
+  hasOrders = false,
 }: Props) {
   const { meal_name, frequency, days, price, description } = row;
 
@@ -56,7 +59,15 @@ export default function MealPlanTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          <Tooltip title={hasOrders ? 'Cannot select meal plan used in orders' : ''}>
+            <span>
+              <Checkbox
+                checked={selected}
+                onClick={onSelectRow}
+                disabled={hasOrders}
+              />
+            </span>
+          </Tooltip>
         </TableCell>
 
         <TableCell>{meal_name}</TableCell>
@@ -90,16 +101,21 @@ export default function MealPlanTableRow({
           Edit
         </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            handleOpenConfirm();
-            handleClosePopover();
-          }}
-          sx={{ color: 'error.main' }}
-        >
-          <Iconify icon="eva:trash-2-outline" />
-          Delete
-        </MenuItem>
+        <Tooltip title={hasOrders ? 'Cannot delete meal plan used in orders' : ''}>
+          <span>
+            <MenuItem
+              onClick={() => {
+                handleOpenConfirm();
+                handleClosePopover();
+              }}
+              sx={{ color: hasOrders ? 'text.disabled' : 'error.main' }}
+              disabled={hasOrders}
+            >
+              <Iconify icon="eva:trash-2-outline" />
+              Delete
+            </MenuItem>
+          </span>
+        </Tooltip>
       </MenuPopover>
 
       <ConfirmDialog
