@@ -39,13 +39,17 @@ interface CombinedInvoice {
   summary: {
     total_orders: number;
     finalized_orders: number;
+    selectable_orders: number;
+    invoiced_orders: number;
     all_finalized: boolean;
+    all_invoiced: boolean;
     grand_total_delivered: number;
     grand_total_absent: number;
     grand_total_extra: number;
     grand_total_amount: number;
   };
   can_approve: boolean;
+  all_invoiced: boolean;
 }
 
 export default async function handler(
@@ -194,13 +198,22 @@ export default async function handler(
     // Count orders that are ready for invoicing (finalized, approved, invoiced, paid, or partial_paid)
     const totalOrders = allOrders.length;
     const readyStatuses = ['finalized', 'approved', 'invoiced', 'paid', 'partial_paid'];
+    const selectableStatuses = ['finalized', 'approved']; // Only these can be selected for new invoice
     const finalizedOrders = allOrders.filter((o) => readyStatuses.includes(o.status)).length;
+    const selectableOrders = allOrders.filter((o) => selectableStatuses.includes(o.status)).length;
+    const invoicedOrders = allOrders.filter((o) => o.status === 'invoiced').length;
+    const paidOrders = allOrders.filter((o) => o.status === 'paid' || o.status === 'partial_paid').length;
     const allFinalized = totalOrders > 0 && finalizedOrders === totalOrders;
+    const allInvoiced = totalOrders > 0 && (invoicedOrders + paidOrders) === totalOrders;
+    const hasSelectableOrders = selectableOrders > 0;
 
     const summary = {
       total_orders: totalOrders,
       finalized_orders: finalizedOrders,
+      selectable_orders: selectableOrders,
+      invoiced_orders: invoicedOrders,
       all_finalized: allFinalized,
+      all_invoiced: allInvoiced,
       grand_total_delivered: allOrders.reduce((sum, o) => sum + (o.total_delivered || 0), 0),
       grand_total_absent: allOrders.reduce((sum, o) => sum + (o.total_absent || 0), 0),
       grand_total_extra: allOrders.reduce((sum, o) => sum + (o.total_extra || 0), 0),
@@ -215,7 +228,8 @@ export default async function handler(
       billing_month: billing_month as string,
       orders: allOrders,
       summary,
-      can_approve: allFinalized,
+      can_approve: hasSelectableOrders, // Only true if there are orders that can actually be selected
+      all_invoiced: allInvoiced, // New flag to indicate all orders are already invoiced
     };
 
     return res.status(200).json({
