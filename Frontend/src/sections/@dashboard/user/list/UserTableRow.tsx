@@ -36,7 +36,7 @@ export default function UserTableRow({
   onSelectRow,
   onDeleteRow,
 }: Props) {
-  const { name, avatarUrl, company, role, isVerified, status } = row;
+  const { name, avatarUrl, email, role, isVerified, status } = row;
 
   const [openConfirm, setOpenConfirm] = useState(false);
 
@@ -75,7 +75,7 @@ export default function UserTableRow({
           </Stack>
         </TableCell>
 
-        <TableCell align="left">{company}</TableCell>
+        <TableCell align="left">{email}</TableCell>
 
         <TableCell align="left" sx={{ textTransform: 'capitalize' }}>
           {role}
