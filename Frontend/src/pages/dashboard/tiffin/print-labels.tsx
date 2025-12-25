@@ -349,18 +349,40 @@ export default function PrintLabelsPage() {
                     <Box
                       sx={{
                         width: inchesToPixels(selectedTemplate.width_inches),
-                        minHeight: inchesToPixels(selectedTemplate.height_inches),
-                        border: '1px solid',
-                        borderColor: 'grey.400',
+                        height: inchesToPixels(selectedTemplate.height_inches),
+                        border: '2px solid #1976d2',
+                        borderRadius: '8px',
                         bgcolor: 'white',
-                        p: 1,
-                        maxWidth: '100%',
-                        overflow: 'auto',
+                        overflow: 'hidden',
+                        boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
+                        boxSizing: 'border-box',
+                        position: 'relative',
                       }}
-                      dangerouslySetInnerHTML={{
-                        __html: generateLabelHtml(selectedCustomer, selectedTemplate, 1),
-                      }}
-                    />
+                    >
+                      <Box
+                        className="ql-editor"
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          padding: '8px !important',
+                          overflow: 'hidden !important',
+                          boxSizing: 'border-box',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          '& p': {
+                            margin: '0 !important',
+                            padding: '0 !important',
+                          },
+                          '& img': {
+                            maxWidth: '100%',
+                          },
+                        }}
+                        dangerouslySetInnerHTML={{
+                          __html: generateLabelHtml(selectedCustomer, selectedTemplate, 1),
+                        }}
+                      />
+                    </Box>
                   ) : (
                     <Typography color="text.secondary">
                       Select a customer and template to preview
@@ -515,7 +537,12 @@ export default function PrintLabelsPage() {
           {printContent.map((html, index) => (
             <div
               key={index}
-              className="print-label"
+              className="print-label ql-editor"
+              style={{
+                padding: '8px',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+              }}
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ))}
