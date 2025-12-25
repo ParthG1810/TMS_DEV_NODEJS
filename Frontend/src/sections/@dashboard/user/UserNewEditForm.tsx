@@ -61,6 +61,13 @@ export default function UserNewEditForm({ isEdit = false, currentUser }: Props) 
   const { user: authUser } = useAuthContext();
 
   const isAdmin = authUser?.role === 'admin';
+  const isManager = authUser?.role === 'manager';
+  const canAssignRoles = isAdmin || isManager;
+
+  // Filter role options based on current user's role
+  const availableRoles = isAdmin
+    ? ROLE_OPTIONS
+    : ROLE_OPTIONS.filter(option => option.value !== 'admin');
 
   const NewUserSchema = Yup.object().shape({
     name: Yup.string().required('Name is required'),
@@ -200,9 +207,9 @@ export default function UserNewEditForm({ isEdit = false, currentUser }: Props) 
                 <RHFTextField name="password" label="Password" type="password" />
               )}
 
-              {isAdmin && (
+              {canAssignRoles && (
                 <RHFSelect native name="role" label="Role">
-                  {ROLE_OPTIONS.map((option) => (
+                  {availableRoles.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
