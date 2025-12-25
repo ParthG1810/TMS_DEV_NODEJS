@@ -1,4 +1,3 @@
-import { paramCase } from 'change-case';
 import { useState, useEffect, useCallback } from 'react';
 // next
 import Head from 'next/head';
@@ -45,6 +44,9 @@ import {
 import { UserTableToolbar, UserTableRow } from '../../../sections/@dashboard/user/list';
 
 // ----------------------------------------------------------------------
+
+// Default admin email that cannot be deleted
+const PROTECTED_ADMIN_EMAIL = 'admin@tms.com';
 
 const ROLE_OPTIONS = ['all', 'admin', 'manager', 'staff', 'tester', 'user'];
 
@@ -113,6 +115,16 @@ export default function UserListPage() {
   // Check if current user can manage users
   const canManageUsers = currentUser?.role === 'admin' || currentUser?.role === 'manager';
 
+  // Check if a user is protected (cannot be deleted)
+  const isProtectedUser = (user: UserData) => {
+    return user.email === PROTECTED_ADMIN_EMAIL || user.id === currentUser?.id;
+  };
+
+  // Get selectable users (exclude protected users)
+  const getSelectableUsers = () => {
+    return tableData.filter((user) => !isProtectedUser(user));
+  };
+
   // Fetch users from API
   const fetchUsers = useCallback(async () => {
     try {
@@ -175,6 +187,13 @@ export default function UserListPage() {
   };
 
   const handleDeleteRow = async (id: string) => {
+    // Check if user is protected
+    const userToDelete = tableData.find((user) => user.id === id);
+    if (userToDelete && isProtectedUser(userToDelete)) {
+      enqueueSnackbar('Cannot delete this user', { variant: 'error' });
+      return;
+    }
+
     try {
       await axios.delete(`/api/users/${id}`);
       const deleteRow = tableData.filter((row) => row.id !== id);
@@ -194,22 +213,33 @@ export default function UserListPage() {
   };
 
   const handleDeleteRows = async (selectedRows: string[]) => {
+    // Filter out protected users
+    const deletableRows = selectedRows.filter((id) => {
+      const user = tableData.find((u) => u.id === id);
+      return user && !isProtectedUser(user);
+    });
+
+    if (deletableRows.length === 0) {
+      enqueueSnackbar('No deletable users selected', { variant: 'warning' });
+      return;
+    }
+
     try {
       // Delete users one by one
-      await Promise.all(selectedRows.map((id) => axios.delete(`/api/users/${id}`)));
+      await Promise.all(deletableRows.map((id) => axios.delete(`/api/users/${id}`)));
 
-      const deleteRows = tableData.filter((row) => !selectedRows.includes(row.id));
+      const deleteRows = tableData.filter((row) => !deletableRows.includes(row.id));
       setSelected([]);
       setTableData(deleteRows);
       enqueueSnackbar('Users deleted successfully');
 
       if (page > 0) {
-        if (selectedRows.length === dataInPage.length) {
+        if (deletableRows.length === dataInPage.length) {
           setPage(page - 1);
-        } else if (selectedRows.length === dataFiltered.length) {
+        } else if (deletableRows.length === dataFiltered.length) {
           setPage(0);
-        } else if (selectedRows.length > dataInPage.length) {
-          const newPage = Math.ceil((tableData.length - selectedRows.length) / rowsPerPage) - 1;
+        } else if (deletableRows.length > dataInPage.length) {
+          const newPage = Math.ceil((tableData.length - deletableRows.length) / rowsPerPage) - 1;
           setPage(newPage);
         }
       }
@@ -220,12 +250,27 @@ export default function UserListPage() {
   };
 
   const handleEditRow = (id: string) => {
-    push(PATH_DASHBOARD.user.edit(paramCase(id)));
+    push(PATH_DASHBOARD.user.edit(id));
   };
 
   const handleResetFilter = () => {
     setFilterName('');
     setFilterRole('all');
+  };
+
+  // Custom select all handler that excludes protected users
+  const handleSelectAllRows = (checked: boolean) => {
+    const selectableIds = getSelectableUsers().map((user) => user.id);
+    onSelectAllRows(checked, selectableIds);
+  };
+
+  // Custom select row handler that prevents selection of protected users
+  const handleSelectRow = (id: string) => {
+    const user = tableData.find((u) => u.id === id);
+    if (user && isProtectedUser(user)) {
+      return; // Don't allow selection of protected users
+    }
+    onSelectRow(id);
   };
 
   // Show permission denied for non-admin/manager users
@@ -296,13 +341,8 @@ export default function UserListPage() {
             <TableSelectedAction
               dense={dense}
               numSelected={selected.length}
-              rowCount={tableData.length}
-              onSelectAllRows={(checked) =>
-                onSelectAllRows(
-                  checked,
-                  tableData.map((row) => row.id)
-                )
-              }
+              rowCount={getSelectableUsers().length}
+              onSelectAllRows={(checked) => handleSelectAllRows(checked)}
               action={
                 currentUser?.role === 'admin' && (
                   <Tooltip title="Delete">
@@ -320,15 +360,10 @@ export default function UserListPage() {
                   order={order}
                   orderBy={orderBy}
                   headLabel={TABLE_HEAD}
-                  rowCount={tableData.length}
+                  rowCount={getSelectableUsers().length}
                   numSelected={selected.length}
                   onSort={onSort}
-                  onSelectAllRows={(checked) =>
-                    onSelectAllRows(
-                      checked,
-                      tableData.map((row) => row.id)
-                    )
-                  }
+                  onSelectAllRows={(checked) => handleSelectAllRows(checked)}
                 />
 
                 <TableBody>
@@ -345,9 +380,10 @@ export default function UserListPage() {
                             key={row.id}
                             row={row}
                             selected={selected.includes(row.id)}
-                            onSelectRow={() => onSelectRow(row.id)}
+                            onSelectRow={() => handleSelectRow(row.id)}
                             onDeleteRow={() => handleDeleteRow(row.id)}
                             onEditRow={() => handleEditRow(row.id)}
+                            isProtected={isProtectedUser(row)}
                           />
                         ))}
 
