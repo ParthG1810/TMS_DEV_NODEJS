@@ -91,13 +91,17 @@ interface CombinedInvoice {
   summary: {
     total_orders: number;
     finalized_orders: number;
+    selectable_orders: number;
+    invoiced_orders: number;
     all_finalized: boolean;
+    all_invoiced: boolean;
     grand_total_delivered: number;
     grand_total_absent: number;
     grand_total_extra: number;
     grand_total_amount: number;
   };
   can_approve: boolean;
+  all_invoiced: boolean;
 }
 
 // ----------------------------------------------------------------------
@@ -389,37 +393,21 @@ export default function CombinedInvoicePage() {
 
             {/* Orders Progress */}
             <Alert
-              severity={invoice.can_approve ? 'success' : 'warning'}
+              severity={invoice.all_invoiced ? 'info' : invoice.can_approve ? 'success' : 'warning'}
               icon={
-                invoice.can_approve ? (
+                invoice.all_invoiced ? (
+                  <Iconify icon="eva:checkmark-circle-2-fill" />
+                ) : invoice.can_approve ? (
                   <Iconify icon="eva:checkmark-circle-2-fill" />
                 ) : (
                   <Iconify icon="eva:alert-triangle-fill" />
                 )
               }
-              action={
-                invoice.can_approve && (
-                  <Button
-                    color="inherit"
-                    size="small"
-                    variant="outlined"
-                    onClick={handleApprove}
-                    disabled={approving}
-                    startIcon={
-                      approving ? (
-                        <CircularProgress size={16} color="inherit" />
-                      ) : (
-                        <Iconify icon="eva:checkmark-circle-2-fill" />
-                      )
-                    }
-                  >
-                    {approving ? 'Approving...' : 'Approve All'}
-                  </Button>
-                )
-              }
             >
-              {invoice.can_approve
-                ? 'All orders are ready. Select orders below to generate a combined invoice.'
+              {invoice.all_invoiced
+                ? 'All orders have already been invoiced. View the invoices in the Invoices section.'
+                : invoice.can_approve
+                ? `${invoice.summary.selectable_orders} order(s) ready for invoicing. Select orders below to generate a combined invoice.`
                 : `${invoice.summary.finalized_orders} of ${invoice.summary.total_orders} orders ready. Please finalize all orders before generating invoice.`}
             </Alert>
 
