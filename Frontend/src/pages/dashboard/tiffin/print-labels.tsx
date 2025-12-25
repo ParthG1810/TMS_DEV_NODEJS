@@ -155,13 +155,27 @@ export default function PrintLabelsPage() {
           margin: 0;
         }
         @media print {
-          body { margin: 0; padding: 0; }
+          html, body {
+            margin: 0;
+            padding: 0;
+          }
           .print-label {
             width: ${template.width_inches}in;
             height: ${template.height_inches}in;
-            page-break-after: always;
+            padding: 8px;
             box-sizing: border-box;
             overflow: hidden;
+            page-break-after: always;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.42;
+          }
+          .print-label p {
+            margin: 0;
+            padding: 0;
+          }
+          .print-label img {
+            max-width: 100%;
           }
           .print-label:last-child {
             page-break-after: avoid;
@@ -192,13 +206,27 @@ export default function PrintLabelsPage() {
           margin: 0;
         }
         @media print {
-          body { margin: 0; padding: 0; }
+          html, body {
+            margin: 0;
+            padding: 0;
+          }
           .print-label {
             width: ${template.width_inches}in;
             height: ${template.height_inches}in;
-            page-break-after: always;
+            padding: 8px;
             box-sizing: border-box;
             overflow: hidden;
+            page-break-after: always;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.42;
+          }
+          .print-label p {
+            margin: 0;
+            padding: 0;
+          }
+          .print-label img {
+            max-width: 100%;
           }
           .print-label:last-child {
             page-break-after: avoid;
@@ -537,12 +565,7 @@ export default function PrintLabelsPage() {
           {printContent.map((html, index) => (
             <div
               key={index}
-              className="print-label ql-editor"
-              style={{
-                padding: '8px',
-                boxSizing: 'border-box',
-                overflow: 'hidden',
-              }}
+              className="print-label"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ))}
