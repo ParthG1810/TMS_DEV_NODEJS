@@ -155,21 +155,37 @@ export default function PrintLabelsPage() {
           margin: 0;
         }
         @media print {
-          body { margin: 0; padding: 0; }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+          }
           .print-label {
             width: ${template.width_inches}in;
             height: ${template.height_inches}in;
             page-break-after: always;
             box-sizing: border-box;
             overflow: hidden;
-            padding: 8px !important;
+            padding: 8px;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.42;
           }
-          .print-label.ql-editor {
-            padding: 8px !important;
+          .print-label * {
+            margin: 0 !important;
+            padding: 0 !important;
           }
           .print-label p {
             margin: 0 !important;
             padding: 0 !important;
+          }
+          .print-label img {
+            max-width: 100%;
+            display: block;
           }
           .print-label:last-child {
             page-break-after: avoid;
@@ -200,21 +216,37 @@ export default function PrintLabelsPage() {
           margin: 0;
         }
         @media print {
-          body { margin: 0; padding: 0; }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+          }
           .print-label {
             width: ${template.width_inches}in;
             height: ${template.height_inches}in;
             page-break-after: always;
             box-sizing: border-box;
             overflow: hidden;
-            padding: 8px !important;
+            padding: 8px;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.42;
           }
-          .print-label.ql-editor {
-            padding: 8px !important;
+          .print-label * {
+            margin: 0 !important;
+            padding: 0 !important;
           }
           .print-label p {
             margin: 0 !important;
             padding: 0 !important;
+          }
+          .print-label img {
+            max-width: 100%;
+            display: block;
           }
           .print-label:last-child {
             page-break-after: avoid;
@@ -553,12 +585,7 @@ export default function PrintLabelsPage() {
           {printContent.map((html, index) => (
             <div
               key={index}
-              className="print-label ql-editor"
-              style={{
-                padding: '8px',
-                boxSizing: 'border-box',
-                overflow: 'hidden',
-              }}
+              className="print-label"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ))}
