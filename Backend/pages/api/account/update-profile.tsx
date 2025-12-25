@@ -25,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       displayName,
       email,
       photoURL,
+      role,
     } = req.body;
 
     // Validate email if being changed
@@ -44,11 +45,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const updatedUser = await updateUser(user.id, {
+    // Only allow admins to change roles
+    const updateData: any = {
       displayName,
       email,
       photoURL,
-    });
+    };
+
+    if (role && user.role === 'admin') {
+      updateData.role = role;
+    }
+
+    const updatedUser = await updateUser(user.id, updateData);
 
     if (!updatedUser) {
       return res.status(404).json({

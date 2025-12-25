@@ -55,11 +55,6 @@ export const requireAuth = async (
     return null;
   }
 
-  if (user.status !== 'active') {
-    res.status(403).json({ message: 'Your account has been deactivated' });
-    return null;
-  }
-
   return user;
 };
 
