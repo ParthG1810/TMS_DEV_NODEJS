@@ -505,9 +505,10 @@ export default function LabelEditorPage() {
                       overflow: 'hidden',
                       boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
                       boxSizing: 'border-box',
+                      position: 'relative',
                     }}
                   >
-                    {/* Inner container to match .ql-editor */}
+                    {/* Inner container to match .ql-editor exactly */}
                     <Box
                       sx={{
                         width: '100%',
@@ -515,13 +516,32 @@ export default function LabelEditorPage() {
                         padding: '8px',
                         overflow: 'hidden',
                         boxSizing: 'border-box',
-                        // Match Quill editor paragraph styling
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        // Match Quill editor default styles exactly
+                        fontFamily: 'Helvetica, Arial, sans-serif',
+                        fontSize: '13px',
+                        lineHeight: 1.42,
+                        tabSize: 4,
+                        textAlign: 'left',
+                        whiteSpace: 'pre-wrap',
+                        wordWrap: 'break-word',
+                        // Reset all nested element margins
                         '& p': {
+                          margin: 0,
+                          padding: 0,
+                        },
+                        '& h1, & h2, & h3, & h4, & h5, & h6': {
                           margin: 0,
                           padding: 0,
                         },
                         '& img': {
                           maxWidth: '100%',
+                          display: 'block',
+                        },
+                        '& *': {
+                          boxSizing: 'border-box',
                         },
                       }}
                       dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
