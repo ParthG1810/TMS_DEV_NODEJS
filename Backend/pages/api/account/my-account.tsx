@@ -60,8 +60,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Check if user is active
-    if (user.status !== 'active') {
+    // Check if user is active (treat undefined/null as active for backwards compatibility)
+    const userStatus = user.status || 'active';
+    if (userStatus !== 'active') {
       return res.status(403).json({
         message: 'Your account has been deactivated',
       });
