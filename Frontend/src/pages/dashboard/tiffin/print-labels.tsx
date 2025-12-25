@@ -143,46 +143,63 @@ export default function PrintLabelsPage() {
     []
   );
 
+  // Quill editor CSS - must match exactly for print to look like editor
+  const getQuillPrintStyles = (widthIn: number, heightIn: number) => `
+    @page {
+      size: ${widthIn}in ${heightIn}in;
+      margin: 0;
+    }
+    @media print {
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+      .print-label {
+        width: ${widthIn}in;
+        height: ${heightIn}in;
+        padding: 8px;
+        box-sizing: border-box;
+        overflow: hidden;
+        page-break-after: always;
+        /* Quill editor defaults */
+        font-family: Helvetica, Arial, sans-serif;
+        font-size: 13px;
+        line-height: 1.42;
+        text-align: left;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      /* Reset all block elements like Quill does */
+      .print-label p,
+      .print-label ol,
+      .print-label ul,
+      .print-label pre,
+      .print-label blockquote,
+      .print-label h1,
+      .print-label h2,
+      .print-label h3,
+      .print-label h4,
+      .print-label h5,
+      .print-label h6 {
+        margin: 0;
+        padding: 0;
+      }
+      .print-label img {
+        max-width: 100%;
+      }
+      .print-label:last-child {
+        page-break-after: avoid;
+      }
+    }
+  `;
+
   // Handle single print
   const handleSinglePrint = useReactToPrint({
     contentRef: printRef,
     pageStyle: () => {
       const template = getTemplate(selectedTemplateId);
       if (!template) return '';
-      return `
-        @page {
-          size: ${template.width_inches}in ${template.height_inches}in;
-          margin: 0;
-        }
-        @media print {
-          html, body {
-            margin: 0;
-            padding: 0;
-          }
-          .print-label {
-            width: ${template.width_inches}in;
-            height: ${template.height_inches}in;
-            padding: 8px;
-            box-sizing: border-box;
-            overflow: hidden;
-            page-break-after: always;
-            padding: 8px !important;
-            font-family: Helvetica, Arial, sans-serif;
-            font-size: 13px;
-            line-height: 1.42;
-          }
-          .print-label p {
-            margin: 0;
-            padding: 0;
-          }
-          .print-label img {
-            max-width: 100%;
-          }
-          .print-label:last-child {
-            page-break-after: avoid;
-          }
-        }
-      `;
+      return getQuillPrintStyles(template.width_inches, template.height_inches);
     },
     onBeforePrint: () => {
       const template = getTemplate(selectedTemplateId);
@@ -201,40 +218,7 @@ export default function PrintLabelsPage() {
     pageStyle: () => {
       const template = getTemplate(bulkTemplateId);
       if (!template) return '';
-      return `
-        @page {
-          size: ${template.width_inches}in ${template.height_inches}in;
-          margin: 0;
-        }
-        @media print {
-          html, body {
-            margin: 0;
-            padding: 0;
-          }
-          .print-label {
-            width: ${template.width_inches}in;
-            height: ${template.height_inches}in;
-            padding: 8px;
-            box-sizing: border-box;
-            overflow: hidden;
-            page-break-after: always;
-            padding: 8px !important;
-            font-family: Helvetica, Arial, sans-serif;
-            font-size: 13px;
-            line-height: 1.42;
-          }
-          .print-label p {
-            margin: 0;
-            padding: 0;
-          }
-          .print-label img {
-            max-width: 100%;
-          }
-          .print-label:last-child {
-            page-break-after: avoid;
-          }
-        }
-      `;
+      return getQuillPrintStyles(template.width_inches, template.height_inches);
     },
     onBeforePrint: () => {
       const template = getTemplate(bulkTemplateId);
