@@ -128,11 +128,10 @@ const navConfig = [
         icon: ICONS.user,
         children: [
           { title: 'profile', path: PATH_DASHBOARD.user.profile },
-          { title: 'cards', path: PATH_DASHBOARD.user.cards },
-          { title: 'list', path: PATH_DASHBOARD.user.list },
-          { title: 'create', path: PATH_DASHBOARD.user.new },
-          { title: 'edit', path: PATH_DASHBOARD.user.demoEdit },
           { title: 'account', path: PATH_DASHBOARD.user.account },
+          { title: 'list', path: PATH_DASHBOARD.user.list, roles: ['admin', 'manager'] },
+          { title: 'create', path: PATH_DASHBOARD.user.new, roles: ['admin', 'manager'] },
+          { title: 'cards', path: PATH_DASHBOARD.user.cards },
         ],
       },
 
