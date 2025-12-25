@@ -294,32 +294,30 @@ export default function LabelEditorPage() {
 
     // Use setTimeout to allow DOM to update, then check overflow
     setTimeout(() => {
-      if (editorRef.current) {
-        const editor = editorRef.current.getEditor();
-        const editorElement = editor?.root;
+      // Find the editor element directly from DOM (works with dynamic import)
+      const editorElement = document.querySelector('.ql-container .ql-editor') as HTMLElement;
 
-        if (editorElement) {
-          // Check if content overflows the container
-          const isOverflowing = editorElement.scrollHeight > editorElement.clientHeight;
+      if (editorElement) {
+        // Check if content overflows the container
+        const isOverflowing = editorElement.scrollHeight > editorElement.clientHeight;
 
-          if (isOverflowing) {
-            // Revert to last valid content
-            setTemplateHtml(lastValidContent);
+        if (isOverflowing) {
+          // Revert to last valid content
+          setTemplateHtml(lastValidContent);
 
-            // Show warning only once per overflow attempt
-            if (!isOverflowWarningShown) {
-              enqueueSnackbar('Content exceeds label size. Remove some content to add more.', {
-                variant: 'warning',
-                autoHideDuration: 3000,
-              });
-              setIsOverflowWarningShown(true);
-              // Reset warning flag after a short delay
-              setTimeout(() => setIsOverflowWarningShown(false), 1000);
-            }
-          } else {
-            // Content fits, update last valid content
-            setLastValidContent(content);
+          // Show warning only once per overflow attempt
+          if (!isOverflowWarningShown) {
+            enqueueSnackbar('Content exceeds label size. Remove some content to add more.', {
+              variant: 'warning',
+              autoHideDuration: 3000,
+            });
+            setIsOverflowWarningShown(true);
+            // Reset warning flag after a short delay
+            setTimeout(() => setIsOverflowWarningShown(false), 1000);
           }
+        } else {
+          // Content fits, update last valid content
+          setLastValidContent(content);
         }
       }
     }, 0);
