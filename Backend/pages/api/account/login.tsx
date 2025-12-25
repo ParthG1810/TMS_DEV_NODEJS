@@ -35,13 +35,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Check if user is active
-    if (user.status !== 'active') {
-      return res.status(403).json({
-        message: 'Your account has been deactivated. Please contact support.',
-      });
-    }
-
     const accessToken = sign({ userId: user.id }, JWT_CONFIG.secret, {
       expiresIn: JWT_CONFIG.expiresIn,
     });
