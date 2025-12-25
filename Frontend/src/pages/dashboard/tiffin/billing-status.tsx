@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
@@ -20,7 +20,11 @@ import {
   Stack,
   MenuItem,
   TextField,
+  Collapse,
+  Box,
+  Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import Scrollbar from '../../../components/scrollbar';
@@ -39,6 +43,20 @@ import {
 
 // ----------------------------------------------------------------------
 
+interface OrderDetail {
+  id: number;
+  order_id: number;
+  meal_plan_name: string;
+  start_date: string;
+  end_date: string;
+  total_delivered: number;
+  total_absent: number;
+  total_extra: number;
+  total_amount: number;
+  status: string;
+  finalized_at: Date | null;
+}
+
 interface BillingRecord {
   id: number;
   customer_id: number;
@@ -51,12 +69,14 @@ interface BillingRecord {
   total_extra: number;
   total_amount: number;
   status: string;
+  effective_status?: string;
   finalized_at: Date | null;
   finalized_by: string | null;
   paid_at: Date | null;
   payment_method: string | null;
   created_at: Date;
   updated_at: Date;
+  orders?: OrderDetail[];
 }
 
 const STATUS_OPTIONS = ['all', 'calculating', 'pending', 'finalized', 'paid'];
@@ -90,6 +110,7 @@ export default function BillingStatusPage() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterMonth, setFilterMonth] = useState('');
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     fetchBillingRecords();
@@ -117,6 +138,18 @@ export default function BillingStatusPage() {
   const handleFilterStatus = (event: React.SyntheticEvent<Element, Event>, newValue: string) => {
     setFilterStatus(newValue);
     onChangePage(null as any, 0);
+  };
+
+  const handleToggleExpand = (billingId: number) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(billingId)) {
+        newSet.delete(billingId);
+      } else {
+        newSet.add(billingId);
+      }
+      return newSet;
+    });
   };
 
   const handleViewDetails = (billingId: number) => {
@@ -196,6 +229,30 @@ export default function BillingStatusPage() {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'calculating':
+        return 'Calculating';
+      case 'pending':
+        return 'Pending';
+      case 'finalized':
+        return 'Invoiced';
+      case 'paid':
+        return 'Paid';
+      default:
+        return status;
+    }
+  };
+
+  const formatDateRange = (startDate: string, endDate: string) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const startDay = start.getDate();
+    const endDay = end.getDate();
+    const month = start.toLocaleString('default', { month: 'short' });
+    return `${month} ${startDay}-${endDay}`;
+  };
+
   return (
     <>
       <Head>
@@ -222,7 +279,7 @@ export default function BillingStatusPage() {
             }}
           >
             {STATUS_OPTIONS.map((tab) => (
-              <Tab key={tab} label={tab} value={tab} />
+              <Tab key={tab} label={tab} value={tab} sx={{ textTransform: 'capitalize' }} />
             ))}
           </Tabs>
 
@@ -265,6 +322,7 @@ export default function BillingStatusPage() {
               <Table size={dense ? 'small' : 'medium'} sx={{ minWidth: 800 }}>
                 <TableHead>
                   <TableRow>
+                    <TableCell sx={{ width: 40 }} />
                     <TableCell>Customer</TableCell>
                     <TableCell>Billing Month</TableCell>
                     <TableCell align="center">Delivered</TableCell>
@@ -279,108 +337,196 @@ export default function BillingStatusPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={9} align="center">
                         Loading...
                       </TableCell>
                     </TableRow>
                   ) : dataInPage.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={9} align="center">
                         No billing records found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    dataInPage.map((row) => (
-                      <TableRow hover key={row.id}>
-                        <TableCell>
-                          <Stack spacing={0.5}>
-                            <strong>{row.customer_name}</strong>
-                            {row.customer_phone && (
-                              <span style={{ fontSize: '0.875rem', color: 'text.secondary' }}>
-                                {row.customer_phone}
-                              </span>
-                            )}
-                          </Stack>
-                        </TableCell>
-                        <TableCell>{row.billing_month}</TableCell>
-                        <TableCell align="center">{row.total_delivered}</TableCell>
-                        <TableCell align="center">{row.total_absent}</TableCell>
-                        <TableCell align="center">{row.total_extra}</TableCell>
-                        <TableCell align="right">
-                          <strong>{fCurrency(row.total_amount)}</strong>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={row.status}
-                            color={statusColor(row.status)}
-                            size="small"
-                            sx={{ textTransform: 'capitalize' }}
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                            <Tooltip title="View Details">
-                              <IconButton
+                    dataInPage.map((row) => {
+                      const isExpanded = expandedRows.has(row.id);
+                      const hasOrders = row.orders && row.orders.length > 0;
+                      const displayStatus = row.effective_status || row.status;
+
+                      return (
+                        <Fragment key={row.id}>
+                          <TableRow hover>
+                            <TableCell sx={{ width: 40 }}>
+                              {hasOrders && (
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleToggleExpand(row.id)}
+                                >
+                                  <Iconify
+                                    icon={isExpanded ? 'eva:arrow-ios-downward-fill' : 'eva:arrow-ios-forward-fill'}
+                                    width={18}
+                                  />
+                                </IconButton>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Stack spacing={0.5}>
+                                <strong>{row.customer_name}</strong>
+                                {row.customer_phone && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {row.customer_phone}
+                                  </Typography>
+                                )}
+                              </Stack>
+                            </TableCell>
+                            <TableCell>{row.billing_month}</TableCell>
+                            <TableCell align="center">{row.total_delivered}</TableCell>
+                            <TableCell align="center">{row.total_absent}</TableCell>
+                            <TableCell align="center">{row.total_extra}</TableCell>
+                            <TableCell align="right">
+                              <strong>{fCurrency(row.total_amount)}</strong>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={getStatusLabel(displayStatus)}
+                                color={statusColor(displayStatus)}
                                 size="small"
-                                onClick={() => handleViewDetails(row.id)}
-                              >
-                                <Iconify icon="eva:eye-outline" />
-                              </IconButton>
-                            </Tooltip>
-
-                            {row.status === 'pending' && (
-                              <>
-                                <Tooltip title="Approve">
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                <Tooltip title="View Details">
                                   <IconButton
                                     size="small"
-                                    color="success"
-                                    onClick={() => handleApprove(row)}
+                                    onClick={() => handleViewDetails(row.id)}
                                   >
-                                    <Iconify icon="eva:checkmark-circle-2-outline" />
+                                    <Iconify icon="eva:eye-outline" />
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Reject">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleReject(row)}
+
+                                {displayStatus === 'pending' && (
+                                  <>
+                                    <Tooltip title="Approve">
+                                      <IconButton
+                                        size="small"
+                                        color="success"
+                                        onClick={() => handleApprove(row)}
+                                      >
+                                        <Iconify icon="eva:checkmark-circle-2-outline" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Reject">
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => handleReject(row)}
+                                      >
+                                        <Iconify icon="eva:close-circle-outline" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </>
+                                )}
+
+                                {displayStatus === 'finalized' && (
+                                  <Tooltip title="Mark as Paid">
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => handleMarkAsPaid(row)}
+                                    >
+                                      <Iconify icon="eva:credit-card-outline" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+
+                                {displayStatus === 'calculating' && (
+                                  <Tooltip title="View Calendar">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        router.push(
+                                          `${PATH_DASHBOARD.tiffin.billingCalendar}?month=${row.billing_month}`
+                                        )
+                                      }
+                                    >
+                                      <Iconify icon="eva:calendar-outline" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </Stack>
+                            </TableCell>
+                          </TableRow>
+
+                          {/* Expandable child rows */}
+                          {hasOrders && (
+                            <TableRow>
+                              <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
+                                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                                  <Box
+                                    sx={{
+                                      py: 1,
+                                      px: 2,
+                                      bgcolor: (theme) => alpha(theme.palette.primary.lighter, 0.3),
+                                    }}
                                   >
-                                    <Iconify icon="eva:close-circle-outline" />
-                                  </IconButton>
-                                </Tooltip>
-                              </>
-                            )}
-
-                            {row.status === 'finalized' && (
-                              <Tooltip title="Mark as Paid">
-                                <IconButton
-                                  size="small"
-                                  color="primary"
-                                  onClick={() => handleMarkAsPaid(row)}
-                                >
-                                  <Iconify icon="eva:credit-card-outline" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-
-                            {row.status === 'calculating' && (
-                              <Tooltip title="View Details">
-                                <IconButton
-                                  size="small"
-                                  onClick={() =>
-                                    router.push(
-                                      `${PATH_DASHBOARD.tiffin.billingCalendar}?month=${row.billing_month}`
-                                    )
-                                  }
-                                >
-                                  <Iconify icon="eva:calendar-outline" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell sx={{ pl: 4 }}>Meal Plan</TableCell>
+                                          <TableCell>Period</TableCell>
+                                          <TableCell align="center">Delivered</TableCell>
+                                          <TableCell align="center">Absent</TableCell>
+                                          <TableCell align="center">Extra</TableCell>
+                                          <TableCell align="right">Amount</TableCell>
+                                          <TableCell>Status</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {row.orders!.map((orderItem) => (
+                                          <TableRow key={orderItem.id} hover>
+                                            <TableCell sx={{ pl: 4 }}>
+                                              <Stack direction="row" alignItems="center" spacing={1}>
+                                                <Iconify
+                                                  icon="eva:corner-down-right-outline"
+                                                  width={16}
+                                                  sx={{ color: 'text.secondary' }}
+                                                />
+                                                <Typography variant="body2">
+                                                  {orderItem.meal_plan_name}
+                                                </Typography>
+                                              </Stack>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Typography variant="caption">
+                                                {formatDateRange(orderItem.start_date, orderItem.end_date)}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell align="center">{orderItem.total_delivered}</TableCell>
+                                            <TableCell align="center">{orderItem.total_absent}</TableCell>
+                                            <TableCell align="center">{orderItem.total_extra}</TableCell>
+                                            <TableCell align="right">
+                                              {fCurrency(orderItem.total_amount)}
+                                            </TableCell>
+                                            <TableCell>
+                                              <Chip
+                                                label={getStatusLabel(orderItem.status)}
+                                                color={statusColor(orderItem.status)}
+                                                size="small"
+                                                variant="outlined"
+                                              />
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </Box>
+                                </Collapse>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Fragment>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -426,7 +572,10 @@ function applyFilter({
   let data = stabilizedThis.map((el) => el[0]);
 
   if (filterStatus !== 'all') {
-    data = data.filter((row) => row.status === filterStatus);
+    data = data.filter((row) => {
+      const displayStatus = row.effective_status || row.status;
+      return displayStatus === filterStatus;
+    });
   }
 
   if (filterMonth) {
