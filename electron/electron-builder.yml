@@ -12,32 +12,30 @@ files:
   - src/splash/**/*
 
 extraResources:
-  - from: ../Backend/.next
-    to: backend/.next
+  # Backend standalone build (self-contained, no node_modules needed)
+  - from: ../Backend/.next/standalone
+    to: backend
     filter:
       - "**/*"
-  - from: ../Backend/node_modules
-    to: backend/node_modules
+  - from: ../Backend/.next/static
+    to: backend/.next/static
     filter:
       - "**/*"
-  - from: ../Backend/package.json
-    to: backend/package.json
   - from: ../Backend/public
     to: backend/public
     filter:
       - "**/*"
   - from: ../Backend/.env
     to: backend/.env
-  - from: ../Frontend/.next
-    to: frontend/.next
+  # Frontend standalone build (self-contained, no node_modules needed)
+  - from: ../Frontend/.next/standalone
+    to: frontend
     filter:
       - "**/*"
-  - from: ../Frontend/node_modules
-    to: frontend/node_modules
+  - from: ../Frontend/.next/static
+    to: frontend/.next/static
     filter:
       - "**/*"
-  - from: ../Frontend/package.json
-    to: frontend/package.json
   - from: ../Frontend/public
     to: frontend/public
     filter:
