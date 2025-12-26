@@ -26,26 +26,113 @@ const DEFAULT_CONFIG: DBConfig = {
   database: 'tms_db',
 };
 
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
 // Get config file path
 function getConfigPath(): string {
   const userDataPath = app.getPath('userData');
   return join(userDataPath, 'db-config.json');
 }
 
-// Load config from file
-function loadConfig(): DBConfig {
+// Get Backend .env path
+function getBackendEnvPath(): string {
+  if (isDev) {
+    return join(__dirname, '../../../Backend/.env');
+  } else {
+    return join(process.resourcesPath, 'backend', '.env');
+  }
+}
+
+// Parse .env file content
+function parseEnvFile(content: string): Record<string, string> {
+  const result: Record<string, string> = {};
+
+  content.split('\n').forEach((line) => {
+    // Remove comments and trim
+    const trimmedLine = line.split('#')[0].trim();
+
+    if (trimmedLine && trimmedLine.includes('=')) {
+      const [key, ...valueParts] = trimmedLine.split('=');
+      let value = valueParts.join('=').trim();
+
+      // Remove quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+
+      result[key.trim()] = value;
+    }
+  });
+
+  return result;
+}
+
+// Load config from Backend/.env file
+function loadFromBackendEnv(): DBConfig | null {
+  const envPath = getBackendEnvPath();
+
+  try {
+    if (existsSync(envPath)) {
+      log.info(`Loading database config from Backend/.env: ${envPath}`);
+      const content = readFileSync(envPath, 'utf-8');
+      const env = parseEnvFile(content);
+
+      const config: DBConfig = {
+        host: env.DB_HOST || DEFAULT_CONFIG.host,
+        port: parseInt(env.DB_PORT || String(DEFAULT_CONFIG.port), 10),
+        user: env.DB_USER || DEFAULT_CONFIG.user,
+        password: env.DB_PASSWORD || DEFAULT_CONFIG.password,
+        database: env.DB_NAME || DEFAULT_CONFIG.database,
+      };
+
+      log.info(`Loaded config from Backend/.env - host: ${config.host}, port: ${config.port}, user: ${config.user}, database: ${config.database}`);
+      return config;
+    }
+  } catch (error) {
+    log.error('Failed to load Backend/.env:', error);
+  }
+
+  return null;
+}
+
+// Load config from electron config file
+function loadFromConfigFile(): DBConfig | null {
   const configPath = getConfigPath();
 
   try {
     if (existsSync(configPath)) {
+      log.info(`Loading database config from: ${configPath}`);
       const data = readFileSync(configPath, 'utf-8');
       const parsed = JSON.parse(data);
       return { ...DEFAULT_CONFIG, ...parsed };
     }
   } catch (error) {
-    log.error('Failed to load config:', error);
+    log.error('Failed to load config file:', error);
   }
 
+  return null;
+}
+
+// Load config with fallback chain:
+// 1. Electron config file (user data)
+// 2. Backend/.env file
+// 3. Default config
+function loadConfig(): DBConfig {
+  // First, try electron config file
+  const fileConfig = loadFromConfigFile();
+  if (fileConfig) {
+    return fileConfig;
+  }
+
+  // Second, try Backend/.env
+  const envConfig = loadFromBackendEnv();
+  if (envConfig) {
+    return envConfig;
+  }
+
+  // Finally, use defaults
+  log.info('Using default database configuration');
   return { ...DEFAULT_CONFIG };
 }
 
