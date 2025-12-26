@@ -9,6 +9,7 @@ directories:
 files:
   - dist/**/*
   - package.json
+  - src/splash/**/*
 
 extraResources:
   - from: ../Backend/.next

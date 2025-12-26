@@ -45,8 +45,8 @@ function createSplashWindow(): void {
   });
 
   const splashPath = isDev
-    ? join(__dirname, '../splash/index.html')
-    : join(__dirname, 'splash/index.html');
+    ? join(__dirname, '../../src/splash/index.html')
+    : join(__dirname, '../../src/splash/index.html');
 
   splashWindow.loadFile(splashPath);
   splashWindow.center();
