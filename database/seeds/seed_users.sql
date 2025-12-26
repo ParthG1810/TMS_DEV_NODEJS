@@ -22,33 +22,13 @@ INSERT INTO users (
     display_name,
     email,
     password_hash,
-    role,
-    status,
-    is_public,
-    is_verified,
-    phone_number,
-    country,
-    address,
-    city,
-    state,
-    zip_code,
-    about
+    role
 ) VALUES (
     'admin-user-001',
     'Admin User',
     'admin@tms.com',
     '$2a$10$rQnM1YV1jK5S5L5X5X5X5O6666666666666666666666666666666',
-    'admin',
-    'active',
-    true,
-    true,
-    '+1 555-0100',
-    'United States',
-    '123 Admin Street',
-    'New York',
-    'NY',
-    '10001',
-    'System administrator with full access to all features.'
+    'admin'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
 -- Insert Regular User
@@ -57,33 +37,13 @@ INSERT INTO users (
     display_name,
     email,
     password_hash,
-    role,
-    status,
-    is_public,
-    is_verified,
-    phone_number,
-    country,
-    address,
-    city,
-    state,
-    zip_code,
-    about
+    role
 ) VALUES (
     'regular-user-001',
     'Regular User',
     'user@tms.com',
     '$2a$10$rQnM1YV1jK5S5L5X5X5X5O6666666666666666666666666666666',
-    'user',
-    'active',
-    true,
-    true,
-    '+1 555-0200',
-    'United States',
-    '456 User Lane',
-    'Los Angeles',
-    'CA',
-    '90001',
-    'Regular user with standard access.'
+    'user'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
 -- Insert Tester User
@@ -92,33 +52,13 @@ INSERT INTO users (
     display_name,
     email,
     password_hash,
-    role,
-    status,
-    is_public,
-    is_verified,
-    phone_number,
-    country,
-    address,
-    city,
-    state,
-    zip_code,
-    about
+    role
 ) VALUES (
     'tester-user-001',
     'QA Tester',
     'tester@tms.com',
     '$2a$10$rQnM1YV1jK5S5L5X5X5X5O6666666666666666666666666666666',
-    'tester',
-    'active',
-    true,
-    true,
-    '+1 555-0300',
-    'United States',
-    '789 Test Drive',
-    'San Francisco',
-    'CA',
-    '94102',
-    'QA tester with testing access.'
+    'tester'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
 -- Insert Manager User
@@ -127,33 +67,13 @@ INSERT INTO users (
     display_name,
     email,
     password_hash,
-    role,
-    status,
-    is_public,
-    is_verified,
-    phone_number,
-    country,
-    address,
-    city,
-    state,
-    zip_code,
-    about
+    role
 ) VALUES (
     'manager-user-001',
     'Manager User',
     'manager@tms.com',
     '$2a$10$rQnM1YV1jK5S5L5X5X5X5O6666666666666666666666666666666',
-    'manager',
-    'active',
-    true,
-    true,
-    '+1 555-0400',
-    'United States',
-    '321 Manager Ave',
-    'Chicago',
-    'IL',
-    '60601',
-    'Manager with team management access.'
+    'manager'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
 SELECT 'Seed users completed successfully' AS status;
