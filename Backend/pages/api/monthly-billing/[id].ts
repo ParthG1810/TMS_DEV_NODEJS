@@ -111,7 +111,6 @@ async function handlePut(
         return res.status(200).json({
           success: true,
           data: null,
-          message: 'Billing record does not exist, no action needed',
         });
       }
 
