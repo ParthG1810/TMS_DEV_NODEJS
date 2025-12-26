@@ -52,16 +52,16 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: resources/icon.png
+  icon: resources/icon.ico
   publisherName: TMS
   artifactName: TMS-Desktop-${version}-Windows-Setup.${ext}
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: resources/icon.png
-  uninstallerIcon: resources/icon.png
-  installerHeaderIcon: resources/icon.png
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: TMS Desktop
