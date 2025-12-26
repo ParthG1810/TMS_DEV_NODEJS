@@ -1,22 +1,20 @@
 import * as Yup from 'yup';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 // form
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 // @mui
-import { Box, Grid, Card, Stack, Typography } from '@mui/material';
+import { Box, Grid, Card, Stack, Typography, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 // auth
 import { useAuthContext } from '../../../../auth/useAuthContext';
 // utils
 import { fData } from '../../../../utils/formatNumber';
-// assets
-import { countries } from '../../../../assets/data';
+import axios from '../../../../utils/axios';
 // components
 import { CustomFile } from '../../../../components/upload';
 import { useSnackbar } from '../../../../components/snackbar';
 import FormProvider, {
-  RHFSwitch,
   RHFSelect,
   RHFTextField,
   RHFUploadAvatar,
@@ -24,50 +22,41 @@ import FormProvider, {
 
 // ----------------------------------------------------------------------
 
+const ROLE_OPTIONS = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'staff', label: 'Staff' },
+  { value: 'tester', label: 'Tester' },
+  { value: 'user', label: 'User' },
+];
+
 type FormValuesProps = {
   displayName: string;
   email: string;
   photoURL: CustomFile | string | null;
-  phoneNumber: string | null;
-  country: string | null;
-  address: string | null;
-  state: string | null;
-  city: string | null;
-  zipCode: string | null;
-  about: string | null;
-  isPublic: boolean;
+  role: string;
 };
 
 export default function AccountGeneral() {
   const { enqueueSnackbar } = useSnackbar();
+  const { user, logout } = useAuthContext();
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const { user } = useAuthContext();
+  const isAdmin = user?.role === 'admin';
 
   const UpdateUserSchema = Yup.object().shape({
     displayName: Yup.string().required('Name is required'),
     email: Yup.string().required('Email is required').email('Email must be a valid email address'),
-    photoURL: Yup.string().required('Avatar is required').nullable(true),
-    phoneNumber: Yup.string().required('Phone number is required'),
-    country: Yup.string().required('Country is required'),
-    address: Yup.string().required('Address is required'),
-    state: Yup.string().required('State is required'),
-    city: Yup.string().required('City is required'),
-    zipCode: Yup.string().required('Zip code is required'),
-    about: Yup.string().required('About is required'),
+    photoURL: Yup.mixed().nullable(true),
+    role: Yup.string(),
   });
 
   const defaultValues = {
     displayName: user?.displayName || '',
     email: user?.email || '',
     photoURL: user?.photoURL || null,
-    phoneNumber: user?.phoneNumber || '',
-    country: user?.country || '',
-    address: user?.address || '',
-    state: user?.state || '',
-    city: user?.city || '',
-    zipCode: user?.zipCode || '',
-    about: user?.about || '',
-    isPublic: user?.isPublic || false,
+    role: user?.role || 'user',
   };
 
   const methods = useForm<FormValuesProps>({
@@ -77,17 +66,34 @@ export default function AccountGeneral() {
 
   const {
     setValue,
+    setError,
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
 
   const onSubmit = async (data: FormValuesProps) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      enqueueSnackbar('Update success!');
-      console.log('DATA', data);
+      // Handle photoURL - if it's a File object, we need to upload it first
+      let photoURL = data.photoURL;
+      if (photoURL && typeof photoURL !== 'string') {
+        // For now, just use the preview URL
+        // In production, you would upload to a storage service
+        photoURL = (photoURL as CustomFile).preview || null;
+      }
+
+      await axios.put('/api/account/update-profile', {
+        displayName: data.displayName,
+        email: data.email,
+        photoURL: photoURL || null,
+        // Only send role if admin, otherwise send the original role
+        role: isAdmin ? data.role : user?.role,
+      });
+      enqueueSnackbar('Profile updated successfully!');
     } catch (error) {
       console.error(error);
+      const message = error?.message || 'Failed to update profile';
+      setError('email', { message });
+      enqueueSnackbar(message, { variant: 'error' });
     }
   };
 
@@ -106,86 +112,127 @@ export default function AccountGeneral() {
     [setValue]
   );
 
+  const handleOpenDeleteDialog = () => {
+    setOpenDeleteDialog(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setOpenDeleteDialog(false);
+  };
+
+  const handleDeleteUser = async () => {
+    try {
+      setIsDeleting(true);
+      await axios.delete(`/api/users/${user?.id}`);
+      enqueueSnackbar('Account deleted successfully');
+      handleCloseDeleteDialog();
+      logout();
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar(error?.message || 'Failed to delete account', { variant: 'error' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <FormProvider methods={methods} onSubmit={handleSubmit(onSubmit)}>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ py: 10, px: 3, textAlign: 'center' }}>
-            <RHFUploadAvatar
-              name="photoURL"
-              maxSize={3145728}
-              onDrop={handleDrop}
-              helperText={
-                <Typography
-                  variant="caption"
-                  sx={{
-                    mt: 2,
-                    mx: 'auto',
-                    display: 'block',
-                    textAlign: 'center',
-                    color: 'text.secondary',
-                  }}
+    <>
+      <FormProvider methods={methods} onSubmit={handleSubmit(onSubmit)}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ py: 10, px: 3, textAlign: 'center' }}>
+              <RHFUploadAvatar
+                name="photoURL"
+                maxSize={3145728}
+                onDrop={handleDrop}
+                helperText={
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      mt: 2,
+                      mx: 'auto',
+                      display: 'block',
+                      textAlign: 'center',
+                      color: 'text.secondary',
+                    }}
+                  >
+                    Allowed *.jpeg, *.jpg, *.png, *.gif
+                    <br /> max size of {fData(3145728)}
+                  </Typography>
+                }
+              />
+
+              {isAdmin && (
+                <Button
+                  variant="soft"
+                  color="error"
+                  sx={{ mt: 3 }}
+                  onClick={handleOpenDeleteDialog}
                 >
-                  Allowed *.jpeg, *.jpg, *.png, *.gif
-                  <br /> max size of {fData(3145728)}
-                </Typography>
-              }
-            />
+                  Delete user
+                </Button>
+              )}
+            </Card>
+          </Grid>
 
-            <RHFSwitch
-              name="isPublic"
-              labelPlacement="start"
-              label="Public Profile"
-              sx={{ mt: 5 }}
-            />
-          </Card>
+          <Grid item xs={12} md={8}>
+            <Card sx={{ p: 3 }}>
+              <Box
+                rowGap={3}
+                columnGap={2}
+                display="grid"
+                gridTemplateColumns={{
+                  xs: 'repeat(1, 1fr)',
+                  sm: 'repeat(2, 1fr)',
+                }}
+              >
+                <RHFTextField name="displayName" label="Name" />
+
+                <RHFTextField name="email" label="Email Address" />
+
+                {isAdmin && (
+                  <RHFSelect native name="role" label="Role">
+                    {ROLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </RHFSelect>
+                )}
+              </Box>
+
+              <Stack spacing={3} alignItems="flex-end" sx={{ mt: 3 }}>
+                <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
+                  Save Changes
+                </LoadingButton>
+              </Stack>
+            </Card>
+          </Grid>
         </Grid>
+      </FormProvider>
 
-        <Grid item xs={12} md={8}>
-          <Card sx={{ p: 3 }}>
-            <Box
-              rowGap={3}
-              columnGap={2}
-              display="grid"
-              gridTemplateColumns={{
-                xs: 'repeat(1, 1fr)',
-                sm: 'repeat(2, 1fr)',
-              }}
-            >
-              <RHFTextField name="displayName" label="Name" />
-
-              <RHFTextField name="email" label="Email Address" />
-
-              <RHFTextField name="phoneNumber" label="Phone Number" />
-
-              <RHFTextField name="address" label="Address" />
-
-              <RHFSelect native name="country" label="Country" placeholder="Country">
-                <option value="" />
-                {countries.map((country) => (
-                  <option key={country.code} value={country.label}>
-                    {country.label}
-                  </option>
-                ))}
-              </RHFSelect>
-
-              <RHFTextField name="state" label="State/Region" />
-
-              <RHFTextField name="city" label="City" />
-
-              <RHFTextField name="zipCode" label="Zip/Code" />
-            </Box>
-
-            <Stack spacing={3} alignItems="flex-end" sx={{ mt: 3 }}>
-              <RHFTextField name="about" multiline rows={4} label="About" />
-
-              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
-                Save Changes
-              </LoadingButton>
-            </Stack>
-          </Card>
-        </Grid>
-      </Grid>
-    </FormProvider>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={openDeleteDialog} onClose={handleCloseDeleteDialog}>
+        <DialogTitle>Delete Account</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this account? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} color="inherit">
+            Cancel
+          </Button>
+          <LoadingButton
+            onClick={handleDeleteUser}
+            color="error"
+            variant="contained"
+            loading={isDeleting}
+          >
+            Delete
+          </LoadingButton>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

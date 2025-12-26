@@ -1,10 +1,8 @@
 import { sign } from 'jsonwebtoken';
-// next
 import { NextApiRequest, NextApiResponse } from 'next';
-// utils
 import cors from 'src/utils/cors';
-// _mock
-import { users, JWT_SECRET, JWT_EXPIRES_IN } from 'src/_mock/_account';
+import { validateCredentials } from 'src/services/userService';
+import { JWT_CONFIG } from '../../../config';
 
 // ----------------------------------------------------------------------
 
@@ -12,24 +10,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await cors(req, res);
 
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
+    if (req.method !== 'POST') {
+      return res.status(405).json({ message: 'Method not allowed' });
+    }
+
     const { email, password } = req.body;
 
-    const user = users.find((_user) => _user.email === email);
+    if (!email || !password) {
+      return res.status(400).json({
+        message: 'Email and password are required',
+      });
+    }
+
+    const user = await validateCredentials(email, password);
 
     if (!user) {
       return res.status(400).json({
-        message: 'There is no user corresponding to the email address.',
+        message: 'Invalid email or password',
       });
     }
 
-    if (user.password !== password) {
-      return res.status(400).json({
-        message: 'Wrong password',
-      });
-    }
-
-    const accessToken = sign({ userId: user.id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
+    const accessToken = sign({ userId: user.id }, JWT_CONFIG.secret, {
+      expiresIn: JWT_CONFIG.expiresIn,
     });
 
     res.status(200).json({
@@ -37,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       user,
     });
   } catch (error) {
-    console.error(error);
+    console.error('Login error:', error);
     res.status(500).json({
       message: 'Internal server error',
     });

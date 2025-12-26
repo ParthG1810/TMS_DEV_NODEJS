@@ -1,0 +1,1096 @@
+import { useEffect, useState, useCallback, useRef } from 'react';
+import Head from 'next/head';
+import ImageResize from 'quill-image-resize-module-react';
+import { useRouter } from 'next/router';
+import dynamic from 'next/dynamic';
+// @mui
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  Button,
+  Container,
+  Grid,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Stack,
+  Typography,
+  Box,
+  Paper,
+  Chip,
+  IconButton,
+  Tooltip,
+  Divider,
+  InputAdornment,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Slider,
+} from '@mui/material';
+// routes
+import { PATH_DASHBOARD } from '../../../routes/paths';
+// @types
+import {
+  LabelTemplate,
+  CreateLabelTemplateRequest,
+  CustomPlaceholder,
+  SYSTEM_PLACEHOLDERS,
+  PRESET_LABEL_SIZES,
+  FONT_SIZE_PRESETS,
+  DEFAULT_ZEBRA_PRINT_SETTINGS,
+  ZEBRA_GX430D_SPECS,
+  inchesToPixels,
+  replacePlaceholders,
+  getSamplePreviewData,
+} from '../../../@types/label';
+// components
+import Iconify from '../../../components/iconify';
+import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
+import { useSnackbar } from '../../../components/snackbar';
+import DashboardLayout from '../../../layouts/dashboard';
+import axios from '../../../utils/axios';
+
+// Dynamically import ReactQuill to avoid SSR issues
+const ReactQuill = dynamic(
+  async () => {
+    const { default: RQ } = await import('react-quill');
+    const { default: Quill } = await import('quill');
+    const { default: ImageResize } = await import('quill-image-resize-module-react');
+
+    // Register image resize module
+    Quill.register('modules/imageResize', ImageResize);
+
+    // Register custom font sizes (null = Normal/default size)
+    const Size = Quill.import('attributors/style/size');
+    Size.whitelist = [null, '10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'];
+    Quill.register(Size, true);
+
+    // Register custom fonts (null = default font)
+    const Font = Quill.import('attributors/style/font');
+    Font.whitelist = [
+      null,
+      'arial',
+      'helvetica',
+      'times-new-roman',
+      'georgia',
+      'verdana',
+      'courier',
+    ];
+    Quill.register(Font, true);
+
+    return RQ;
+  },
+  {
+    ssr: false,
+    loading: () => <Box sx={{ height: 200, bgcolor: 'grey.100' }} />,
+  }
+);
+import 'react-quill/dist/quill.snow.css';
+
+// Helper to clean HTML from ReactQuill artifacts (empty paragraphs, trailing breaks)
+const cleanQuillHtml = (html: string): string => {
+  if (!html) return html;
+
+  let cleaned = html;
+
+  // Remove empty paragraphs with any attributes: <p class="..."><br></p>, <p><br/></p>, <p></p>
+  cleaned = cleaned.replace(/<p[^>]*>\s*<br\s*\/?>\s*<\/p>/gi, '');
+  cleaned = cleaned.replace(/<p[^>]*>\s*<\/p>/gi, '');
+
+  // Remove paragraphs with only &nbsp;
+  cleaned = cleaned.replace(/<p[^>]*>\s*(&nbsp;|\u00A0)\s*<\/p>/gi, '');
+
+  // Remove trailing <br> inside paragraphs (before </p>)
+  cleaned = cleaned.replace(/<br\s*\/?>\s*<\/p>/gi, '</p>');
+
+  // Remove standalone <br> tags between paragraphs
+  cleaned = cleaned.replace(/<\/p>\s*<br\s*\/?>\s*<p/gi, '</p><p');
+
+  // Trim whitespace
+  cleaned = cleaned.trim();
+
+  return cleaned;
+};
+
+// ----------------------------------------------------------------------
+
+LabelEditorPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page}</DashboardLayout>;
+
+export default function LabelEditorPage() {
+  const { push, query } = useRouter();
+  const { enqueueSnackbar } = useSnackbar();
+  const editorRef = useRef<any>(null);
+  const skipOverflowCheckRef = useRef(false); // Skip overflow check during load
+  const loadedContentRef = useRef<string>(''); // Store originally loaded content
+
+  const editId = query.id ? parseInt(query.id as string) : null;
+  const isEdit = !!editId;
+
+  // Form state
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [widthInches, setWidthInches] = useState(4.0);
+  const [heightInches, setHeightInches] = useState(2.0);
+  const [templateHtml, setTemplateHtml] = useState(
+    '<p>{{customerName}}</p><p>{{customerAddress}}</p>'
+  );
+  const [customPlaceholders, setCustomPlaceholders] = useState<CustomPlaceholder[]>([]);
+  const [printSettings, setPrintSettings] = useState(DEFAULT_ZEBRA_PRINT_SETTINGS);
+  const [isDefault, setIsDefault] = useState(false);
+
+  // Content overflow tracking
+  const [lastValidContent, setLastValidContent] = useState(templateHtml);
+  const [isOverflowWarningShown, setIsOverflowWarningShown] = useState(false);
+
+  // UI state
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
+  const [customPlaceholderDialog, setCustomPlaceholderDialog] = useState(false);
+  const [newPlaceholder, setNewPlaceholder] = useState({
+    key: '',
+    defaultValue: '',
+    description: '',
+  });
+  const [originalTemplate, setOriginalTemplate] = useState<LabelTemplate | null>(null);
+
+  // Load template if editing
+  useEffect(() => {
+    if (editId) {
+      loadTemplate(editId);
+    }
+  }, [editId]);
+
+  const loadTemplate = async (id: number) => {
+    setIsLoading(true);
+    skipOverflowCheckRef.current = true; // Disable overflow check during load
+    try {
+      const response = await axios.get(`/api/label-templates/${id}`);
+      if (response.data.success) {
+        const template = response.data.data;
+        // Clean HTML on load to remove any artifacts
+        const cleanedHtml = cleanQuillHtml(template.template_html);
+
+        setName(template.name);
+        setDescription(template.description || '');
+        setWidthInches(template.width_inches);
+        setHeightInches(template.height_inches);
+        setTemplateHtml(cleanedHtml);
+        setLastValidContent(cleanedHtml); // Track loaded content as valid
+        loadedContentRef.current = cleanedHtml; // Store for overflow comparison
+        setCustomPlaceholders(template.custom_placeholders || []);
+        setPrintSettings(template.print_settings || DEFAULT_ZEBRA_PRINT_SETTINGS);
+        setIsDefault(template.is_default);
+        setOriginalTemplate(template);
+        // Re-enable overflow check after DOM fully settles (longer delay for Quill)
+        setTimeout(() => {
+          skipOverflowCheckRef.current = false;
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error loading template:', error);
+      enqueueSnackbar('Failed to load template', { variant: 'error' });
+      skipOverflowCheckRef.current = false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle preset size selection
+  const handlePresetChange = (presetName: string) => {
+    const preset = PRESET_LABEL_SIZES.find((p) => p.name === presetName);
+    if (preset && preset.width > 0) {
+      setWidthInches(preset.width);
+      setHeightInches(preset.height);
+    }
+  };
+
+  // Insert placeholder into editor
+  const insertPlaceholder = (key: string) => {
+    const placeholder = `{{${key}}}`;
+    setTemplateHtml((prev) => prev + placeholder);
+    enqueueSnackbar(`Inserted {{${key}}}`, { variant: 'info' });
+  };
+
+  // Add custom placeholder
+  const handleAddCustomPlaceholder = () => {
+    if (!newPlaceholder.key.trim()) {
+      enqueueSnackbar('Placeholder key is required', { variant: 'error' });
+      return;
+    }
+
+    // Validate key format (alphanumeric and camelCase)
+    const keyRegex = /^[a-zA-Z][a-zA-Z0-9]*$/;
+    if (!keyRegex.test(newPlaceholder.key)) {
+      enqueueSnackbar('Key must start with a letter and contain only alphanumeric characters', {
+        variant: 'error',
+      });
+      return;
+    }
+
+    // Check for duplicates
+    const isDuplicate =
+      customPlaceholders.some((p) => p.key === newPlaceholder.key) ||
+      SYSTEM_PLACEHOLDERS.some((p) => p.key === newPlaceholder.key);
+
+    if (isDuplicate) {
+      enqueueSnackbar('This placeholder key already exists', { variant: 'error' });
+      return;
+    }
+
+    setCustomPlaceholders((prev) => [...prev, newPlaceholder]);
+    setNewPlaceholder({ key: '', defaultValue: '', description: '' });
+    setCustomPlaceholderDialog(false);
+    enqueueSnackbar('Custom placeholder added');
+  };
+
+  // Remove custom placeholder
+  const handleRemoveCustomPlaceholder = (key: string) => {
+    setCustomPlaceholders((prev) => prev.filter((p) => p.key !== key));
+  };
+
+  // Save template
+  const handleSave = async () => {
+    // Validation
+    if (!name.trim()) {
+      enqueueSnackbar('Template name is required', { variant: 'error' });
+      return;
+    }
+    if (widthInches < 0.75 || widthInches > ZEBRA_GX430D_SPECS.maxPrintWidth) {
+      enqueueSnackbar(`Width must be between 0.75 and ${ZEBRA_GX430D_SPECS.maxPrintWidth} inches`, {
+        variant: 'error',
+      });
+      return;
+    }
+    if (!templateHtml.trim()) {
+      enqueueSnackbar('Template content is required', { variant: 'error' });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Clean HTML before saving to remove ReactQuill artifacts
+      const cleanedHtml = cleanQuillHtml(templateHtml);
+
+      const data: CreateLabelTemplateRequest = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        width_inches: widthInches,
+        height_inches: heightInches,
+        template_html: cleanedHtml,
+        custom_placeholders: customPlaceholders.length > 0 ? customPlaceholders : undefined,
+        print_settings: printSettings,
+        is_default: isDefault,
+      };
+
+      if (isEdit && editId) {
+        await axios.put(`/api/label-templates/${editId}`, data);
+        enqueueSnackbar('Template updated successfully');
+      } else {
+        await axios.post('/api/label-templates', data);
+        enqueueSnackbar('Template created successfully');
+      }
+
+      push(PATH_DASHBOARD.tiffin.labelTemplates);
+    } catch (error: any) {
+      console.error('Error saving template:', error);
+      enqueueSnackbar(error.response?.data?.error || 'Failed to save template', {
+        variant: 'error',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Cancel and load default (original)
+  const handleCancelAndLoadDefault = () => {
+    if (originalTemplate) {
+      setName(originalTemplate.name);
+      setDescription(originalTemplate.description || '');
+      setWidthInches(originalTemplate.width_inches);
+      setHeightInches(originalTemplate.height_inches);
+      setTemplateHtml(originalTemplate.template_html);
+      setCustomPlaceholders(originalTemplate.custom_placeholders || []);
+      setPrintSettings(originalTemplate.print_settings || DEFAULT_ZEBRA_PRINT_SETTINGS);
+      setIsDefault(originalTemplate.is_default);
+      enqueueSnackbar('Reverted to saved version');
+    } else {
+      push(PATH_DASHBOARD.tiffin.labelTemplates);
+    }
+  };
+
+  // Generate preview HTML
+  const getPreviewHtml = useCallback(() => {
+    const sampleData = getSamplePreviewData();
+    // Add custom placeholder defaults
+    customPlaceholders.forEach((p) => {
+      sampleData[p.key] = p.defaultValue || `[${p.key}]`;
+    });
+    return replacePlaceholders(templateHtml, sampleData);
+  }, [templateHtml, customPlaceholders]);
+
+  // Quill modules configuration
+  const quillModules = {
+    toolbar: [
+      [{ header: [1, 2, 3, 4, 5, 6, false] }], // Headers
+      [{ font: [] }],
+      [
+        {
+          size: [
+            'small',
+            false,
+            'large',
+            'huge',
+            '10px',
+            '12px',
+            '14px',
+            '16px',
+            '18px',
+            '20px',
+            '24px',
+            '32px',
+          ],
+        },
+      ], // Custom pixel sizes (false = Normal)
+      ['bold', 'italic', 'underline', 'strike'], // Text styling
+      ['blockquote', 'code-block'], // Block quotes and code
+      [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }], // Lists
+      [{ script: 'sub' }, { script: 'super' }], // Subscript/superscript
+      [{ indent: '-1' }, { indent: '+1' }], // Indentation
+      [{ color: [] }, { background: [] }], // Colors
+      [{ direction: 'rtl' }], // Text direction
+      [{ align: [] }], // Alignment
+      ['link', 'image', 'video', 'formula'], // Media
+      ['clean'], // Clean formatting
+    ],
+    // History (undo/redo)
+    history: {
+      delay: 500,
+      maxStack: 100,
+      userOnly: true,
+    },
+    // Clipboard (paste handling)
+    clipboard: {
+      matchVisual: false, // Don't match visual formatting on paste
+    },
+    // Image resize (with quill-image-resize-module-react)
+    imageResize: {
+      modules: ['Resize', 'DisplaySize', 'Toolbar'],
+    },
+  };
+
+  const quillFormats = [
+    'header',
+    'font',
+    'size',
+    'bold',
+    'italic',
+    'underline',
+    'strike',
+    'script',
+    'color',
+    'background',
+    'align',
+    'list',
+    'bullet',
+    'indent',
+    'link',
+    'image',
+    'font',
+    'size',
+    'list',
+    'bullet',
+    'link',
+    'code',
+    'indent',
+    'blockquote',
+    'direction', // Text direction (RTL)
+    'code-block',
+    'formula',
+    'video',
+  ];
+
+  // Handle editor change with overflow detection
+  const handleEditorChange = useCallback(
+    (content: string) => {
+      // Clean the HTML to remove ReactQuill artifacts (empty paragraphs, trailing breaks)
+      const cleanedContent = cleanQuillHtml(content);
+
+      // Skip overflow check during template loading
+      if (skipOverflowCheckRef.current) {
+        setTemplateHtml(cleanedContent);
+        setLastValidContent(cleanedContent);
+        return;
+      }
+
+      // Always allow the content change first
+      setTemplateHtml(cleanedContent);
+
+      // Check if this is a deletion (content is shorter)
+      const isDeleting = cleanedContent.length < lastValidContent.length;
+
+      // Check if content matches the originally loaded content (always allow saved content)
+      const isLoadedContent = cleanedContent === loadedContentRef.current;
+
+      // Use setTimeout to allow DOM to update, then check overflow
+      setTimeout(() => {
+        // Skip if still loading
+        if (skipOverflowCheckRef.current) {
+          setLastValidContent(cleanedContent);
+          return;
+        }
+
+        // Always allow the originally loaded/saved content
+        if (isLoadedContent) {
+          setLastValidContent(cleanedContent);
+          return;
+        }
+
+        // Find the editor element directly from DOM (works with dynamic import)
+        const editorElement = document.querySelector('.ql-container .ql-editor') as HTMLElement;
+
+        if (editorElement) {
+          // Check if content overflows the container
+          const isOverflowing = editorElement.scrollHeight > editorElement.clientHeight;
+
+          if (isOverflowing && !isDeleting) {
+            // Only revert if adding content caused overflow, not deleting
+            setTemplateHtml(lastValidContent);
+
+            // Show warning only once per overflow attempt
+            if (!isOverflowWarningShown) {
+              enqueueSnackbar('Content exceeds label size. Remove some content to add more.', {
+                variant: 'warning',
+                autoHideDuration: 3000,
+              });
+              setIsOverflowWarningShown(true);
+              // Reset warning flag after a short delay
+              setTimeout(() => setIsOverflowWarningShown(false), 1000);
+            }
+          } else {
+            // Content fits OR user is deleting (allow deletions even if still overflowing)
+            setLastValidContent(cleanedContent);
+          }
+        }
+      }, 0);
+    },
+    [lastValidContent, isOverflowWarningShown, enqueueSnackbar]
+  );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key.toLowerCase()) {
+          case 's':
+            e.preventDefault();
+            handleSave();
+            break;
+        }
+      }
+      if (e.key === 'Escape') {
+        handleCancelAndLoadDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [name, templateHtml, widthInches, heightInches]);
+
+  return (
+    <>
+      <Head>
+        <title>{isEdit ? 'Edit Label Template' : 'New Label Template'} | TMS</title>
+      </Head>
+
+      <Container maxWidth={false}>
+        <CustomBreadcrumbs
+          heading={isEdit ? 'Edit Label Template' : 'Create Label Template'}
+          links={[
+            { name: 'Dashboard', href: PATH_DASHBOARD.root },
+            { name: 'Tiffin', href: PATH_DASHBOARD.tiffin.root },
+            { name: 'Label Templates', href: PATH_DASHBOARD.tiffin.labelTemplates },
+            { name: isEdit ? 'Edit' : 'New' },
+          ]}
+        />
+
+        <Grid container spacing={3}>
+          {/* Left Column - Editor */}
+          <Grid item xs={12} md={8}>
+            {/* Template Info */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader title="Template Information" />
+              <CardContent>
+                <Stack spacing={3}>
+                  <TextField
+                    fullWidth
+                    label="Template Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    placeholder="e.g., Standard Tiffin 4x2"
+                  />
+                  <TextField
+                    fullWidth
+                    label="Description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    multiline
+                    rows={2}
+                    placeholder="Optional description"
+                  />
+                </Stack>
+              </CardContent>
+            </Card>
+
+            {/* Label Size */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader title="Label Size" />
+              <CardContent>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={4}>
+                    <FormControl fullWidth>
+                      <InputLabel>Preset Size</InputLabel>
+                      <Select
+                        label="Preset Size"
+                        value=""
+                        onChange={(e) => handlePresetChange(e.target.value)}
+                      >
+                        {PRESET_LABEL_SIZES.map((preset) => (
+                          <MenuItem key={preset.name} value={preset.name}>
+                            {preset.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <TextField
+                      fullWidth
+                      label="Width"
+                      type="number"
+                      value={widthInches}
+                      onChange={(e) => setWidthInches(parseFloat(e.target.value) || 0)}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">in</InputAdornment>,
+                        inputProps: { min: 0.75, max: 4.09, step: 0.25 },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <TextField
+                      fullWidth
+                      label="Height"
+                      type="number"
+                      value={heightInches}
+                      onChange={(e) => setHeightInches(parseFloat(e.target.value) || 0)}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">in</InputAdornment>,
+                        inputProps: { min: 0.5, max: 12, step: 0.25 },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={2}>
+                    <Typography variant="caption" color="text.secondary">
+                      Max: {ZEBRA_GX430D_SPECS.maxPrintWidth}" (GX430d)
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+
+            {/* Editor */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader title="Template Editor" />
+              <CardContent>
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  Design your label within the blue bordered area. Content outside this area will be
+                  clipped during printing.
+                </Alert>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Keyboard shortcuts: Ctrl+S (Save), Escape (Cancel)
+                </Alert>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: 'block', mb: 2 }}
+                >
+                  Fixed canvas: {widthInches}" x {heightInches}" ({inchesToPixels(widthInches)}px x{' '}
+                  {inchesToPixels(heightInches)}px)
+                </Typography>
+                <Box
+                  sx={{
+                    '& .quill': {
+                      display: 'flex',
+                      flexDirection: 'column',
+                    },
+                    '& .ql-toolbar': {
+                      borderRadius: '8px 8px 0 0',
+                      backgroundColor: '#f5f5f5',
+                      borderColor: 'grey.300',
+                      border: '1px solid #ccc',
+                    },
+                    // Size dropdown label styling
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label::before, & .ql-snow .ql-picker.ql-size .ql-picker-item::before':
+                      {
+                        content: '"Normal"',
+                      },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="10px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="10px"]::before':
+                      {
+                        content: '"10px"',
+                      },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="12px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before':
+                      {
+                        content: '"12px"',
+                      },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="14px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before':
+                      {
+                        content: '"14px"',
+                      },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="16px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before':
+                      {
+                        content: '"16px"',
+                      },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="18px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before':
+                      {
+                        content: '"18px"',
+                      },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="20px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before':
+                      {
+                        content: '"20px"',
+                      },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="24px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before':
+                      {
+                        content: '"24px"',
+                      },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="32px"]::before, & .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="32px"]::before':
+                      {
+                        content: '"32px"',
+                      },
+                    // Make dropdown items show their actual size
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="10px"]::before': {
+                      fontSize: '10px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before': {
+                      fontSize: '12px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before': {
+                      fontSize: '14px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before': {
+                      fontSize: '16px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before': {
+                      fontSize: '18px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before': {
+                      fontSize: '20px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before': {
+                      fontSize: '24px',
+                    },
+                    '& .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="32px"]::before': {
+                      fontSize: '32px',
+                    },
+                    '& .ql-container': {
+                      width: inchesToPixels(widthInches),
+                      height: inchesToPixels(heightInches),
+                      border: '2px solid #1976d2',
+                      borderRadius: '8px',
+                      backgroundColor: 'white',
+                      mx: 'auto',
+                      mt: 2,
+                      overflow: 'hidden',
+                      boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
+                      position: 'relative',
+                      boxSizing: 'border-box', // Match preview - border included in dimensions
+                    },
+                    '& .ql-editor': {
+                      // MUST match preview structure exactly - position absolute clips content
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      padding: '8px !important',
+                      overflow: 'hidden !important',
+                      boxSizing: 'border-box',
+                      // Reset paragraph margins to match preview exactly
+                      '& p': {
+                        margin: '0 !important',
+                        padding: '0 !important',
+                      },
+                      '& img': {
+                        maxWidth: '100%',
+                      },
+                    },
+                  }}
+                >
+                  <ReactQuill
+                    ref={editorRef}
+                    theme="snow"
+                    value={templateHtml}
+                    onChange={handleEditorChange}
+                    modules={quillModules}
+                    formats={quillFormats}
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Live Preview - Moved here from right column */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader
+                title="Live Preview"
+                action={
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography variant="caption">Zoom:</Typography>
+                    <Slider
+                      value={previewZoom}
+                      onChange={(e, v) => setPreviewZoom(v as number)}
+                      min={50}
+                      max={200}
+                      step={10}
+                      sx={{ width: 100 }}
+                      size="small"
+                    />
+                    <Typography variant="caption">{previewZoom}%</Typography>
+                  </Stack>
+                }
+              />
+              <CardContent>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    bgcolor: 'grey.50',
+                    overflow: 'auto',
+                    maxHeight: 400,
+                  }}
+                >
+                  {/* Outer container to match .ql-container */}
+                  <Box
+                    sx={{
+                      width: inchesToPixels(widthInches),
+                      height: inchesToPixels(heightInches),
+                      border: '2px solid #1976d2',
+                      borderRadius: '8px',
+                      bgcolor: 'white',
+                      transform: `scale(${previewZoom / 100})`,
+                      transformOrigin: 'top left',
+                      overflow: 'hidden',
+                      boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.1)',
+                      boxSizing: 'border-box',
+                      position: 'relative',
+                    }}
+                  >
+                    {/* Inner container using .ql-editor class for exact styling match */}
+                    <Box
+                      className="ql-editor"
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        padding: '8px !important',
+                        overflow: 'hidden !important',
+                        boxSizing: 'border-box',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        // Override only what's needed
+                        '& p': {
+                          margin: '0 !important',
+                          padding: '0 !important',
+                        },
+                        '& img': {
+                          maxWidth: '100%',
+                        },
+                      }}
+                      dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
+                    />
+                  </Box>
+                </Paper>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 1, display: 'block' }}
+                >
+                  Preview shows sample data. Actual values will be replaced during printing.
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Right Column - Placeholders & Settings */}
+          <Grid item xs={12} md={4}>
+            {/* Placeholders */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader title="Placeholders" subheader="Click to insert into template" />
+              <CardContent>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  System Placeholders
+                </Typography>
+                <Stack
+                  spacing={1}
+                  sx={{
+                    mb: 2,
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                    pr: 1,
+                  }}
+                >
+                  {SYSTEM_PLACEHOLDERS.map((p) => (
+                    <Box
+                      key={p.key}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        p: 1,
+                        borderRadius: 1,
+                        bgcolor: 'grey.100',
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'grey.200' },
+                      }}
+                      onClick={() => insertPlaceholder(p.key)}
+                    >
+                      <Box>
+                        <Typography variant="body2" fontFamily="monospace">
+                          {`{{${p.key}}}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {p.description}
+                        </Typography>
+                      </Box>
+                      <IconButton size="small">
+                        <Iconify icon="eva:plus-circle-fill" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Stack>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mb: 1 }}
+                >
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Custom Placeholders
+                  </Typography>
+                  <Button
+                    size="small"
+                    startIcon={<Iconify icon="eva:plus-fill" />}
+                    onClick={() => setCustomPlaceholderDialog(true)}
+                  >
+                    Add
+                  </Button>
+                </Stack>
+                <Stack spacing={1}>
+                  {customPlaceholders.length === 0 ? (
+                    <Typography variant="caption" color="text.secondary">
+                      No custom placeholders yet
+                    </Typography>
+                  ) : (
+                    customPlaceholders.map((p) => (
+                      <Box
+                        key={p.key}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          p: 1,
+                          borderRadius: 1,
+                          bgcolor: 'primary.lighter',
+                          cursor: 'pointer',
+                          '&:hover': { bgcolor: 'primary.light' },
+                        }}
+                        onClick={() => insertPlaceholder(p.key)}
+                      >
+                        <Box>
+                          <Typography variant="body2" fontFamily="monospace">
+                            {`{{${p.key}}}`}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {p.description || p.defaultValue}
+                          </Typography>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveCustomPlaceholder(p.key);
+                          }}
+                        >
+                          <Iconify icon="eva:trash-2-outline" />
+                        </IconButton>
+                      </Box>
+                    ))
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
+
+            {/* Print Settings - Moved from left column */}
+            <Card sx={{ mb: 3 }}>
+              <CardHeader title="Print Settings (Zebra GX430d)" />
+              <CardContent>
+                <Stack spacing={2}>
+                  <TextField
+                    fullWidth
+                    label="Darkness"
+                    type="number"
+                    size="small"
+                    value={printSettings.darkness}
+                    onChange={(e) =>
+                      setPrintSettings((prev) => ({
+                        ...prev,
+                        darkness: parseInt(e.target.value) || 15,
+                      }))
+                    }
+                    InputProps={{
+                      inputProps: { min: 0, max: 30 },
+                    }}
+                    helperText="0-30"
+                  />
+                  <TextField
+                    fullWidth
+                    label="Print Speed"
+                    type="number"
+                    size="small"
+                    value={printSettings.printSpeed}
+                    onChange={(e) =>
+                      setPrintSettings((prev) => ({
+                        ...prev,
+                        printSpeed: parseInt(e.target.value) || 4,
+                      }))
+                    }
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">in/s</InputAdornment>,
+                      inputProps: { min: 1, max: 4 },
+                    }}
+                  />
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Print Method</InputLabel>
+                    <Select
+                      label="Print Method"
+                      value={printSettings.printMethod}
+                      onChange={(e) =>
+                        setPrintSettings((prev) => ({
+                          ...prev,
+                          printMethod: e.target.value as 'native' | 'usb-direct',
+                        }))
+                      }
+                    >
+                      <MenuItem value="native">Windows Driver</MenuItem>
+                      <MenuItem value="usb-direct">Direct USB</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Media Type</InputLabel>
+                    <Select
+                      label="Media Type"
+                      value={printSettings.mediaType}
+                      onChange={(e) =>
+                        setPrintSettings((prev) => ({
+                          ...prev,
+                          mediaType: e.target.value as 'direct-thermal' | 'thermal-transfer',
+                        }))
+                      }
+                    >
+                      <MenuItem value="direct-thermal">Direct Thermal</MenuItem>
+                      <MenuItem value="thermal-transfer">Thermal Transfer</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <Stack spacing={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                size="large"
+                startIcon={<Iconify icon="eva:save-fill" />}
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save Template'}
+              </Button>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<Iconify icon="eva:close-fill" />}
+                onClick={handleCancelAndLoadDefault}
+              >
+                {isEdit ? 'Cancel & Load Default' : 'Cancel'}
+              </Button>
+              {!isEdit && (
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={<Iconify icon="eva:copy-fill" />}
+                  onClick={() => {
+                    // Save as new logic would go here
+                    enqueueSnackbar('Use Save to create new template', { variant: 'info' });
+                  }}
+                >
+                  Save As New
+                </Button>
+              )}
+            </Stack>
+          </Grid>
+        </Grid>
+      </Container>
+
+      {/* Add Custom Placeholder Dialog */}
+      <Dialog open={customPlaceholderDialog} onClose={() => setCustomPlaceholderDialog(false)}>
+        <DialogTitle>Add Custom Placeholder</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1, minWidth: 300 }}>
+            <TextField
+              fullWidth
+              label="Placeholder Key"
+              value={newPlaceholder.key}
+              onChange={(e) => setNewPlaceholder((prev) => ({ ...prev, key: e.target.value }))}
+              placeholder="e.g., routeNumber"
+              helperText="Will become {{routeNumber}}"
+            />
+            <TextField
+              fullWidth
+              label="Default Value"
+              value={newPlaceholder.defaultValue}
+              onChange={(e) =>
+                setNewPlaceholder((prev) => ({ ...prev, defaultValue: e.target.value }))
+              }
+              placeholder="e.g., R1"
+            />
+            <TextField
+              fullWidth
+              label="Description"
+              value={newPlaceholder.description}
+              onChange={(e) =>
+                setNewPlaceholder((prev) => ({ ...prev, description: e.target.value }))
+              }
+              placeholder="e.g., Route number for delivery"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCustomPlaceholderDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddCustomPlaceholder}>
+            Add Placeholder
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}

@@ -26,6 +26,7 @@ import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import Scrollbar from '../../../components/scrollbar';
 import Iconify from '../../../components/iconify';
+import Label from '../../../components/label';
 import { PATH_DASHBOARD } from '../../../routes/paths';
 import { useSettingsContext } from '../../../components/settings';
 import axios from '../../../utils/axios';
@@ -83,7 +84,7 @@ interface BillingRecord {
   orders?: OrderDetail[];
 }
 
-const STATUS_OPTIONS = ['all', 'calculating', 'pending', 'finalized', 'partial_paid', 'paid'];
+// Status options moved to TABS array inside component for dynamic counts
 
 // ----------------------------------------------------------------------
 
