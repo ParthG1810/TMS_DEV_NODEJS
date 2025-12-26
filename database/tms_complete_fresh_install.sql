@@ -11,16 +11,16 @@
 -- USAGE:
 --   mysql -u root -p < tms_complete_fresh_install.sql
 --
--- WARNING: This script will DROP the existing tms_db database!
+-- WARNING: This script will DROP the existing TmsDb_Dev database!
 -- ============================================================
 
 -- ============================================================
 -- STEP 1: DROP AND CREATE DATABASE
 -- ============================================================
 
-DROP DATABASE IF EXISTS tms_db;
-CREATE DATABASE tms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE tms_db;
+DROP DATABASE IF EXISTS TmsDb_Dev;
+CREATE DATABASE TmsDb_Dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE TmsDb_Dev;
 
 SET FOREIGN_KEY_CHECKS = 0;
 SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
@@ -1544,10 +1544,10 @@ SET FOREIGN_KEY_CHECKS = 1;
 SHOW TABLES;
 
 -- Check table counts
-SELECT 'Tables' AS type, COUNT(*) AS count FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'tms_db';
-SELECT 'Views' AS type, COUNT(*) AS count FROM information_schema.VIEWS WHERE TABLE_SCHEMA = 'tms_db';
-SELECT 'Procedures' AS type, COUNT(*) AS count FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = 'tms_db' AND ROUTINE_TYPE = 'PROCEDURE';
-SELECT 'Triggers' AS type, COUNT(*) AS count FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = 'tms_db';
+SELECT 'Tables' AS type, COUNT(*) AS count FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'TmsDb_Dev';
+SELECT 'Views' AS type, COUNT(*) AS count FROM information_schema.VIEWS WHERE TABLE_SCHEMA = 'TmsDb_Dev';
+SELECT 'Procedures' AS type, COUNT(*) AS count FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = 'TmsDb_Dev' AND ROUTINE_TYPE = 'PROCEDURE';
+SELECT 'Triggers' AS type, COUNT(*) AS count FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = 'TmsDb_Dev';
 
 -- Check users
 SELECT id, display_name, email, role, status FROM users;
@@ -1561,7 +1561,7 @@ SELECT COUNT(*) as ingredients FROM ingredients;
 SELECT '============================================================' AS '';
 SELECT 'TMS DATABASE INSTALLATION COMPLETE!' AS Status;
 SELECT '============================================================' AS '';
-SELECT 'Database: tms_db' AS Info;
+SELECT 'Database: TmsDb_Dev' AS Info;
 SELECT 'Tables: 24' AS Info;
 SELECT 'Views: 8' AS Info;
 SELECT 'Stored Procedures: 5' AS Info;
