@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
+import sumBy from 'lodash/sumBy';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 // @mui
+import { useTheme } from '@mui/material/styles';
 import {
   Card,
   Table,
@@ -11,6 +13,10 @@ import {
   Container,
   IconButton,
   TableContainer,
+  Tabs,
+  Tab,
+  Stack,
+  Divider,
 } from '@mui/material';
 // routes
 import { PATH_DASHBOARD } from '../../../routes/paths';
@@ -25,6 +31,7 @@ import Scrollbar from '../../../components/scrollbar';
 import ConfirmDialog from '../../../components/confirm-dialog';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import { useSnackbar } from '../../../components/snackbar';
+import Label from '../../../components/label';
 import {
   useTable,
   getComparator,
@@ -36,7 +43,7 @@ import {
   TablePaginationCustom,
 } from '../../../components/table';
 // sections
-import { MealPlanTableRow, MealPlanTableToolbar } from '../../../sections/@dashboard/tiffin/meal-plan/list';
+import { MealPlanTableRow, MealPlanTableToolbar, MealPlanAnalytic } from '../../../sections/@dashboard/tiffin/meal-plan/list';
 import DashboardLayout from '../../../layouts/dashboard';
 import axios from '../../../utils/axios';
 
@@ -55,6 +62,8 @@ const TABLE_HEAD = [
 MealPlansPage.getLayout = (page: React.ReactElement) => <DashboardLayout>{page}</DashboardLayout>;
 
 export default function MealPlansPage() {
+  const theme = useTheme();
+
   const {
     dense,
     page,
@@ -80,6 +89,9 @@ export default function MealPlansPage() {
 
   const [tableData, setTableData] = useState<IMealPlan[]>([]);
   const [filterName, setFilterName] = useState('');
+  const [filterFrequency, setFilterFrequency] = useState('all');
+  const [filterPriceOperator, setFilterPriceOperator] = useState('');
+  const [filterPriceValue, setFilterPriceValue] = useState('');
   const [openConfirm, setOpenConfirm] = useState(false);
   const [importing, setImporting] = useState(false);
 
@@ -95,10 +107,45 @@ export default function MealPlansPage() {
     }
   }, [mealPlans]);
 
+  // Calculate frequency counts
+  const getFrequencyCount = (frequency: string) => {
+    if (frequency === 'all') return tableData.length;
+    return tableData.filter((plan) => {
+      const planFrequency = plan.frequency?.toLowerCase() || '';
+      return planFrequency === frequency.toLowerCase();
+    }).length;
+  };
+
+  const getTotalPriceByFrequency = (frequency: string) => {
+    if (frequency === 'all') return sumBy(tableData, (plan) => Number(plan.price) || 0);
+    return sumBy(
+      tableData.filter((plan) => {
+        const planFrequency = plan.frequency?.toLowerCase() || '';
+        return planFrequency === frequency.toLowerCase();
+      }),
+      (plan) => Number(plan.price) || 0
+    );
+  };
+
+  const getPercentByFrequency = (frequency: string) => {
+    if (tableData.length === 0) return 0;
+    return (getFrequencyCount(frequency) / tableData.length) * 100;
+  };
+
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: tableData.length },
+    { value: 'daily', label: 'Daily', color: 'success', count: getFrequencyCount('daily') },
+    { value: 'weekly', label: 'Weekly', color: 'warning', count: getFrequencyCount('weekly') },
+    { value: 'monthly', label: 'Monthly', color: 'error', count: getFrequencyCount('monthly') },
+  ] as const;
+
   const dataFiltered = applyFilter({
     inputData: tableData,
     comparator: getComparator(order, orderBy),
     filterName,
+    filterFrequency,
+    filterPriceOperator,
+    filterPriceValue,
   });
 
   // Get only deletable rows (meal plans not used in orders)
@@ -106,7 +153,7 @@ export default function MealPlansPage() {
 
   const dataInPage = dataFiltered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const denseHeight = dense ? 52 : 72;
-  const isFiltered = filterName !== '';
+  const isFiltered = filterName !== '' || filterFrequency !== 'all' || filterPriceOperator !== '';
   const isNotFound = (!dataFiltered.length && !!filterName) || (!isLoading && !dataFiltered.length);
 
   const handleOpenConfirm = () => setOpenConfirm(true);
@@ -115,6 +162,21 @@ export default function MealPlansPage() {
   const handleFilterName = (event: React.ChangeEvent<HTMLInputElement>) => {
     setPage(0);
     setFilterName(event.target.value);
+  };
+
+  const handleFilterFrequency = (event: React.SyntheticEvent, newValue: string) => {
+    setPage(0);
+    setFilterFrequency(newValue);
+  };
+
+  const handleFilterPriceOperator = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setPage(0);
+    setFilterPriceOperator(event.target.value);
+  };
+
+  const handleFilterPriceValue = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setPage(0);
+    setFilterPriceValue(event.target.value);
   };
 
   const handleDeleteRow = async (id: number) => {
@@ -165,6 +227,9 @@ export default function MealPlansPage() {
 
   const handleResetFilter = () => {
     setFilterName('');
+    setFilterFrequency('all');
+    setFilterPriceOperator('');
+    setFilterPriceValue('');
   };
 
   const handlePrint = () => {
@@ -410,11 +475,88 @@ export default function MealPlansPage() {
           }
         />
 
+        {/* Analytics Cards */}
+        <Card sx={{ mb: 5 }}>
+          <Scrollbar>
+            <Stack
+              direction="row"
+              divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+              sx={{ py: 2 }}
+            >
+              <MealPlanAnalytic
+                title="Total"
+                total={tableData.length}
+                percent={100}
+                price={getTotalPriceByFrequency('all')}
+                icon="ic:round-receipt"
+                color={theme.palette.info.main}
+              />
+
+              <MealPlanAnalytic
+                title="Daily"
+                total={getFrequencyCount('daily')}
+                percent={getPercentByFrequency('daily')}
+                price={getTotalPriceByFrequency('daily')}
+                icon="eva:calendar-outline"
+                color={theme.palette.success.main}
+              />
+
+              <MealPlanAnalytic
+                title="Weekly"
+                total={getFrequencyCount('weekly')}
+                percent={getPercentByFrequency('weekly')}
+                price={getTotalPriceByFrequency('weekly')}
+                icon="eva:calendar-outline"
+                color={theme.palette.warning.main}
+              />
+
+              <MealPlanAnalytic
+                title="Monthly"
+                total={getFrequencyCount('monthly')}
+                percent={getPercentByFrequency('monthly')}
+                price={getTotalPriceByFrequency('monthly')}
+                icon="eva:calendar-outline"
+                color={theme.palette.error.main}
+              />
+            </Stack>
+          </Scrollbar>
+        </Card>
+
         <Card>
+          {/* Frequency Tabs */}
+          <Tabs
+            value={filterFrequency}
+            onChange={handleFilterFrequency}
+            sx={{
+              px: 2,
+              bgcolor: 'background.neutral',
+            }}
+          >
+            {TABS.map((tab) => (
+              <Tab
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                icon={
+                  <Label color={tab.color} sx={{ mr: 1 }}>
+                    {tab.count}
+                  </Label>
+                }
+                iconPosition="start"
+              />
+            ))}
+          </Tabs>
+
+          <Divider />
+
           <MealPlanTableToolbar
             isFiltered={isFiltered}
             filterName={filterName}
+            filterPriceOperator={filterPriceOperator}
+            filterPriceValue={filterPriceValue}
             onFilterName={handleFilterName}
+            onFilterPriceOperator={handleFilterPriceOperator}
+            onFilterPriceValue={handleFilterPriceValue}
             onResetFilter={handleResetFilter}
             onPrint={handlePrint}
             onImport={handleImport}
@@ -528,10 +670,16 @@ function applyFilter({
   inputData,
   comparator,
   filterName,
+  filterFrequency,
+  filterPriceOperator,
+  filterPriceValue,
 }: {
   inputData: IMealPlan[];
   comparator: (a: any, b: any) => number;
   filterName: string;
+  filterFrequency: string;
+  filterPriceOperator: string;
+  filterPriceValue: string;
 }) {
   const stabilizedThis = inputData.map((el, index) => [el, index] as const);
 
@@ -543,12 +691,45 @@ function applyFilter({
 
   inputData = stabilizedThis.map((el) => el[0]);
 
+  // Filter by name/description search
   if (filterName) {
     inputData = inputData.filter(
       (plan) =>
         plan.meal_name.toLowerCase().indexOf(filterName.toLowerCase()) !== -1 ||
         plan.description?.toLowerCase().indexOf(filterName.toLowerCase()) !== -1
     );
+  }
+
+  // Filter by frequency
+  if (filterFrequency !== 'all') {
+    inputData = inputData.filter((plan) => {
+      const planFrequency = plan.frequency?.toLowerCase() || '';
+      return planFrequency === filterFrequency.toLowerCase();
+    });
+  }
+
+  // Filter by price
+  if (filterPriceOperator && filterPriceValue) {
+    const priceValue = parseFloat(filterPriceValue);
+    if (!isNaN(priceValue)) {
+      inputData = inputData.filter((plan) => {
+        const price = Number(plan.price) || 0;
+        switch (filterPriceOperator) {
+          case '>':
+            return price > priceValue;
+          case '>=':
+            return price >= priceValue;
+          case '<':
+            return price < priceValue;
+          case '<=':
+            return price <= priceValue;
+          case '==':
+            return price === priceValue;
+          default:
+            return true;
+        }
+      });
+    }
   }
 
   return inputData;
