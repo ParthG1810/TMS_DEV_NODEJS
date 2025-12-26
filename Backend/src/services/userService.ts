@@ -31,8 +31,17 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   displayName?: string;
   email?: string;
+  phoneNumber?: string;
+  country?: string;
+  address?: string;
+  state?: string;
+  city?: string;
+  zipCode?: string;
+  about?: string;
   photoURL?: string;
+  isPublic?: boolean;
   role?: 'admin' | 'manager' | 'staff' | 'tester' | 'user';
+  status?: string;
 }
 
 // ----------------------------------------------------------------------
