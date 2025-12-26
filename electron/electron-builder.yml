@@ -67,6 +67,9 @@ nsis:
   shortcutName: TMS Desktop
   menuCategory: TMS
 
+portable:
+  artifactName: TMS-Desktop-${version}-Windows-Portable.${ext}
+
 # macOS Configuration
 mac:
   target:
