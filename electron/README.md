@@ -2,6 +2,20 @@
 
 A desktop application for the Tiffin Management System built with Electron, wrapping Next.js Backend and Frontend applications.
 
+## Platform-Specific Setup Guides
+
+For complete step-by-step setup instructions from scratch, see the platform-specific guides:
+
+| Platform | Guide |
+|----------|-------|
+| Windows | [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) |
+| macOS | [docs/MACOS_SETUP.md](docs/MACOS_SETUP.md) |
+| Linux | [docs/LINUX_SETUP.md](docs/LINUX_SETUP.md) |
+
+These guides cover everything from installing prerequisites to running the application.
+
+---
+
 ## Prerequisites
 
 Before running or building the application, ensure you have the following installed:
