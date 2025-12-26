@@ -2,19 +2,6 @@
 -- Seed Script: User Accounts
 -- Description: Creates default user accounts with hashed passwords
 -- ============================================================
---
--- IMPORTANT: Run this after running the migration 032_auth_users_table.sql
---
--- Passwords (pre-hashed with bcrypt, 10 rounds):
--- Admin@123 -> $2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq
--- User@123 -> $2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq
--- Tester@123 -> $2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq
---
--- Note: The above hashes are examples. The actual seed uses proper unique hashes.
--- ============================================================
-
--- Clear existing users (BE CAREFUL IN PRODUCTION!)
--- DELETE FROM users;
 
 -- Insert Admin User
 INSERT INTO users (
@@ -27,7 +14,7 @@ INSERT INTO users (
     'admin-user-001',
     'Admin User',
     'admin@tms.com',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq',
+    '$2b$10$E3dU4bNyUYulH.fTNoAmCeddJfh3a7D48k/SPmlQcFcHrIE9mFmby',
     'admin'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
@@ -42,7 +29,7 @@ INSERT INTO users (
     'regular-user-001',
     'Regular User',
     'user@tms.com',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq',
+    '$2b$10$Q/F96Yg1eBrOnToryj2sseax3XxXZTvoCynDMQXN5DAymydMAwuRG',
     'user'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
@@ -57,7 +44,7 @@ INSERT INTO users (
     'tester-user-001',
     'QA Tester',
     'tester@tms.com',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq',
+    '$2b$10$ab.LfeHD7g2Wy9TR10RtlelPKUjajDwyggzdY3Rj1oTcSElvSRrHS',
     'tester'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
@@ -72,7 +59,7 @@ INSERT INTO users (
     'manager-user-001',
     'Manager User',
     'manager@tms.com',
-    '$2a$10$rQnM1YV1jK5S5L5X5X5X5O6666666666666666666666666666666',
+    '$2b$10$Or50FB5seK98o71Njj4X0OoNJaGDt7s.RiJ.VZhyG5FrtjUr3IjYG',
     'manager'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
