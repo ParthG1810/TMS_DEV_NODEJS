@@ -1,0 +1,41 @@
+{
+  "name": "tms-desktop",
+  "version": "1.0.0",
+  "description": "TMS - Tiffin Management System Desktop Application",
+  "main": "dist/main/index.js",
+  "author": "TMS Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "npm run build && concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev:electron": "wait-on http://localhost:8081 http://localhost:3000 && electron .",
+    "dev:backend": "cd ../Backend && npm run dev",
+    "dev:frontend": "cd ../Frontend && npm run dev",
+    "build": "tsc -p tsconfig.json",
+    "build:backend": "cd ../Backend && npm run build",
+    "build:frontend": "cd ../Frontend && npm run build",
+    "build:all": "npm run build:backend && npm run build:frontend && npm run build",
+    "package": "npm run build:all && electron-builder",
+    "package:win": "npm run build:all && electron-builder --win",
+    "package:mac": "npm run build:all && electron-builder --mac",
+    "package:linux": "npm run build:all && electron-builder --linux",
+    "package:all": "npm run build:all && electron-builder --win --mac --linux",
+    "publish": "npm run build:all && electron-builder --publish always"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.0",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "wait-on": "^8.0.1"
+  },
+  "dependencies": {
+    "electron-log": "^5.2.4",
+    "electron-store": "^10.0.0",
+    "electron-updater": "^6.3.9",
+    "mysql2": "^3.11.5"
+  },
+  "build": {
+    "extends": "electron-builder.yml"
+  }
+}
