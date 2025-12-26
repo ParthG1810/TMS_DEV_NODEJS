@@ -1,0 +1,121 @@
+appId: com.tms.desktop
+productName: TMS Desktop
+copyright: Copyright © 2024 TMS
+
+directories:
+  output: dist-packages
+  buildResources: resources
+
+files:
+  - dist/**/*
+  - package.json
+
+extraResources:
+  - from: ../Backend/.next
+    to: backend/.next
+    filter:
+      - "**/*"
+  - from: ../Backend/node_modules
+    to: backend/node_modules
+    filter:
+      - "**/*"
+  - from: ../Backend/package.json
+    to: backend/package.json
+  - from: ../Backend/public
+    to: backend/public
+    filter:
+      - "**/*"
+  - from: ../Backend/.env
+    to: backend/.env
+  - from: ../Frontend/.next
+    to: frontend/.next
+    filter:
+      - "**/*"
+  - from: ../Frontend/node_modules
+    to: frontend/node_modules
+    filter:
+      - "**/*"
+  - from: ../Frontend/package.json
+    to: frontend/package.json
+  - from: ../Frontend/public
+    to: frontend/public
+    filter:
+      - "**/*"
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - "**/node_modules/**"
+
+# Windows Configuration
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+  publisherName: TMS
+  artifactName: TMS-Desktop-${version}-Windows-Setup.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: TMS Desktop
+  menuCategory: TMS
+
+# macOS Configuration
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: resources/icon.icns
+  category: public.app-category.business
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  artifactName: TMS-Desktop-${version}-macOS-${arch}.${ext}
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 400
+
+# Linux Configuration
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  icon: resources/icons
+  category: Office
+  maintainer: tms@example.com
+  vendor: TMS
+  artifactName: TMS-Desktop-${version}-Linux-${arch}.${ext}
+  desktop:
+    Name: TMS Desktop
+    Comment: Tiffin Management System
+    Categories: Office;Business;
+
+appImage:
+  artifactName: TMS-Desktop-${version}-Linux.${ext}
+
+deb:
+  artifactName: TMS-Desktop-${version}-Linux.${ext}
+
+# Auto-update configuration
+publish:
+  provider: github
+  owner: ParthG1810
+  repo: TMS_DEV_NODEJS
+  releaseType: release
