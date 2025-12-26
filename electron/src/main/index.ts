@@ -249,9 +249,6 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (mainWindow === null) {
     createMainWindow();
-    if (mainWindow) {
-      mainWindow.loadURL(FRONTEND_URL);
-    }
   } else {
     mainWindow.show();
   }

@@ -25,7 +25,7 @@ export function createTray(mainWindow: BrowserWindow): void {
   const iconPath = getIconPath();
   log.info(`Creating tray with icon: ${iconPath}`);
 
-  let icon: nativeImage;
+  let icon: Electron.NativeImage;
 
   try {
     icon = nativeImage.createFromPath(iconPath);
