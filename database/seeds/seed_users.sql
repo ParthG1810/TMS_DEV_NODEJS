@@ -27,7 +27,7 @@ INSERT INTO users (
     'admin-user-001',
     'Admin User',
     'admin@tms.com',
-    '$2a$10$rQnM1YV1jK5S5L5X5X5X5O6666666666666666666666666666666',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq',
     'admin'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
@@ -42,7 +42,7 @@ INSERT INTO users (
     'regular-user-001',
     'Regular User',
     'user@tms.com',
-    '$2a$10$rQnM1YV1jK5S5L5X5X5X5O6666666666666666666666666666666',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq',
     'user'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
@@ -57,7 +57,7 @@ INSERT INTO users (
     'tester-user-001',
     'QA Tester',
     'tester@tms.com',
-    '$2a$10$rQnM1YV1jK5S5L5X5X5X5O6666666666666666666666666666666',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMye.IW0gJ7jxSJZWr1Lq3ygKwMqJvYVpJq',
     'tester'
 ) ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
