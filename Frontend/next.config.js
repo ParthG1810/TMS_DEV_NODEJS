@@ -16,6 +16,7 @@ module.exports = withTM({
   swcMinify: false,
   trailingSlash: true,
   optimizeFonts: false,
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: true,
   },
