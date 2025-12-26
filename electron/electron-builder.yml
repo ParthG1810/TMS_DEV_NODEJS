@@ -52,6 +52,8 @@ win:
   target:
     - target: nsis
       arch: [x64]
+    - target: portable
+      arch: [x64]
   icon: resources/icon.ico
   publisherName: TMS
   artifactName: TMS-Desktop-${version}-Windows-Setup.${ext}
@@ -66,6 +68,9 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: TMS Desktop
   menuCategory: TMS
+
+portable:
+  artifactName: TMS-Desktop-${version}-Windows-Portable.${ext}
 
 # macOS Configuration
 mac:
