@@ -9,17 +9,34 @@ import MenuPopover from '../../../../../components/menu-popover';
 type Props = {
   isFiltered: boolean;
   filterName: string;
+  filterPriceOperator: string;
+  filterPriceValue: string;
   onFilterName: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onFilterPriceOperator: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onFilterPriceValue: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onResetFilter: VoidFunction;
   onPrint?: VoidFunction;
   onImport?: VoidFunction;
   onExport?: VoidFunction;
 };
 
+const PRICE_OPERATORS = [
+  { value: '', label: 'Any' },
+  { value: '>', label: '>' },
+  { value: '>=', label: '>=' },
+  { value: '<', label: '<' },
+  { value: '<=', label: '<=' },
+  { value: '==', label: '=' },
+];
+
 export default function MealPlanTableToolbar({
   isFiltered,
   filterName,
+  filterPriceOperator,
+  filterPriceValue,
   onFilterName,
+  onFilterPriceOperator,
+  onFilterPriceValue,
   onResetFilter,
   onPrint,
   onImport,
@@ -41,15 +58,45 @@ export default function MealPlanTableToolbar({
       alignItems="center"
       direction={{
         xs: 'column',
-        sm: 'row',
+        md: 'row',
       }}
       sx={{ px: 2.5, py: 3 }}
     >
+      {/* Price Filter */}
+      <Stack direction="row" spacing={1} sx={{ minWidth: { md: 280 } }}>
+        <TextField
+          select
+          label="Price"
+          value={filterPriceOperator}
+          onChange={onFilterPriceOperator}
+          sx={{ width: 100 }}
+        >
+          {PRICE_OPERATORS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          type="number"
+          label="Value"
+          value={filterPriceValue}
+          onChange={onFilterPriceValue}
+          disabled={!filterPriceOperator}
+          InputProps={{
+            startAdornment: <InputAdornment position="start">$</InputAdornment>,
+          }}
+          sx={{ width: 150 }}
+        />
+      </Stack>
+
+      {/* Search */}
       <TextField
         fullWidth
         value={filterName}
         onChange={onFilterName}
-        placeholder="Search meal plan..."
+        placeholder="Search meal plan name or description..."
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
