@@ -92,7 +92,7 @@ async function handleGet(
  */
 async function handlePut(
   req: NextApiRequest,
-  res: NextApiResponse<ApiResponse<MonthlyBillingWithDetails>>,
+  res: NextApiResponse<ApiResponse<MonthlyBillingWithDetails | null>>,
   id: number
 ) {
   try {
