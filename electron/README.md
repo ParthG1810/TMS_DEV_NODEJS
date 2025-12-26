@@ -311,13 +311,107 @@ cd ../electron && rm -rf node_modules && npm install
 
 ## Environment Configuration
 
-The application requires a `.env` file in the Backend folder. Create one based on your environment:
+The application requires a `.env` file in the Backend folder for database and API configurations.
 
+### Step 1: Create the .env File
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item Backend\.env.example Backend\.env
+```
+
+**Windows (CMD):**
+```cmd
+copy Backend\.env.example Backend\.env
+```
+
+**macOS | Linux:**
 ```bash
 cp Backend/.env.example Backend/.env
 ```
 
-Edit the `.env` file with your database and API configurations.
+### Step 2: Configure Environment Variables
+
+Open `Backend/.env` in a text editor and configure the following:
+
+#### Required Settings
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DB_HOST` | MySQL server hostname | `localhost` |
+| `DB_USER` | MySQL username | `root` |
+| `DB_PASSWORD` | MySQL password | `your_password` |
+| `DB_NAME` | Database name | `tms_database` |
+| `DB_PORT` | MySQL port | `3306` |
+
+#### Optional Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NODE_ENV` | Environment mode | `development` |
+| `PORT` | Backend server port | `3000` |
+| `JWT_SECRET` | Secret key for JWT tokens | `your-secret-key` |
+| `JWT_EXPIRES_IN` | JWT token expiry | `3d` |
+
+#### Gmail Integration (Optional)
+
+For email functionality, configure Gmail OAuth:
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+| `GOOGLE_REDIRECT_URI` | OAuth redirect URL |
+
+**To get Google OAuth credentials:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable the Gmail API
+4. Go to Credentials > Create Credentials > OAuth 2.0 Client IDs
+5. Add authorized redirect URI: `http://localhost:3000/api/gmail/callback`
+
+### Step 3: Setup MySQL Database
+
+**Windows (PowerShell/CMD):**
+```cmd
+mysql -u root -p -e "CREATE DATABASE tms_database CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+**macOS | Linux:**
+```bash
+mysql -u root -p -e "CREATE DATABASE tms_database CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+### Sample .env File
+
+```env
+# Environment
+NODE_ENV=development
+
+# Server Configuration
+PORT=3000
+DEV_API=http://localhost:3000
+PRODUCTION_API=https://your-production-url.com
+
+# Database Configuration (REQUIRED)
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=YOUR_MYSQL_PASSWORD_HERE
+DB_NAME=tms_database
+DB_PORT=3306
+
+# JWT Configuration
+JWT_SECRET=change-this-to-a-random-string-in-production
+JWT_EXPIRES_IN=3d
+
+# Gmail OAuth (Optional)
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/gmail/callback
+
+# Next.js Public URL
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
 
 ---
 
