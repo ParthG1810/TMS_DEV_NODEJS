@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import cors from 'src/utils/cors';
 import { requireAdminOrManager, requireAdmin } from 'src/utils/authMiddleware';
-import { findById, updateUser, deleteUser, emailExists, resetPassword, updateUserStatus } from 'src/services/userService';
+import { findById, updateUser, deleteUser, emailExists, resetPassword } from 'src/services/userService';
 
 // ----------------------------------------------------------------------
 

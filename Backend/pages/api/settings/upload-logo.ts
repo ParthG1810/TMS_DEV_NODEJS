@@ -9,7 +9,7 @@ import { query } from '../../../src/config/database';
  */
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<ApiResponse<{ url: string }>>
+  res: NextApiResponse<ApiResponse<{ url: string } | null>>
 ) {
   await cors(req, res);
 
