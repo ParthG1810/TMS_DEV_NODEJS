@@ -50,11 +50,11 @@ asarUnpack:
 # Windows Configuration
 win:
   target:
-    - target: nsis
+    - target: portable
       arch: [x64]
   icon: resources/icon.png
   publisherName: TMS
-  artifactName: TMS-Desktop-${version}-Windows-Setup.${ext}
+  artifactName: TMS-Desktop-${version}-Windows.${ext}
 
 nsis:
   oneClick: false
