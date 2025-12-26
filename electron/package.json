@@ -19,6 +19,7 @@
     "package:win:nsis": "npm run build:all && electron-builder --win --x64 -c.win.target=nsis",
     "package:win:portable": "npm run build:all && electron-builder --win --x64 -c.win.target=portable",
     "package:win:fast": "npm run build:all && electron-builder --win --x64 -c.win.target=portable -c.asar=false",
+    "package:win:both": "npm run build:all && electron-builder --win --x64 -c.win.target=nsis -c.win.target=portable",
     "package:mac": "npm run build:all && electron-builder --mac",
     "package:linux": "npm run build:all && electron-builder --linux",
     "package:all": "npm run build:all && electron-builder --win --mac --linux",
