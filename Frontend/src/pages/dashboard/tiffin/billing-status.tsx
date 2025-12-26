@@ -165,15 +165,6 @@ export default function BillingStatusPage() {
     return (getStatusCount(status) / tableData.length) * 100;
   };
 
-  const TABS = [
-    { value: 'all', label: 'All', color: 'info', count: tableData.length },
-    { value: 'calculating', label: 'Calculating', color: 'default', count: getStatusCount('calculating') },
-    { value: 'pending', label: 'Pending Approval', color: 'warning', count: getStatusCount('pending') },
-    { value: 'finalized', label: 'Invoiced', color: 'info', count: getStatusCount('finalized') },
-    { value: 'partial_paid', label: 'Partial Paid', color: 'secondary', count: getStatusCount('partial_paid') },
-    { value: 'paid', label: 'Paid', color: 'success', count: getStatusCount('paid') },
-  ] as const;
-
   const handleFilterStatus = (event: React.SyntheticEvent<Element, Event>, newValue: string) => {
     setFilterStatus(newValue);
     setPage(0);
@@ -635,16 +626,11 @@ export default function BillingStatusPage() {
               bgcolor: 'background.neutral',
             }}
           >
-            {TABS.map((tab) => (
+            {STATUS_OPTIONS.map((tab) => (
               <Tab
-                key={tab.value}
-                value={tab.value}
-                label={tab.label}
-                icon={
-                  <Label color={tab.color} sx={{ mr: 1 }}>
-                    {tab.count}
-                  </Label>
-                }
+                key={tab}
+                label={tab === 'all' ? 'All' : getStatusLabel(tab)}
+                value={tab}
               />
             ))}
           </Tabs>
