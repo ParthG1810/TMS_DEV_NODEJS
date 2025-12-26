@@ -1,12 +1,8 @@
 import mysql from 'mysql2/promise';
 import log from 'electron-log';
-import Store from 'electron-store';
-
-// Initialize store for persisting database configuration
-const store = new Store({
-  name: 'tms-config',
-  encryptionKey: 'tms-desktop-encryption-key', // Encrypt sensitive data
-});
+import { app } from 'electron';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 
 export interface DBConfig {
   host: string;
@@ -30,36 +26,67 @@ const DEFAULT_CONFIG: DBConfig = {
   database: 'tms_db',
 };
 
-// Get database configuration from store
-export function getDBConfig(): DBConfig {
-  return {
-    host: store.get('db.host', DEFAULT_CONFIG.host) as string,
-    port: store.get('db.port', DEFAULT_CONFIG.port) as number,
-    user: store.get('db.user', DEFAULT_CONFIG.user) as string,
-    password: store.get('db.password', DEFAULT_CONFIG.password) as string,
-    database: store.get('db.database', DEFAULT_CONFIG.database) as string,
-  };
+// Get config file path
+function getConfigPath(): string {
+  const userDataPath = app.getPath('userData');
+  return join(userDataPath, 'db-config.json');
 }
 
-// Save database configuration to store
-export function saveDBConfig(config: Partial<DBConfig>): void {
-  if (config.host !== undefined) store.set('db.host', config.host);
-  if (config.port !== undefined) store.set('db.port', config.port);
-  if (config.user !== undefined) store.set('db.user', config.user);
-  if (config.password !== undefined) store.set('db.password', config.password);
-  if (config.database !== undefined) store.set('db.database', config.database);
+// Load config from file
+function loadConfig(): DBConfig {
+  const configPath = getConfigPath();
 
+  try {
+    if (existsSync(configPath)) {
+      const data = readFileSync(configPath, 'utf-8');
+      const parsed = JSON.parse(data);
+      return { ...DEFAULT_CONFIG, ...parsed };
+    }
+  } catch (error) {
+    log.error('Failed to load config:', error);
+  }
+
+  return { ...DEFAULT_CONFIG };
+}
+
+// Save config to file
+function saveConfig(config: DBConfig): void {
+  const configPath = getConfigPath();
+
+  try {
+    const dir = dirname(configPath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    log.info('Config saved to:', configPath);
+  } catch (error) {
+    log.error('Failed to save config:', error);
+  }
+}
+
+// Get database configuration
+export function getDBConfig(): DBConfig {
+  return loadConfig();
+}
+
+// Save database configuration
+export function saveDBConfig(config: Partial<DBConfig>): void {
+  const current = loadConfig();
+  const updated: DBConfig = {
+    host: config.host ?? current.host,
+    port: config.port ?? current.port,
+    user: config.user ?? current.user,
+    password: config.password ?? current.password,
+    database: config.database ?? current.database,
+  };
+  saveConfig(updated);
   log.info('Database configuration saved');
 }
 
 // Reset database configuration to defaults
 export function resetDBConfig(): void {
-  store.delete('db.host');
-  store.delete('db.port');
-  store.delete('db.user');
-  store.delete('db.password');
-  store.delete('db.database');
-
+  saveConfig(DEFAULT_CONFIG);
   log.info('Database configuration reset to defaults');
 }
 
