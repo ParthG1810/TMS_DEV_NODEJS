@@ -26,6 +26,7 @@ let isQuitting = false;
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const FRONTEND_URL = 'http://localhost:8081';
+const LOGIN_URL = `${FRONTEND_URL}/auth/login`;
 
 // Create splash screen
 function createSplashWindow(): void {
@@ -103,8 +104,8 @@ function createMainWindow(): void {
     return { action: 'deny' };
   });
 
-  // Load the frontend
-  mainWindow.loadURL(FRONTEND_URL);
+  // Load the login page directly
+  mainWindow.loadURL(LOGIN_URL);
 
   // DevTools in development
   if (isDev) {
