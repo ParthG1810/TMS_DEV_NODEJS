@@ -363,12 +363,7 @@ For email functionality, configure Gmail OAuth:
 | `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
 | `GOOGLE_REDIRECT_URI` | OAuth redirect URL |
 
-**To get Google OAuth credentials:**
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable the Gmail API
-4. Go to Credentials > Create Credentials > OAuth 2.0 Client IDs
-5. Add authorized redirect URI: `http://localhost:3000/api/gmail/callback`
+> **Detailed Setup Guide:** See [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md) for step-by-step instructions with screenshots and explanations.
 
 ### Step 3: Setup MySQL Database
 
