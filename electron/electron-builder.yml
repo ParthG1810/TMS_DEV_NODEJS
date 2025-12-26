@@ -42,10 +42,7 @@ extraResources:
     filter:
       - "**/*"
 
-asar: true
-asarUnpack:
-  - "**/*.node"
-  - "**/node_modules/**"
+asar: false
 
 # Windows Configuration
 win:
