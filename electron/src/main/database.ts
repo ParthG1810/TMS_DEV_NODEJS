@@ -1,8 +1,8 @@
-import mysql from 'mysql2/promise';
-import log from 'electron-log';
-import { app } from 'electron';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import mysql from "mysql2/promise";
+import log from "electron-log";
+import { app } from "electron";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { join, dirname } from "path";
 
 export interface DBConfig {
   host: string;
@@ -19,27 +19,27 @@ export interface ConnectionResult {
 
 // Default configuration
 const DEFAULT_CONFIG: DBConfig = {
-  host: 'localhost',
+  host: "localhost",
   port: 3306,
-  user: 'root',
-  password: '',
-  database: 'tms_db',
+  user: "root",
+  password: "Mysql",
+  database: "TmsDb_Dev",
 };
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 
 // Get config file path
 function getConfigPath(): string {
-  const userDataPath = app.getPath('userData');
-  return join(userDataPath, 'db-config.json');
+  const userDataPath = app.getPath("userData");
+  return join(userDataPath, "db-config.json");
 }
 
 // Get Backend .env path
 function getBackendEnvPath(): string {
   if (isDev) {
-    return join(__dirname, '../../../Backend/.env');
+    return join(__dirname, "../../../Backend/.env");
   } else {
-    return join(process.resourcesPath, 'backend', '.env');
+    return join(process.resourcesPath, "backend", ".env");
   }
 }
 
@@ -47,17 +47,19 @@ function getBackendEnvPath(): string {
 function parseEnvFile(content: string): Record<string, string> {
   const result: Record<string, string> = {};
 
-  content.split('\n').forEach((line) => {
+  content.split("\n").forEach((line) => {
     // Remove comments and trim
-    const trimmedLine = line.split('#')[0].trim();
+    const trimmedLine = line.split("#")[0].trim();
 
-    if (trimmedLine && trimmedLine.includes('=')) {
-      const [key, ...valueParts] = trimmedLine.split('=');
-      let value = valueParts.join('=').trim();
+    if (trimmedLine && trimmedLine.includes("=")) {
+      const [key, ...valueParts] = trimmedLine.split("=");
+      let value = valueParts.join("=").trim();
 
       // Remove quotes if present
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))) {
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
         value = value.slice(1, -1);
       }
 
@@ -75,7 +77,7 @@ function loadFromBackendEnv(): DBConfig | null {
   try {
     if (existsSync(envPath)) {
       log.info(`Loading database config from Backend/.env: ${envPath}`);
-      const content = readFileSync(envPath, 'utf-8');
+      const content = readFileSync(envPath, "utf-8");
       const env = parseEnvFile(content);
 
       const config: DBConfig = {
@@ -86,11 +88,13 @@ function loadFromBackendEnv(): DBConfig | null {
         database: env.DB_NAME || DEFAULT_CONFIG.database,
       };
 
-      log.info(`Loaded config from Backend/.env - host: ${config.host}, port: ${config.port}, user: ${config.user}, database: ${config.database}`);
+      log.info(
+        `Loaded config from Backend/.env - host: ${config.host}, port: ${config.port}, user: ${config.user}, database: ${config.database}`
+      );
       return config;
     }
   } catch (error) {
-    log.error('Failed to load Backend/.env:', error);
+    log.error("Failed to load Backend/.env:", error);
   }
 
   return null;
@@ -103,12 +107,12 @@ function loadFromConfigFile(): DBConfig | null {
   try {
     if (existsSync(configPath)) {
       log.info(`Loading database config from: ${configPath}`);
-      const data = readFileSync(configPath, 'utf-8');
+      const data = readFileSync(configPath, "utf-8");
       const parsed = JSON.parse(data);
       return { ...DEFAULT_CONFIG, ...parsed };
     }
   } catch (error) {
-    log.error('Failed to load config file:', error);
+    log.error("Failed to load config file:", error);
   }
 
   return null;
@@ -132,7 +136,7 @@ function loadConfig(): DBConfig {
   }
 
   // Finally, use defaults
-  log.info('Using default database configuration');
+  log.info("Using default database configuration");
   return { ...DEFAULT_CONFIG };
 }
 
@@ -145,10 +149,10 @@ function saveConfig(config: DBConfig): void {
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
-    writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
-    log.info('Config saved to:', configPath);
+    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+    log.info("Config saved to:", configPath);
   } catch (error) {
-    log.error('Failed to save config:', error);
+    log.error("Failed to save config:", error);
   }
 }
 
@@ -168,20 +172,22 @@ export function saveDBConfig(config: Partial<DBConfig>): void {
     database: config.database ?? current.database,
   };
   saveConfig(updated);
-  log.info('Database configuration saved');
+  log.info("Database configuration saved");
 }
 
 // Reset database configuration to defaults
 export function resetDBConfig(): void {
   saveConfig(DEFAULT_CONFIG);
-  log.info('Database configuration reset to defaults');
+  log.info("Database configuration reset to defaults");
 }
 
 // Check MySQL connection
 export async function checkMySQLConnection(): Promise<ConnectionResult> {
   const config = getDBConfig();
 
-  log.info(`Checking MySQL connection to ${config.host}:${config.port}/${config.database}`);
+  log.info(
+    `Checking MySQL connection to ${config.host}:${config.port}/${config.database}`
+  );
   log.info(`Using user: ${config.user}`);
 
   try {
@@ -195,44 +201,44 @@ export async function checkMySQLConnection(): Promise<ConnectionResult> {
     });
 
     // Test query
-    await connection.query('SELECT 1 as test');
+    await connection.query("SELECT 1 as test");
 
     // Get MySQL version
-    const [rows] = await connection.query('SELECT VERSION() as version');
-    const version = (rows as any[])[0]?.version || 'Unknown';
+    const [rows] = await connection.query("SELECT VERSION() as version");
+    const version = (rows as any[])[0]?.version || "Unknown";
     log.info(`MySQL version: ${version}`);
 
     await connection.end();
 
-    log.info('MySQL connection test successful');
+    log.info("MySQL connection test successful");
     return { success: true };
   } catch (error: any) {
-    log.error('MySQL connection failed:', error.message);
-    log.error('Error code:', error.code);
+    log.error("MySQL connection failed:", error.message);
+    log.error("Error code:", error.code);
 
-    let errorMessage = 'Unknown database error';
+    let errorMessage = "Unknown database error";
 
     switch (error.code) {
-      case 'ECONNREFUSED':
+      case "ECONNREFUSED":
         errorMessage = `Cannot connect to MySQL at ${config.host}:${config.port}.\n\nPlease ensure MySQL server is installed and running.`;
         break;
-      case 'ER_ACCESS_DENIED_ERROR':
+      case "ER_ACCESS_DENIED_ERROR":
         errorMessage = `Access denied for user '${config.user}'.\n\nPlease check your username and password.`;
         break;
-      case 'ER_BAD_DB_ERROR':
+      case "ER_BAD_DB_ERROR":
         errorMessage = `Database '${config.database}' does not exist.\n\nPlease create the database first:\nCREATE DATABASE ${config.database};`;
         break;
-      case 'ETIMEDOUT':
+      case "ETIMEDOUT":
         errorMessage = `Connection timed out to ${config.host}:${config.port}.\n\nPlease check if MySQL is accessible.`;
         break;
-      case 'ENOTFOUND':
+      case "ENOTFOUND":
         errorMessage = `Host '${config.host}' not found.\n\nPlease check the hostname.`;
         break;
-      case 'ER_NOT_SUPPORTED_AUTH_MODE':
+      case "ER_NOT_SUPPORTED_AUTH_MODE":
         errorMessage = `Authentication mode not supported.\n\nTry running in MySQL:\nALTER USER '${config.user}'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your_password';`;
         break;
       default:
-        errorMessage = error.message || 'Unknown database error';
+        errorMessage = error.message || "Unknown database error";
     }
 
     return { success: false, error: errorMessage };
@@ -240,10 +246,14 @@ export async function checkMySQLConnection(): Promise<ConnectionResult> {
 }
 
 // Test connection with custom config (without saving)
-export async function testConnection(config: Partial<DBConfig>): Promise<ConnectionResult> {
+export async function testConnection(
+  config: Partial<DBConfig>
+): Promise<ConnectionResult> {
   const fullConfig = { ...getDBConfig(), ...config };
 
-  log.info(`Testing connection to ${fullConfig.host}:${fullConfig.port}/${fullConfig.database}`);
+  log.info(
+    `Testing connection to ${fullConfig.host}:${fullConfig.port}/${fullConfig.database}`
+  );
 
   try {
     const connection = await mysql.createConnection({
@@ -255,13 +265,13 @@ export async function testConnection(config: Partial<DBConfig>): Promise<Connect
       connectTimeout: 10000,
     });
 
-    await connection.query('SELECT 1');
+    await connection.query("SELECT 1");
     await connection.end();
 
-    log.info('Test connection successful');
+    log.info("Test connection successful");
     return { success: true };
   } catch (error: any) {
-    log.error('Test connection failed:', error.message);
+    log.error("Test connection failed:", error.message);
     return { success: false, error: error.message };
   }
 }
@@ -292,7 +302,7 @@ export async function ensureDatabaseExists(): Promise<ConnectionResult> {
     log.info(`Database '${config.database}' ensured`);
     return { success: true };
   } catch (error: any) {
-    log.error('Failed to create database:', error.message);
+    log.error("Failed to create database:", error.message);
     return { success: false, error: error.message };
   }
 }
@@ -318,11 +328,11 @@ export async function getDatabaseStatus(): Promise<{
     });
 
     // Get version
-    const [versionRows] = await connection.query('SELECT VERSION() as version');
+    const [versionRows] = await connection.query("SELECT VERSION() as version");
     const version = (versionRows as any[])[0]?.version;
 
     // Get table count
-    const [tableRows] = await connection.query('SHOW TABLES');
+    const [tableRows] = await connection.query("SHOW TABLES");
     const tableCount = (tableRows as any[]).length;
 
     await connection.end();
