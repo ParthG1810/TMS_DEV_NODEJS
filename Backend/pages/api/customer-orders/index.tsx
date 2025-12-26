@@ -247,7 +247,7 @@ async function handleCreateCustomerOrder(
 
     // Auto-create calendar entries for all plan days with status 'T' (delivered)
     // This pre-populates the billing calendar so customers only need to mark absences
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayNames: DayName[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     // Parse dates as local dates (not UTC) to avoid timezone issues
     const [startYear, startMonth, startDay] = formattedStartDate.split('-').map(Number);
