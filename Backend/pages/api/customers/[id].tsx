@@ -195,7 +195,7 @@ async function handleUpdateCustomer(
 
 /**
  * DELETE /api/customers/:id
- * Delete a customer (cascade deletes their orders)
+ * Delete a customer (only if they have no orders)
  */
 async function handleDeleteCustomer(
   req: NextApiRequest,
@@ -215,7 +215,20 @@ async function handleDeleteCustomer(
       });
     }
 
-    // Delete customer (orders will be cascade deleted due to FK constraint)
+    // Check if customer has any orders
+    const orders = (await query(
+      'SELECT COUNT(*) as count FROM customer_orders WHERE customer_id = ?',
+      [id]
+    )) as any[];
+
+    if (orders[0].count > 0) {
+      return res.status(409).json({
+        success: false,
+        error: 'Cannot delete customer that has orders',
+      });
+    }
+
+    // Delete customer
     await query('DELETE FROM customers WHERE id = ?', [id]);
 
     return res.status(200).json({

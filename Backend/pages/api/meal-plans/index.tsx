@@ -44,9 +44,13 @@ async function handleGetMealPlans(
   res: NextApiResponse<ApiResponse>
 ) {
   try {
+    // Fetch meal plans with order count
     const mealPlans = (await query(
-      'SELECT * FROM meal_plans ORDER BY created_at DESC'
-    )) as MealPlan[];
+      `SELECT mp.*,
+        (SELECT COUNT(*) FROM customer_orders WHERE meal_plan_id = mp.id) as order_count
+       FROM meal_plans mp
+       ORDER BY mp.created_at DESC`
+    )) as (MealPlan & { order_count: number })[];
 
     return res.status(200).json({
       success: true,

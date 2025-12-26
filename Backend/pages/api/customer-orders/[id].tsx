@@ -160,7 +160,7 @@ async function handleUpdateCustomerOrder(
       selected_days = daysArray as any;
     }
 
-    // Check if order exists
+    // Check if order exists and get payment_status
     const existingOrders = (await query('SELECT * FROM customer_orders WHERE id = ?', [
       id,
     ])) as any[];
@@ -169,6 +169,22 @@ async function handleUpdateCustomerOrder(
       return res.status(404).json({
         success: false,
         error: 'Order not found',
+      });
+    }
+
+    // LOCK: Prevent editing if order is in locked states (finalized, paid, or partial_paid)
+    const order = existingOrders[0];
+    if (order.payment_status && ['finalized', 'paid', 'partial_paid'].includes(order.payment_status)) {
+      const statusMessages: { [key: string]: string } = {
+        finalized: 'This order is locked because the billing has been approved. The order cannot be modified.',
+        paid: 'This order is locked because payment has been completed. The order is read-only.',
+        partial_paid: 'This order is locked because partial payment has been received. The order is read-only.',
+      };
+      const message = statusMessages[order.payment_status] || 'This order is locked and cannot be modified.';
+
+      return res.status(403).json({
+        success: false,
+        error: message,
       });
     }
 
@@ -365,7 +381,7 @@ async function handleDeleteCustomerOrder(
   try {
     // Check if order exists and get order details
     const existingOrders = (await query(
-      'SELECT customer_id, start_date, end_date FROM customer_orders WHERE id = ?',
+      'SELECT customer_id, start_date, end_date, payment_status FROM customer_orders WHERE id = ?',
       [id]
     )) as any[];
 
@@ -377,6 +393,22 @@ async function handleDeleteCustomerOrder(
     }
 
     const order = existingOrders[0];
+
+    // Prevent deletion if payment_status is in locked states
+    if (order.payment_status && ['pending', 'finalized', 'paid', 'partial_paid'].includes(order.payment_status)) {
+      const statusMessages: { [key: string]: string } = {
+        pending: 'billing is pending approval. Please reject or approve the billing first.',
+        finalized: 'billing has been approved. The order is locked and cannot be deleted.',
+        paid: 'payment has been completed. The order is read-only and cannot be deleted.',
+        partial_paid: 'partial payment has been received. The order is read-only and cannot be deleted.',
+      };
+      const message = statusMessages[order.payment_status] || 'order is locked.';
+
+      return res.status(403).json({
+        success: false,
+        error: `Cannot delete order - ${message}`,
+      });
+    }
     const customerId = order.customer_id;
     const startDate = new Date(order.start_date);
     const endDate = new Date(order.end_date);

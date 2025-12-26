@@ -166,30 +166,25 @@ async function handleCreateCustomerOrder(
       price,
       start_date,
       end_date,
+      parent_order_id, // Optional: links extra tiffin orders to parent meal plan
     } = req.body as any; // Use any to allow flexible type handling
 
     // Robust handling of selected_days - ensure it's always an array
-    console.log('[v2] Handling selected_days input:', typeof selected_days, selected_days);
     let daysArray: string[] = [];
 
     if (Array.isArray(selected_days)) {
       // Already an array - use as is
       daysArray = selected_days;
-      console.log('[v2] selected_days is array:', daysArray);
     } else if (typeof selected_days === 'string') {
       // String format - could be comma-separated or JSON string
       try {
         // Try parsing as JSON first
         daysArray = JSON.parse(selected_days);
-        console.log('[v2] selected_days parsed from JSON string:', daysArray);
       } catch {
         // If JSON parse fails, treat as comma-separated string
         daysArray = selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
-        console.log('[v2] selected_days parsed from comma-separated string:', daysArray);
       }
     }
-
-    console.log('[v2] Final daysArray before validation:', daysArray);
 
     // Validation
     const errors = await validateCustomerOrderInput({
@@ -214,34 +209,82 @@ async function handleCreateCustomerOrder(
     const formattedEndDate = new Date(end_date).toISOString().split('T')[0];
 
     // Check for duplicate orders (same customer, meal plan, and date range)
-    const duplicateCheck = (await query(
-      `SELECT id FROM customer_orders
-       WHERE customer_id = ?
-       AND meal_plan_id = ?
-       AND start_date = ?
-       AND end_date = ?
-       LIMIT 1`,
-      [customer_id, meal_plan_id, formattedStartDate, formattedEndDate]
-    )) as any[];
+    // Only check for duplicates if this is NOT an extra tiffin order (no parent_order_id)
+    // Extra tiffin orders (with parent_order_id) are allowed to have the same dates
+    if (!parent_order_id) {
+      const duplicateCheck = (await query(
+        `SELECT id FROM customer_orders
+         WHERE customer_id = ?
+         AND meal_plan_id = ?
+         AND start_date = ?
+         AND end_date = ?
+         AND (parent_order_id IS NULL OR parent_order_id = 0)
+         LIMIT 1`,
+        [customer_id, meal_plan_id, formattedStartDate, formattedEndDate]
+      )) as any[];
 
-    if (duplicateCheck.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Duplicate order: An order with the same customer, meal plan, and date range already exists',
-      });
+      if (duplicateCheck.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Duplicate order: An order with the same customer, meal plan, and date range already exists',
+        });
+      }
     }
 
     // Convert selected_days to JSON string for database storage
     const selectedDaysJson = JSON.stringify(daysArray);
-    console.log('[v2] Storing in database as JSON:', selectedDaysJson);
 
-    // Insert customer order
+    // Insert customer order with payment_status='calculating' (initial state)
+    // parent_order_id is used to link extra tiffin orders to their parent meal plan
+    const parentOrderIdValue = parent_order_id ? Number(parent_order_id) : null;
     const result = (await query(
-      'INSERT INTO customer_orders (customer_id, meal_plan_id, quantity, selected_days, price, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [customer_id, meal_plan_id, quantity, selectedDaysJson, price, formattedStartDate, formattedEndDate]
+      'INSERT INTO customer_orders (customer_id, meal_plan_id, quantity, selected_days, price, start_date, end_date, payment_status, parent_order_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [customer_id, meal_plan_id, quantity, selectedDaysJson, price, formattedStartDate, formattedEndDate, 'calculating', parentOrderIdValue]
     )) as any;
 
     const orderId = result.insertId;
+
+    // Auto-create calendar entries for all plan days with status 'T' (delivered)
+    // This pre-populates the billing calendar so customers only need to mark absences
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    // Parse dates as local dates (not UTC) to avoid timezone issues
+    const [startYear, startMonth, startDay] = formattedStartDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = formattedEndDate.split('-').map(Number);
+    const startDateObj = new Date(startYear, startMonth - 1, startDay);
+    const endDateObj = new Date(endYear, endMonth - 1, endDay);
+
+    // Get the order price per day (for single-day pricing)
+    const pricePerDay = Number(price) / (daysArray.length > 0 ? daysArray.length : 1);
+
+    let currentDate = new Date(startDateObj);
+    const calendarEntries: { delivery_date: string; status: string }[] = [];
+
+    while (currentDate <= endDateObj) {
+      const dayOfWeek = dayNames[currentDate.getDay()];
+
+      // Check if this day is in the selected_days array
+      if (daysArray.length === 0 || daysArray.includes(dayOfWeek)) {
+        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+        calendarEntries.push({ delivery_date: dateStr, status: 'T' });
+      }
+
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Bulk insert calendar entries
+    if (calendarEntries.length > 0) {
+      const insertValues = calendarEntries.map(entry =>
+        `(${customer_id}, ${orderId}, '${entry.delivery_date}', '${entry.status}', 1, 0)`
+      ).join(', ');
+
+      await query(`
+        INSERT INTO tiffin_calendar_entries (customer_id, order_id, delivery_date, status, quantity, price)
+        VALUES ${insertValues}
+        ON DUPLICATE KEY UPDATE status = VALUES(status), order_id = VALUES(order_id)
+      `);
+    }
 
     // Fetch the created order with details
     const createdOrders = (await query(
@@ -264,28 +307,21 @@ async function handleCreateCustomerOrder(
     )) as any[];
 
     // Parse JSON selected_days with defensive handling
-    console.log('[v2] Retrieved from database:', typeof createdOrders[0].selected_days, createdOrders[0].selected_days);
-
     let parsedDays: string[];
 
     // Check if it's already an array (MySQL driver may auto-parse JSON columns)
     if (Array.isArray(createdOrders[0].selected_days)) {
       parsedDays = createdOrders[0].selected_days;
-      console.log('[v2] selected_days already an array:', parsedDays);
     } else if (typeof createdOrders[0].selected_days === 'string') {
       // It's a string - try parsing
       try {
         parsedDays = JSON.parse(createdOrders[0].selected_days);
-        console.log('[v2] Successfully parsed selected_days from JSON string:', parsedDays);
       } catch (error) {
-        console.error('[v2] JSON.parse failed, trying comma-separated parsing');
         // If parse fails, try to handle as comma-separated string
         parsedDays = createdOrders[0].selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
-        console.log('[v2] Parsed as comma-separated string:', parsedDays);
       }
     } else {
       parsedDays = [];
-      console.error('[v2] Unexpected type for selected_days:', typeof createdOrders[0].selected_days);
     }
 
     const orderWithParsedDays = {

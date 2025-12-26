@@ -105,6 +105,17 @@ async function handlePut(
     );
 
     if (existing.length === 0) {
+      // If billing doesn't exist and we're trying to set it to 'calculating',
+      // that's already achieved - return success instead of 404
+      if (body.status === 'calculating') {
+        return res.status(200).json({
+          success: true,
+          data: null,
+          message: 'Billing record does not exist, no action needed',
+        });
+      }
+
+      // For other operations, return 404
       return res.status(404).json({
         success: false,
         error: 'Billing record not found',
@@ -122,7 +133,22 @@ async function handlePut(
         });
       }
 
-      // Update to finalized status
+      // Get billing info first (we need customer_id and billing_month)
+      const billingInfo = await query<any[]>(
+        'SELECT mb.customer_id, mb.billing_month, mb.total_amount, c.name AS customer_name FROM monthly_billing mb INNER JOIN customers c ON mb.customer_id = c.id WHERE mb.id = ?',
+        [id]
+      );
+
+      if (billingInfo.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Billing record not found',
+        });
+      }
+
+      const { customer_id, billing_month } = billingInfo[0];
+
+      // Update monthly_billing to pending status
       await query(
         `
           UPDATE monthly_billing
@@ -137,17 +163,35 @@ async function handlePut(
         [finalize.finalized_by, finalize.notes || null, id]
       );
 
+      // Update all customer_orders for this customer in this month to payment_status='pending'
+      // This ensures orders are marked as pending when billing is finalized
+      const [year, month] = billing_month.split('-');
+      const firstDay = `${billing_month}-01`;
+      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+      const lastDayStr = `${billing_month}-${String(lastDay).padStart(2, '0')}`;
+
+      await query(
+        `
+          UPDATE customer_orders
+          SET payment_status = 'pending',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE customer_id = ?
+            AND (
+              (start_date <= ? AND end_date >= ?)
+              OR (start_date >= ? AND start_date <= ?)
+            )
+        `,
+        [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
+      );
+
       // Delete any existing notifications for this billing (in case of re-finalize)
       await query(
         'DELETE FROM payment_notifications WHERE billing_id = ? AND notification_type = ?',
         [id, 'billing_pending_approval']
       );
 
-      // Create new notification
-      const billing = await query<any[]>(
-        'SELECT mb.customer_id, mb.billing_month, mb.total_amount, c.name AS customer_name FROM monthly_billing mb INNER JOIN customers c ON mb.customer_id = c.id WHERE mb.id = ?',
-        [id]
-      );
+      // Use the billing info we already fetched
+      const billing = billingInfo;
 
       if (billing.length > 0) {
         await query(
@@ -166,7 +210,7 @@ async function handlePut(
             `Billing Pending Approval - ${billing[0].customer_name}`,
             `Billing for ${billing[0].customer_name} (${billing[0].billing_month}) has been finalized and is pending approval. Total amount: CAD $${Number(billing[0].total_amount).toFixed(2)}`,
             'high',
-            `/dashboard/tiffin/billing-calendar?month=${billing[0].billing_month}`,
+            `/dashboard/tiffin/billing-details?id=${id}`,
           ]
         );
       }
@@ -180,7 +224,20 @@ async function handlePut(
         params.push(body.notes || null);
       }
 
-      if (body.status && ['calculating', 'pending', 'finalized', 'paid'].includes(body.status)) {
+      // Check if status is being changed to 'calculating' (rejection)
+      const isRejection = body.status === 'calculating' && existing[0].status !== 'calculating';
+
+      // Check if status is being changed to 'finalized' (approval)
+      const isApproval = body.status === 'finalized' && existing[0].status !== 'finalized';
+
+      console.log('Status Update Debug:', {
+        currentStatus: existing[0].status,
+        newStatus: body.status,
+        isApproval,
+        isRejection,
+      });
+
+      if (body.status && ['calculating', 'pending', 'finalized', 'paid', 'partial_paid'].includes(body.status)) {
         updates.push('status = ?');
         params.push(body.status);
       }
@@ -199,6 +256,99 @@ async function handlePut(
         `UPDATE monthly_billing SET ${updates.join(', ')} WHERE id = ?`,
         params
       );
+
+      // Handle rejection: delete notifications and reset related statuses
+      if (isRejection) {
+        // Get billing info for customer_id and billing_month
+        const billingInfo = await query<any[]>(
+          'SELECT customer_id, billing_month FROM monthly_billing WHERE id = ?',
+          [id]
+        );
+
+        if (billingInfo.length > 0) {
+          const { customer_id, billing_month } = billingInfo[0];
+
+          // Delete all notifications related to this billing
+          await query(
+            'DELETE FROM payment_notifications WHERE billing_id = ?',
+            [id]
+          );
+
+          // Reset customer_orders payment_status back to 'calculating' for this billing period
+          const [year, month] = billing_month.split('-');
+          const firstDay = `${billing_month}-01`;
+          const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+          const lastDayStr = `${billing_month}-${String(lastDay).padStart(2, '0')}`;
+
+          await query(
+            `
+              UPDATE customer_orders
+              SET payment_status = 'calculating',
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE customer_id = ?
+                AND (
+                  (start_date <= ? AND end_date >= ?)
+                  OR (start_date >= ? AND start_date <= ?)
+                )
+            `,
+            [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
+          );
+
+          // Trigger recalculation by clearing finalized_at and finalized_by
+          await query(
+            `
+              UPDATE monthly_billing
+              SET finalized_at = NULL,
+                  finalized_by = NULL,
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `,
+            [id]
+          );
+        }
+      }
+
+      // Handle approval: update customer orders to 'finalized' status
+      if (isApproval) {
+        console.log('Approval triggered - updating customer orders to finalized');
+
+        // Get billing info for customer_id and billing_month
+        const billingInfo = await query<any[]>(
+          'SELECT customer_id, billing_month FROM monthly_billing WHERE id = ?',
+          [id]
+        );
+
+        if (billingInfo.length > 0) {
+          const { customer_id, billing_month } = billingInfo[0];
+          console.log('Updating orders for customer:', customer_id, 'billing_month:', billing_month);
+
+          // Update customer_orders payment_status to 'finalized' for this billing period
+          const [year, month] = billing_month.split('-');
+          const firstDay = `${billing_month}-01`;
+          const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+          const lastDayStr = `${billing_month}-${String(lastDay).padStart(2, '0')}`;
+
+          const result = await query(
+            `
+              UPDATE customer_orders
+              SET payment_status = 'finalized',
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE customer_id = ?
+                AND (
+                  (start_date <= ? AND end_date >= ?)
+                  OR (start_date >= ? AND start_date <= ?)
+                )
+            `,
+            [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
+          );
+
+          console.log('Customer orders update result:', result);
+        } else {
+          console.log('No billing info found for id:', id);
+        }
+      } else {
+        console.log('Approval NOT triggered');
+      }
     }
 
     // Fetch updated billing

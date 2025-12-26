@@ -138,6 +138,7 @@ export type IMealPlan = {
   frequency: MealFrequency;
   days: MealDays;
   price: number;
+  order_count?: number;
   created_at: Date | string;
   updated_at: Date | string;
 };
@@ -156,6 +157,7 @@ export type ICustomer = {
   name: string;
   phone?: string;
   address: string;
+  order_count?: number;
   created_at: Date | string;
   updated_at: Date | string;
 };
@@ -202,9 +204,13 @@ export type ICustomerOrderFormValues = {
 
 // Daily Tiffin Count
 export type IDailyTiffinCount = {
+  customer_id: number;
   customer_name: string;
+  customer_phone?: string;
+  customer_address?: string;
   quantity: number;
   meal_plan_name: string;
+  print_order: number;
 };
 
 export type IDailyTiffinSummary = {
@@ -240,9 +246,9 @@ export type ICustomerOrderState = {
 // Payment Management Types
 // ----------------------------------------------------------------------
 
-export type PaymentStatus = 'pending' | 'received' | 'calculating';
+export type PaymentStatus = 'calculating' | 'pending' | 'finalized' | 'paid' | 'partial_paid';
 export type CalendarEntryStatus = 'T' | 'A' | 'E';
-export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid';
+export type BillingStatus = 'calculating' | 'pending' | 'finalized' | 'paid' | 'partial_paid';
 export type NotificationType = 'month_end_calculation' | 'payment_received' | 'payment_overdue';
 export type NotificationPriority = 'low' | 'medium' | 'high';
 
@@ -358,13 +364,19 @@ export type ICalendarCustomerData = {
   total_absent: number;
   total_extra: number;
   total_amount: number;
+  // Per-order billing status (for individual order finalization)
   billing_status: BillingStatus;
-  billing_id?: number;
+  billing_id?: number; // order_billing.id
+  order_billing_id?: number; // order_billing.id (alias)
+  // Combined invoice billing (for customer-level finalization)
+  combined_billing_id?: number;
+  combined_billing_status?: BillingStatus;
   orders?: Array<{
     id: number;
     start_date: string;
     end_date: string;
     selected_days?: string[]; // Array of day names: ['Monday', 'Tuesday', etc.]
+    meal_plan_name?: string; // Name of the meal plan for this order
   }>;
 };
 

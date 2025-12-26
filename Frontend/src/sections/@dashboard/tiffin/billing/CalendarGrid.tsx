@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
 // @mui
 import {
   Card,
@@ -33,6 +34,8 @@ import { useDispatch } from '../../../../redux/store';
 import { createCalendarEntry, finalizeBilling } from '../../../../redux/slices/payment';
 // types
 import { ICalendarCustomerData, CalendarEntryStatus } from '../../../../@types/tms';
+// paths
+import { PATH_DASHBOARD } from '../../../../routes/paths';
 
 // ----------------------------------------------------------------------
 
@@ -157,16 +160,18 @@ interface CalendarGridProps {
   year: number;
   month: number; // 1-12
   customers: ICalendarCustomerData[];
-  onUpdate: () => void;
+  onUpdate: () => void | Promise<void>;
 }
 
 export default function CalendarGrid({ year, month, customers, onUpdate }: CalendarGridProps) {
+  const router = useRouter();
   const dispatch = useDispatch();
   const { enqueueSnackbar } = useSnackbar();
 
   const [selectedCustomer, setSelectedCustomer] = useState<ICalendarCustomerData | null>(null);
   const [openFinalizeDialog, setOpenFinalizeDialog] = useState(false);
   const [finalizingCustomerId, setFinalizingCustomerId] = useState<number | null>(null);
+
 
   // Extra tiffin order dialog state
   const [openExtraDialog, setOpenExtraDialog] = useState(false);
@@ -176,10 +181,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     customer_name: string;
     delivery_date: string;
     order_id: number;
+    parent_order_id?: number; // Links extra tiffin to parent meal plan order
   } | null>(null);
   const [mealPlans, setMealPlans] = useState<any[]>([]);
   const [selectedMealPlan, setSelectedMealPlan] = useState<number | null>(null);
   const [extraPrice, setExtraPrice] = useState<string>('');
+
+  // Processing lock to prevent duplicate execution of handleCellClick
+  const processingRef = useRef<Set<string>>(new Set());
 
   // Fetch meal plans on component mount
   useEffect(() => {
@@ -188,7 +197,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         const response = await axios.get('/api/meal-plans');
         setMealPlans(response.data.data || []);
       } catch (error) {
-        console.error('Error fetching meal plans:', error);
+        // Silently handle error
       }
     };
     fetchMealPlans();
@@ -257,9 +266,26 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     currentStatus: CalendarEntryStatus | null,
     isPlanDay: boolean
   ) => {
+    // Create unique key for this cell to prevent duplicate processing
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const cellKey = `${customer.customer_id}-${date}`;
+
+    // Check if this cell is already being processed
+    if (processingRef.current.has(cellKey)) {
+      return;
+    }
+
+    // Block editing if billing is not in 'calculating' status
+    if (customer.billing_status && customer.billing_status !== 'calculating') {
+      enqueueSnackbar(
+        `Cannot modify calendar - billing is ${customer.billing_status}. Please reject billing first.`,
+        { variant: 'warning' }
+      );
+      return;
+    }
+
     // Get customer's orders
     const orders = customer.orders || [];
-    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     // Find an order that covers this date
     const activeOrder = orders.find((order) => {
@@ -270,6 +296,9 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     // For plan days: cycle through Blank → T → A → Blank
     if (isPlanDay && activeOrder) {
+      // Add to processing set
+      processingRef.current.add(cellKey);
+
       // Determine next status in the cycle
       let newStatus: CalendarEntryStatus | null = null;
       let shouldDelete = false;
@@ -287,10 +316,10 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
       try {
         if (shouldDelete) {
-          // Delete the entry to clear it
+          // Delete the entry to clear it - use order_id for specific order isolation
           await axios.delete('/api/calendar-entries', {
             params: {
-              customer_id: customer.customer_id,
+              order_id: activeOrder.id,
               delivery_date: date,
             },
           });
@@ -322,75 +351,127 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
         onUpdate(); // Refresh the calendar
       } catch (error) {
-        console.error('Error updating calendar entry:', error);
         enqueueSnackbar('Failed to update entry', { variant: 'error' });
+      } finally {
+        // Remove from processing set
+        processingRef.current.delete(cellKey);
       }
+
+      return; // Exit early for plan days
     }
 
     // For non-plan days with 'E' status: remove the entry and delete the order
     if (!isPlanDay && currentStatus === 'E') {
+      // Add to processing set
+      processingRef.current.add(cellKey);
+
       try {
-        // First, get the calendar entry to find the order_id
-        const entryResponse = await axios.get('/api/calendar-entries', {
+        // Get all orders for this customer in the current month
+        const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+        const ordersResponse = await axios.get('/api/customer-orders', {
           params: {
-            customer_id: customer.customer_id,
-            delivery_date: date,
+            filter: 'monthly',
+            month: monthStr,
           },
         });
 
-        // GET returns an array, so we need to get the first element
-        const entries = entryResponse.data?.data;
-        const orderId = entries && entries.length > 0 ? entries[0].order_id : null;
+        const allOrders = ordersResponse.data?.data?.orders || [];
 
-        if (orderId) {
-          // Get the order details to check if it's a Single day order (extra tiffin)
-          const orderResponse = await axios.get(`/api/customer-orders/${orderId}`);
-          const order = orderResponse.data?.data;
+        // Filter to find the extra tiffin order matching this exact date
+        const customerOrders = allOrders.filter((order: any) => order.customer_id === customer.customer_id);
 
-          // Normalize dates to string format (YYYY-MM-DD) for comparison
-          const orderStartDate = order?.start_date?.split('T')[0] || order?.start_date;
-          const orderEndDate = order?.end_date?.split('T')[0] || order?.end_date;
+        // Extra tiffin orders are single-day orders with a parent_order_id
+        const extraTiffinOrder = customerOrders.find((order: any) => {
+          const orderStartDate = order.start_date?.split('T')[0] || order.start_date;
+          const orderEndDate = order.end_date?.split('T')[0] || order.end_date;
 
-          // Only delete the order if it's a Single day order with meal_plan_days = 'Single'
-          // This prevents deleting the main plan order (Mon-Fri, Mon-Sat)
-          if (order && orderStartDate === orderEndDate && order.meal_plan_days === 'Single') {
-            // This is an extra tiffin order - safe to delete
-            await axios.delete(`/api/customer-orders/${orderId}`);
-            enqueueSnackbar('Extra tiffin order removed', { variant: 'info' });
-          } else {
-            // This is a plan order - just delete the calendar entry, not the order
-            await axios.delete('/api/calendar-entries', {
-              params: {
+          // Extra tiffins have:
+          // 1. start_date === end_date (single day)
+          // 2. Both dates match the clicked date
+          // 3. parent_order_id is set (links to main order)
+          return (
+            orderStartDate === date &&
+            orderEndDate === date &&
+            order.parent_order_id != null &&
+            order.parent_order_id > 0
+          );
+        });
+
+        if (extraTiffinOrder) {
+          const deleteResult = await axios.delete(`/api/customer-orders/${extraTiffinOrder.id}`);
+
+          if (deleteResult.data?.success) {
+            // Also delete the calendar entry
+            // The entry's order_id is set to parent_order_id, not the extra order's ID
+            try {
+              const calendarDeleteResult = await axios.delete('/api/calendar-entries', {
+                params: {
+                  order_id: extraTiffinOrder.parent_order_id, // Calendar entry uses parent order ID
+                  customer_id: customer.customer_id,
+                  delivery_date: date,
+                },
+              });
+            } catch (calendarError: any) {
+              // Continue anyway - order is already deleted
+            }
+
+            enqueueSnackbar('Extra tiffin order removed', { variant: 'success' });
+
+            // Revert billing status if it was finalized
+            await revertBillingIfFinalized(customer);
+
+            // Explicitly recalculate billing to ensure accurate data
+            // This calls sp_calculate_monthly_billing stored procedure
+            try {
+              const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+              enqueueSnackbar('Recalculating billing...', { variant: 'info' });
+
+              const recalcResult = await axios.post('/api/monthly-billing', {
                 customer_id: customer.customer_id,
-                delivery_date: date,
-              },
-            });
-            enqueueSnackbar('Calendar entry removed', { variant: 'info' });
+                billing_month: billingMonth,
+              });
+
+              if (recalcResult.data?.success) {
+                // Billing successfully recalculated, now refresh UI
+                onUpdate();
+              } else {
+                enqueueSnackbar('Billing recalculation failed - refreshing anyway', { variant: 'warning' });
+                onUpdate();
+              }
+            } catch (recalcError: any) {
+              enqueueSnackbar('Error recalculating billing - refreshing anyway', { variant: 'warning' });
+              onUpdate();
+            }
+          } else {
+            enqueueSnackbar('Failed to remove order: ' + (deleteResult.data?.error || 'Unknown error'), { variant: 'error' });
           }
         } else {
-          // Fallback: just delete the calendar entry if no order found
-          await axios.delete('/api/calendar-entries', {
-            params: {
-              customer_id: customer.customer_id,
-              delivery_date: date,
-            },
-          });
-          enqueueSnackbar('Extra tiffin removed', { variant: 'info' });
+          // If no extra order found, it might have been a manually created calendar entry
+          enqueueSnackbar('No extra tiffin order found to remove', { variant: 'warning' });
         }
-
-        // Revert billing status if it was finalized
-        await revertBillingIfFinalized(customer);
-
-        onUpdate();
-      } catch (error) {
-        console.error('Error removing extra tiffin:', error);
-        enqueueSnackbar('Failed to remove extra tiffin', { variant: 'error' });
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.error || error.message || 'Failed to remove extra tiffin';
+        enqueueSnackbar(errorMsg, { variant: 'error' });
+      } finally {
+        // Remove from processing set
+        processingRef.current.delete(cellKey);
       }
+
+      return; // Exit early for extra tiffin removal
     }
   };
 
   // Handle double-click on non-plan days for extra tiffin
   const handleCellDoubleClick = (customer: ICalendarCustomerData, day: number, currentStatus: CalendarEntryStatus | null, isPlanDay: boolean) => {
+    // Block editing if billing is not in 'calculating' status
+    if (customer.billing_status && customer.billing_status !== 'calculating') {
+      enqueueSnackbar(
+        `Cannot add extra tiffin - billing is ${customer.billing_status}. Please reject billing first.`,
+        { variant: 'warning' }
+      );
+      return;
+    }
+
     // Only allow double-click on non-plan days
     if (isPlanDay) {
       return;
@@ -403,12 +484,18 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
     const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
+    // Each row now represents ONE order, so use that order as the parent
+    // The extra tiffin will appear in this order's row in the billing calendar
+    const parentOrder = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+    const parentOrderId = parentOrder?.id;
+
     // Set data and show confirmation dialog
     setExtraOrderData({
       customer_id: customer.customer_id,
       customer_name: customer.customer_name,
       delivery_date: date,
       order_id: 0, // Will be created
+      parent_order_id: parentOrderId,
     });
     setOpenConfirmDialog(true);
   };
@@ -435,16 +522,18 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           status: 'calculating',
         });
         // Note: onUpdate() will be called by the parent to refresh the data
-      } catch (error) {
-        console.error('Error reverting billing status:', error);
-        // Don't show error to user - this is a background operation
+      } catch (error: any) {
+        // Silently ignore errors - billing record might not exist
+        // This is a background operation, no need to log or show to user
       }
     }
   };
 
   const handleFinalize = async (customer: ICalendarCustomerData) => {
-    if (!customer.billing_id) {
-      enqueueSnackbar('No billing record found for this customer', { variant: 'warning' });
+    // Get the order for this row
+    const order = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+    if (!order) {
+      enqueueSnackbar('No order found for this row', { variant: 'warning' });
       return;
     }
 
@@ -470,22 +559,76 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
     setFinalizingCustomerId(customer.customer_id);
 
     try {
-      const result = await dispatch(
-        finalizeBilling(customer.billing_id, 'admin', `Finalized for ${customer.customer_name}`)
-      );
+      // Call the order-billing finalize API (per-order finalization)
+      const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+      const response = await axios.post('/api/order-billing/finalize', {
+        order_id: order.id,
+        billing_month: billingMonth,
+        finalized_by: 'admin',
+      });
 
-      if (result.success) {
-        enqueueSnackbar('Billing finalized successfully', { variant: 'success' });
-        onUpdate();
+      if (response.data.success) {
+        const { all_orders_finalized, total_orders, finalized_orders } = response.data.data;
+
+        if (all_orders_finalized) {
+          enqueueSnackbar(
+            `Order finalized! All ${total_orders} orders for ${customer.customer_name} are now finalized.`,
+            { variant: 'success' }
+          );
+        } else {
+          enqueueSnackbar(
+            `Order finalized! ${finalized_orders}/${total_orders} orders finalized for ${customer.customer_name}.`,
+            { variant: 'success' }
+          );
+        }
+
+        // Refresh the UI
+        await onUpdate();
+
+        // Trigger notification refresh so the new notification appears immediately
+        window.dispatchEvent(new CustomEvent('refresh-notifications'));
+
+        setFinalizingCustomerId(null);
       } else {
-        enqueueSnackbar(result.error || 'Failed to finalize billing', { variant: 'error' });
+        enqueueSnackbar(response.data.error || 'Failed to finalize order', { variant: 'error' });
+        setFinalizingCustomerId(null);
       }
-    } catch (error) {
-      enqueueSnackbar('Failed to finalize billing', { variant: 'error' });
-    } finally {
+    } catch (error: any) {
+      enqueueSnackbar(error.response?.data?.error || 'Failed to finalize order', { variant: 'error' });
       setFinalizingCustomerId(null);
     }
   };
+
+  const handleViewInvoice = (customer: ICalendarCustomerData) => {
+    const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+    router.push({
+      pathname: '/dashboard/tiffin/combined-invoice',
+      query: {
+        customerId: customer.customer_id,
+        customerName: customer.customer_name,
+        month: billingMonth,
+      },
+    });
+  };
+
+  const handleViewOrderInvoice = (customer: ICalendarCustomerData) => {
+    const order = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+    if (!order) {
+      enqueueSnackbar('No order found', { variant: 'warning' });
+      return;
+    }
+
+    // Navigate to the new order invoice page
+    const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
+    router.push({
+      pathname: '/dashboard/tiffin/order-invoice-details',
+      query: {
+        orderId: order.id,
+        month: billingMonth,
+      },
+    });
+  };
+
 
   const handleCreateExtraOrder = async () => {
     if (!extraOrderData || !selectedMealPlan || !extraPrice) {
@@ -507,19 +650,21 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
 
       // IMPORTANT: Delete any existing calendar entry for this date first
       // This ensures we start with a clean state and the new order_id is correctly set
+      // Use parent_order_id to only delete entries for this specific parent order
       try {
         await axios.delete('/api/calendar-entries', {
           params: {
+            order_id: extraOrderData.parent_order_id,
             customer_id: extraOrderData.customer_id,
             delivery_date: extraOrderData.delivery_date,
           },
         });
       } catch (deleteError) {
         // Ignore error if entry doesn't exist
-        console.log('No existing entry to delete (expected for new extra tiffins)');
       }
 
       // Create a new order for the extra tiffin
+      // Link to parent order if one exists for proper grouping
       const orderResult = await axios.post('/api/customer-orders', {
         customer_id: extraOrderData.customer_id,
         meal_plan_id: selectedMealPlan,
@@ -528,16 +673,20 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         quantity: 1,
         price: priceValue,
         selected_days: [dayOfWeek], // Single day for extra tiffin
+        parent_order_id: extraOrderData.parent_order_id || null, // Link to parent meal plan
       });
 
       if (orderResult.data.success) {
         const newOrderId = orderResult.data.data.id;
+        // Use parent_order_id for the calendar entry so it appears in the parent order's row
+        const entryOrderId = extraOrderData.parent_order_id || newOrderId;
 
         // Create the calendar entry with 'E' status
+        // Use parent_order_id so the entry appears in the parent order's row in the billing calendar
         const result = await dispatch(
           createCalendarEntry({
             customer_id: extraOrderData.customer_id,
-            order_id: newOrderId,
+            order_id: entryOrderId,
             delivery_date: extraOrderData.delivery_date,
             status: 'E',
             quantity: 1,
@@ -566,7 +715,6 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
         enqueueSnackbar('Failed to create extra order', { variant: 'error' });
       }
     } catch (error) {
-      console.error('Error creating extra order:', error);
       enqueueSnackbar('Failed to create extra order', { variant: 'error' });
     }
   };
@@ -615,8 +763,14 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           </TableHead>
 
           <TableBody>
-            {customers.map((customer) => (
-              <TableRow key={customer.customer_id} hover>
+            {customers.map((customer, index) => {
+              // Get the order for this row (now each row represents one order)
+              const order = customer.orders && customer.orders.length > 0 ? customer.orders[0] : null;
+              // Use order ID + customer ID + index for unique key (same customer can have multiple orders)
+              const rowKey = order ? `${customer.customer_id}-${order.id}` : `${customer.customer_id}-${index}`;
+
+              return (
+              <TableRow key={rowKey} hover>
                 <StyledTableCell>
                   <Stack spacing={0.2} alignItems="flex-start">
                     <Typography
@@ -627,13 +781,27 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                         lineHeight: 1.3,
                         wordBreak: 'break-word',
                         display: '-webkit-box',
-                        WebkitLineClamp: 3,
+                        WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
                       }}
                     >
                       {customer.customer_name}
                     </Typography>
+                    {order?.meal_plan_name && (
+                      <Typography
+                        variant="caption"
+                        color="primary.main"
+                        sx={{
+                          fontSize: 8,
+                          lineHeight: 1.2,
+                          wordBreak: 'break-word',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {order.meal_plan_name}
+                      </Typography>
+                    )}
                     {customer.customer_phone && (
                       <Typography
                         variant="caption"
@@ -654,13 +822,16 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                   const status = getStatusForDate(customer, day);
                   const weekend = isWeekend(day);
                   const isPlanDay = isDateCoveredByOrder(customer, day);
+                  const isLocked = customer.billing_status && customer.billing_status !== 'calculating';
                   const disabled = !isPlanDay && !status;
 
                   return (
                     <StyledTableCell key={day}>
                       <Tooltip
                         title={
-                          isPlanDay
+                          isLocked
+                            ? `Billing ${customer.billing_status} - editing locked`
+                            : isPlanDay
                             ? status
                               ? status === 'T'
                                 ? 'Delivered - Click to mark Absent'
@@ -676,10 +847,15 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                         <DayCell
                           status={status}
                           isWeekend={weekend}
-                          disabled={disabled}
+                          disabled={disabled || isLocked}
                           isPlanDay={isPlanDay}
                           onClick={() => handleCellClick(customer, day, status, isPlanDay)}
                           onDoubleClick={() => handleCellDoubleClick(customer, day, status, isPlanDay)}
+                          sx={isLocked ? {
+                            opacity: 0.6,
+                            cursor: 'not-allowed !important',
+                            pointerEvents: 'auto'
+                          } : {}}
                         >
                           {status || ''}
                         </DayCell>
@@ -733,25 +909,50 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
                     )}
 
                     {customer.billing_status !== 'calculating' && (
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          px: 0.75,
-                          py: 0.25,
-                          borderRadius: 0.5,
-                          fontSize: 9,
-                          bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
-                          color: `${getBillingStatusColor(customer.billing_status)}.darker`,
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {customer.billing_status}
-                      </Typography>
+                      <Stack spacing={0.5} alignItems="center">
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              px: 0.75,
+                              py: 0.25,
+                              borderRadius: 0.5,
+                              fontSize: 9,
+                              bgcolor: `${getBillingStatusColor(customer.billing_status)}.lighter`,
+                              color: `${getBillingStatusColor(customer.billing_status)}.darker`,
+                              textTransform: 'capitalize',
+                            }}
+                          >
+                            {customer.billing_status}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={0.25}>
+                          <Tooltip title="View Order Invoice">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewOrderInvoice(customer)}
+                              sx={{ p: 0.25 }}
+                            >
+                              <Iconify icon="eva:file-outline" width={14} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="View Combined Invoice">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewInvoice(customer)}
+                              sx={{ p: 0.25 }}
+                            >
+                              <Iconify icon="eva:layers-outline" width={14} />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </Stack>
                     )}
                   </Stack>
                 </StyledTableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
@@ -800,12 +1001,18 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
               label="Select Meal Plan"
               value={selectedMealPlan || ''}
               onChange={(e) => setSelectedMealPlan(Number(e.target.value))}
+              helperText="Only showing meal plans with frequency='Daily' and days='Single'"
             >
-              {mealPlans.map((plan) => (
-                <MenuItem key={plan.id} value={plan.id}>
-                  {plan.meal_name} - CAD ${Number(plan.price).toFixed(2)}
-                </MenuItem>
-              ))}
+              {mealPlans
+                .filter((plan) => plan.frequency === 'Daily' && plan.days === 'Single')
+                .map((plan) => (
+                  <MenuItem key={plan.id} value={plan.id}>
+                    {plan.meal_name} - CAD ${Number(plan.price).toFixed(2)}
+                  </MenuItem>
+                ))}
+              {mealPlans.filter((plan) => plan.frequency === 'Daily' && plan.days === 'Single').length === 0 && (
+                <MenuItem disabled>No Daily/Single meal plans available</MenuItem>
+              )}
             </TextField>
 
             <TextField
@@ -840,10 +1047,12 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           <Button
             onClick={async () => {
               // Make the cell blank by deleting any existing entry
+              // Use parent_order_id to only delete entries for this specific order
               if (extraOrderData) {
                 try {
                   await axios.delete('/api/calendar-entries', {
                     params: {
+                      order_id: extraOrderData.parent_order_id,
                       customer_id: extraOrderData.customer_id,
                       delivery_date: extraOrderData.delivery_date,
                     },
@@ -869,6 +1078,7 @@ export default function CalendarGrid({ year, month, customers, onUpdate }: Calen
           </Button>
         </DialogActions>
       </Dialog>
+
     </Card>
   );
 }

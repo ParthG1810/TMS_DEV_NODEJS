@@ -1,5 +1,6 @@
 import { noCase } from 'change-case';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 // @mui
 import {
   Box,
@@ -45,6 +46,7 @@ interface PaymentNotification {
 }
 
 export default function NotificationsPopover() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
   const [openPopover, setOpenPopover] = useState<HTMLElement | null>(null);
   const { enqueueSnackbar } = useSnackbar();
@@ -53,6 +55,19 @@ export default function NotificationsPopover() {
   // Fetch notifications from API
   useEffect(() => {
     fetchNotifications();
+  }, []);
+
+  // Listen for custom event to refresh notifications (e.g., after approval)
+  useEffect(() => {
+    const handleRefreshNotifications = () => {
+      fetchNotifications();
+    };
+
+    window.addEventListener('refresh-notifications', handleRefreshNotifications);
+
+    return () => {
+      window.removeEventListener('refresh-notifications', handleRefreshNotifications);
+    };
   }, []);
 
   // Show startup alert for pending approvals
@@ -120,6 +135,21 @@ export default function NotificationsPopover() {
     }
   };
 
+  const handleClearAll = async () => {
+    try {
+      // Dismiss all notifications
+      for (const notification of notifications) {
+        await axios.delete(`/api/payment-notifications/${notification.id}`);
+      }
+      // Clear local state
+      setNotifications([]);
+      enqueueSnackbar('All notifications cleared', { variant: 'success' });
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      enqueueSnackbar('Failed to clear notifications', { variant: 'error' });
+    }
+  };
+
   const handleNotificationClick = async (notification: PaymentNotification) => {
     try {
       // Mark as read
@@ -128,14 +158,25 @@ export default function NotificationsPopover() {
         await fetchNotifications();
       }
 
-      // Navigate to action URL
-      if (notification.action_url) {
-        window.location.href = notification.action_url;
-      }
-
+      // Close popover
       handleClosePopover();
+
+      // Navigate to action URL using Next.js router
+      if (notification.action_url) {
+        router.push(notification.action_url);
+      }
     } catch (error) {
       console.error('Error handling notification click:', error);
+    }
+  };
+
+  const handleDismissNotification = async (e: React.MouseEvent, notificationId: number) => {
+    e.stopPropagation(); // Prevent triggering the click handler
+    try {
+      await axios.delete(`/api/payment-notifications/${notificationId}`);
+      await fetchNotifications();
+    } catch (error) {
+      console.error('Error dismissing notification:', error);
     }
   };
 
@@ -172,7 +213,7 @@ export default function NotificationsPopover() {
 
         <Divider sx={{ borderStyle: 'dashed' }} />
 
-        <Scrollbar sx={{ height: { xs: 340, sm: 'auto' } }}>
+        <Scrollbar sx={{ maxHeight: 400 }}>
           {notifications.length === 0 ? (
             <Box sx={{ p: 3, textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">
@@ -191,12 +232,12 @@ export default function NotificationsPopover() {
               >
                 {notifications
                   .filter((n) => !n.is_read)
-                  .slice(0, 5)
                   .map((notification) => (
                     <NotificationItem
                       key={notification.id}
                       notification={notification}
                       onClick={() => handleNotificationClick(notification)}
+                      onDismiss={handleDismissNotification}
                     />
                   ))}
               </List>
@@ -212,12 +253,12 @@ export default function NotificationsPopover() {
                 >
                   {notifications
                     .filter((n) => n.is_read)
-                    .slice(0, 5)
                     .map((notification) => (
                       <NotificationItem
                         key={notification.id}
                         notification={notification}
                         onClick={() => handleNotificationClick(notification)}
+                        onDismiss={handleDismissNotification}
                       />
                     ))}
                 </List>
@@ -229,9 +270,24 @@ export default function NotificationsPopover() {
         <Divider sx={{ borderStyle: 'dashed' }} />
 
         <Box sx={{ p: 1 }}>
-          <Button fullWidth disableRipple>
-            View All
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              fullWidth
+              color="inherit"
+              onClick={handleClosePopover}
+            >
+              Close
+            </Button>
+            {notifications.length > 0 && (
+              <Button
+                fullWidth
+                color="error"
+                onClick={handleClearAll}
+              >
+                Clear All
+              </Button>
+            )}
+          </Stack>
         </Box>
       </MenuPopover>
     </>
@@ -243,9 +299,11 @@ export default function NotificationsPopover() {
 function NotificationItem({
   notification,
   onClick,
+  onDismiss,
 }: {
   notification: PaymentNotification;
   onClick: () => void;
+  onDismiss: (e: React.MouseEvent, id: number) => void;
 }) {
   const { avatar, title } = renderContent(notification);
 
@@ -275,6 +333,16 @@ function NotificationItem({
           </Stack>
         }
       />
+
+      <Tooltip title="Dismiss">
+        <IconButton
+          size="small"
+          onClick={(e) => onDismiss(e, notification.id)}
+          sx={{ ml: 1 }}
+        >
+          <Iconify icon="eva:close-fill" width={18} />
+        </IconButton>
+      </Tooltip>
     </ListItemButton>
   );
 }
@@ -297,6 +365,12 @@ function renderContent(notification: PaymentNotification) {
       title,
     };
   }
+  if (notification.notification_type === 'order_approved') {
+    return {
+      avatar: <Iconify icon="eva:checkmark-square-fill" width={24} />,
+      title,
+    };
+  }
   if (notification.notification_type === 'month_end_calculation') {
     return {
       avatar: <Iconify icon="eva:calendar-fill" width={24} />,
@@ -306,6 +380,12 @@ function renderContent(notification: PaymentNotification) {
   if (notification.notification_type === 'payment_received') {
     return {
       avatar: <Iconify icon="eva:checkmark-circle-fill" width={24} />,
+      title,
+    };
+  }
+  if (notification.notification_type === 'invoice_generated') {
+    return {
+      avatar: <Iconify icon="eva:file-text-fill" width={24} />,
       title,
     };
   }
