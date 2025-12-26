@@ -1,259 +1,274 @@
-# Electron Desktop Application Plan for TMS
+# TMS Desktop Application Plan
 
 ## Executive Summary
 
-This document outlines a comprehensive plan to convert the TMS (Tiffin Management System) web application into a cross-platform desktop application using Electron. The plan covers architecture decisions, implementation approaches, and recommendations.
+This document outlines the plan to convert TMS (Tiffin Management System) into a cross-platform desktop application using **Electron** with **Option A: Embedded Servers** approach. The application will use the **existing local MySQL database** installed on each machine - no database changes required.
 
 ---
 
-## 1. Current Application Architecture
+## 1. Architecture Overview
 
-### Overview
-| Component | Technology | Port |
-|-----------|------------|------|
-| Frontend | Next.js 13 + React 18 + TypeScript | 8081 |
-| Backend | Next.js 12 API Server | 3000 |
-| Database | MySQL 8.0+ | 3306 |
-| UI Library | Material-UI v5 | - |
-| State Management | Redux Toolkit | - |
+### Selected Approach: Option A - Electron Wrapper with Local MySQL
 
-### Key Characteristics
-- Decoupled frontend/backend architecture
-- REST API communication via Axios
-- JWT-based authentication
-- 91 API endpoints
-- File uploads and storage
-- Gmail OAuth integration
-- Multi-language support (i18n)
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                         USER'S MACHINE                                  │
+│                                                                         │
+│  ┌────────────────────────────────────────────────────────────────┐    │
+│  │                    ELECTRON APPLICATION                         │    │
+│  │                                                                 │    │
+│  │  ┌─────────────────┐        ┌─────────────────┐                │    │
+│  │  │  Main Process   │        │ Renderer Process │                │    │
+│  │  │                 │        │  (BrowserWindow) │                │    │
+│  │  │  - App Lifecycle│        │                  │                │    │
+│  │  │  - IPC Handlers │◄──────►│  Next.js Frontend│                │    │
+│  │  │  - Native APIs  │        │  (localhost:8081)│                │    │
+│  │  │  - Server Mgmt  │        │                  │                │    │
+│  │  └────────┬────────┘        └─────────────────┘                │    │
+│  │           │                                                     │    │
+│  │  ┌────────▼────────┐                                           │    │
+│  │  │  Backend Server │                                           │    │
+│  │  │  (localhost:3000)│                                           │    │
+│  │  │  Next.js API     │                                           │    │
+│  │  └────────┬────────┘                                           │    │
+│  └───────────┼────────────────────────────────────────────────────┘    │
+│              │                                                          │
+│  ┌───────────▼───────────┐                                             │
+│  │   LOCAL MySQL 8.0+    │  ◄── Pre-installed on machine               │
+│  │   (localhost:3306)    │                                             │
+│  │   Database: tms_db    │                                             │
+│  └───────────────────────┘                                             │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why This Approach?
+
+| Benefit | Description |
+|---------|-------------|
+| **Minimal Code Changes** | 95%+ of existing code remains unchanged |
+| **No Database Migration** | Uses existing MySQL - no schema changes |
+| **Single Codebase** | Same code for web and desktop |
+| **Fast Development** | Can be production-ready in 4-6 weeks |
+| **Proven Stack** | MySQL + Node.js is battle-tested |
 
 ---
 
-## 2. Proposed Architecture Options
+## 2. Prerequisites for End Users
 
-### Option A: Electron Wrapper with Embedded Servers (Recommended)
+### MySQL Installation Requirements
 
+Users must have MySQL installed locally before running the TMS Desktop app:
+
+#### Windows
+```powershell
+# Option 1: MySQL Installer (Recommended)
+# Download from: https://dev.mysql.com/downloads/installer/
+
+# Option 2: Using Chocolatey
+choco install mysql
+
+# Option 3: Using WinGet
+winget install Oracle.MySQL
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Electron Main Process                     │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
-│  │  Backend Server │  │ Frontend Server │  │   MySQL     │ │
-│  │   (Port 3000)   │  │   (Port 8081)   │  │ (Embedded)  │ │
-│  └────────┬────────┘  └────────┬────────┘  └──────┬──────┘ │
-│           │                    │                   │        │
-│  ┌────────┴────────────────────┴───────────────────┴──────┐ │
-│  │              BrowserWindow (Renderer Process)          │ │
-│  │                    Next.js Frontend                    │ │
-│  └────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+
+#### macOS
+```bash
+# Option 1: Using Homebrew (Recommended)
+brew install mysql
+brew services start mysql
+
+# Option 2: Download DMG from MySQL website
+# https://dev.mysql.com/downloads/mysql/
 ```
 
-**Pros:**
-- ✅ Minimal code changes required
-- ✅ Preserves existing architecture
-- ✅ Easy to maintain parity with web version
-- ✅ Faster time to market
-- ✅ Can still connect to remote servers if needed
+#### Linux (Ubuntu/Debian)
+```bash
+# Install MySQL
+sudo apt update
+sudo apt install mysql-server
 
-**Cons:**
-- ❌ Larger application bundle size (~200-400MB)
-- ❌ Higher memory usage
-- ❌ Requires bundling Node.js runtime
+# Start MySQL service
+sudo systemctl start mysql
+sudo systemctl enable mysql
+```
+
+#### Linux (Fedora/RHEL)
+```bash
+# Install MySQL
+sudo dnf install mysql-server
+
+# Start MySQL service
+sudo systemctl start mysqld
+sudo systemctl enable mysqld
+```
 
 ---
 
-### Option B: Electron with Direct Database Access
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Electron Main Process                     │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │           IPC Handlers (Database Operations)            ││
-│  │    ┌──────────────┐    ┌────────────────────────┐      ││
-│  │    │   SQLite/    │    │   Business Logic       │      ││
-│  │    │  Better-SQL  │    │   (Migrated Services)  │      ││
-│  │    └──────────────┘    └────────────────────────┘      ││
-│  └─────────────────────────────────────────────────────────┘│
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │              BrowserWindow (Renderer Process)           ││
-│  │              React Frontend (Without Next.js)           ││
-│  └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Pros:**
-- ✅ Smaller application size (~100-150MB)
-- ✅ Better performance (no network overhead)
-- ✅ True offline-first capability
-- ✅ More "native" desktop feel
-
-**Cons:**
-- ❌ Significant code rewrite required
-- ❌ Need to migrate from MySQL to SQLite
-- ❌ Separate codebases to maintain
-- ❌ Loss of remote server connectivity
-
----
-
-### Option C: Hybrid Approach (Best of Both Worlds)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Electron Main Process                     │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                  IPC Bridge Layer                      │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌───────────────┐  │  │
-│  │  │Local SQLite │  │Remote MySQL │  │  Sync Engine  │  │  │
-│  │  │  (Offline)  │◄─┤  (Online)   │◄─┤ (Background)  │  │  │
-│  │  └─────────────┘  └─────────────┘  └───────────────┘  │  │
-│  └───────────────────────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │              BrowserWindow (Renderer Process)          │  │
-│  │                  React Frontend (Vite)                 │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Pros:**
-- ✅ Works offline and online
-- ✅ Data synchronization capability
-- ✅ Modern frontend build (Vite is faster than Webpack)
-- ✅ Moderate bundle size (~150-200MB)
-
-**Cons:**
-- ❌ Complex sync logic
-- ❌ Conflict resolution challenges
-- ❌ More development time
-
----
-
-## 3. Recommended Approach: Option A (Phased Implementation)
-
-Given the existing mature codebase with 91 API endpoints, I recommend **Option A** as the initial implementation, with the possibility to evolve toward Option C in the future.
-
-### Rationale
-1. **Time to Market**: Minimal code changes mean faster deployment
-2. **Code Reuse**: 90%+ of existing code can be reused
-3. **Maintainability**: Single codebase for web and desktop
-4. **Risk Mitigation**: Proven architecture, lower chance of bugs
-
----
-
-## 4. Implementation Plan
-
-### Phase 1: Project Setup (Week 1-2)
-
-#### 4.1 Create Electron Directory Structure
+## 3. Project Structure
 
 ```
 TMS_DEV_NODEJS/
-├── Frontend/                 # Existing
-├── Backend/                  # Existing
-├── database/                 # Existing
-├── electron/                 # NEW - Electron wrapper
-│   ├── main/
-│   │   ├── index.ts         # Main process entry
-│   │   ├── preload.ts       # Preload script
-│   │   ├── server.ts        # Backend server manager
-│   │   └── utils/
-│   │       ├── paths.ts     # Path utilities
-│   │       ├── database.ts  # Database manager
-│   │       └── updater.ts   # Auto-update logic
-│   ├── renderer/            # Frontend assets
-│   ├── resources/           # Icons, assets
-│   │   ├── icon.ico         # Windows icon
-│   │   ├── icon.icns        # macOS icon
-│   │   └── icon.png         # Linux icon
+├── Frontend/                    # Existing Next.js 13 frontend
+├── Backend/                     # Existing Next.js 12 API backend
+├── database/                    # Existing MySQL schemas
+├── electron/                    # NEW - Electron wrapper
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── index.ts        # Main process entry point
+│   │   │   ├── preload.ts      # Preload script for IPC
+│   │   │   ├── servers.ts      # Frontend/Backend server manager
+│   │   │   ├── database.ts     # MySQL connection checker
+│   │   │   ├── tray.ts         # System tray management
+│   │   │   ├── updater.ts      # Auto-update logic
+│   │   │   ├── menu.ts         # Application menu
+│   │   │   └── ipc/
+│   │   │       ├── dialogs.ts  # Native file dialogs
+│   │   │       ├── printing.ts # Print functionality
+│   │   │       └── system.ts   # System info handlers
+│   │   └── splash/
+│   │       └── index.html      # Splash screen
+│   ├── resources/
+│   │   ├── icon.ico            # Windows icon
+│   │   ├── icon.icns           # macOS icon
+│   │   ├── icon.png            # Linux icon (512x512)
+│   │   └── icons/              # Linux icon set
+│   │       ├── 16x16.png
+│   │       ├── 32x32.png
+│   │       ├── 64x64.png
+│   │       ├── 128x128.png
+│   │       ├── 256x256.png
+│   │       └── 512x512.png
 │   ├── package.json
-│   ├── electron-builder.yml # Build configuration
-│   └── tsconfig.json
-└── package.json             # Root workspace config
+│   ├── tsconfig.json
+│   ├── electron-builder.yml
+│   └── forge.config.ts         # Alternative: Electron Forge config
+└── package.json                 # Root workspace config
 ```
 
-#### 4.2 Core Dependencies
+---
+
+## 4. Implementation Details
+
+### 4.1 Electron Dependencies
 
 ```json
 {
+  "name": "tms-desktop",
+  "version": "1.0.0",
+  "description": "TMS - Tiffin Management System Desktop Application",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:electron\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:electron": "wait-on http://localhost:8081 && electron .",
+    "dev:backend": "cd ../Backend && npm run dev",
+    "dev:frontend": "cd ../Frontend && npm run dev",
+    "build": "tsc -p tsconfig.json",
+    "build:all": "npm run build:backend && npm run build:frontend && npm run build",
+    "build:backend": "cd ../Backend && npm run build",
+    "build:frontend": "cd ../Frontend && npm run build",
+    "package": "npm run build:all && electron-builder",
+    "package:win": "npm run build:all && electron-builder --win",
+    "package:mac": "npm run build:all && electron-builder --mac",
+    "package:linux": "npm run build:all && electron-builder --linux",
+    "package:all": "npm run build:all && electron-builder --win --mac --linux"
+  },
   "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1",
-    "electron-devtools-installer": "^3.2.0",
-    "concurrently": "^8.2.2",
-    "wait-on": "^7.2.0",
-    "cross-env": "^7.0.3"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.3.0",
+    "concurrently": "^9.1.0",
+    "wait-on": "^8.0.1",
+    "@types/node": "^22.0.0"
   },
   "dependencies": {
-    "electron-store": "^8.1.0",
-    "electron-updater": "^6.1.7",
-    "electron-log": "^5.0.1",
-    "fix-path": "^4.0.0"
+    "electron-updater": "^6.3.9",
+    "electron-log": "^5.2.4",
+    "electron-store": "^10.0.0",
+    "mysql2": "^3.11.5"
   }
 }
 ```
 
----
-
-### Phase 2: Main Process Implementation (Week 2-3)
-
-#### 4.3 Main Process Entry (`electron/main/index.ts`)
+### 4.2 Main Process (`electron/src/main/index.ts`)
 
 ```typescript
-import { app, BrowserWindow, ipcMain, shell, Menu, Tray } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import { join } from 'path';
-import { startBackendServer, stopBackendServer } from './server';
-import { setupAutoUpdater } from './utils/updater';
-import { initDatabase } from './utils/database';
 import log from 'electron-log';
+import { startServers, stopServers } from './servers';
+import { checkMySQLConnection } from './database';
+import { createTray, destroyTray } from './tray';
+import { setupAutoUpdater } from './updater';
+import { createApplicationMenu } from './menu';
+import { setupIPC } from './ipc';
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
+// Configure logging
+log.transports.file.level = 'info';
+log.transports.console.level = 'debug';
+
+// Prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
   app.quit();
 }
 
 let mainWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
+let splashWindow: BrowserWindow | null = null;
 let isQuitting = false;
 
+const isDev = process.env.NODE_ENV === 'development';
 const FRONTEND_URL = 'http://localhost:8081';
-const BACKEND_URL = 'http://localhost:3000';
 
-async function createWindow() {
+// Create splash screen
+function createSplashWindow(): void {
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 300,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  splashWindow.loadFile(join(__dirname, '../splash/index.html'));
+  splashWindow.center();
+}
+
+// Create main application window
+function createMainWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
-    minHeight: 768,
+    minHeight: 700,
+    show: false,
+    icon: join(__dirname, '../../resources/icon.png'),
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      webSecurity: true,
     },
-    icon: join(__dirname, '../resources/icon.png'),
-    show: false, // Show when ready
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: { x: 15, y: 15 },
   });
 
-  // Show window when ready
+  // Window events
   mainWindow.once('ready-to-show', () => {
+    if (splashWindow) {
+      splashWindow.destroy();
+      splashWindow = null;
+    }
     mainWindow?.show();
     mainWindow?.focus();
   });
 
-  // Handle external links
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  // Load the frontend
-  await mainWindow.loadURL(FRONTEND_URL);
-
-  // DevTools in development
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.openDevTools();
-  }
-
-  // Handle window close
   mainWindow.on('close', (event) => {
     if (!isQuitting && process.platform === 'darwin') {
       event.preventDefault();
@@ -264,50 +279,111 @@ async function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Handle external links
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  // Load the frontend
+  mainWindow.loadURL(FRONTEND_URL);
+
+  // DevTools in development
+  if (isDev) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 }
 
-async function initialize() {
+// Show MySQL connection error dialog
+async function showMySQLError(error: string): Promise<void> {
+  const result = await dialog.showMessageBox({
+    type: 'error',
+    title: 'Database Connection Failed',
+    message: 'Unable to connect to MySQL database',
+    detail: `${error}\n\nPlease ensure:\n1. MySQL is installed and running\n2. Database 'tms_db' exists\n3. Credentials in .env are correct`,
+    buttons: ['Retry', 'Open Settings', 'Quit'],
+    defaultId: 0,
+  });
+
+  if (result.response === 0) {
+    // Retry
+    await initialize();
+  } else if (result.response === 1) {
+    // Open settings folder
+    shell.openPath(app.getPath('userData'));
+  } else {
+    // Quit
+    app.quit();
+  }
+}
+
+// Initialize application
+async function initialize(): Promise<void> {
   log.info('Starting TMS Desktop Application...');
+  log.info(`App version: ${app.getVersion()}`);
+  log.info(`Electron version: ${process.versions.electron}`);
+  log.info(`Platform: ${process.platform}`);
 
-  // Initialize database (if using embedded)
-  await initDatabase();
+  // Show splash screen
+  createSplashWindow();
 
-  // Start backend server
-  await startBackendServer();
+  try {
+    // Step 1: Check MySQL connection
+    log.info('Checking MySQL connection...');
+    const dbResult = await checkMySQLConnection();
+    if (!dbResult.success) {
+      throw new Error(dbResult.error);
+    }
+    log.info('MySQL connection successful');
 
-  // Create main window
-  await createWindow();
+    // Step 2: Start backend and frontend servers
+    log.info('Starting servers...');
+    await startServers();
+    log.info('Servers started successfully');
 
-  // Setup auto-updater
-  setupAutoUpdater();
+    // Step 3: Create main window
+    createMainWindow();
 
-  // Create system tray
-  createTray();
+    // Step 4: Setup system tray
+    createTray(mainWindow!);
 
-  log.info('TMS Desktop Application started successfully');
+    // Step 5: Setup application menu
+    createApplicationMenu();
+
+    // Step 6: Setup IPC handlers
+    setupIPC();
+
+    // Step 7: Setup auto-updater (production only)
+    if (!isDev) {
+      setupAutoUpdater();
+    }
+
+    log.info('TMS Desktop Application started successfully');
+  } catch (error: any) {
+    log.error('Initialization error:', error);
+    if (splashWindow) {
+      splashWindow.destroy();
+    }
+    await showMySQLError(error.message);
+  }
 }
 
-function createTray() {
-  tray = new Tray(join(__dirname, '../resources/icon.png'));
-
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show TMS', click: () => mainWindow?.show() },
-    { type: 'separator' },
-    { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
-  ]);
-
-  tray.setToolTip('TMS - Tiffin Management System');
-  tray.setContextMenu(contextMenu);
-
-  tray.on('click', () => mainWindow?.show());
-}
-
-// App lifecycle
+// App lifecycle events
 app.whenReady().then(initialize);
+
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
 
 app.on('before-quit', async () => {
   isQuitting = true;
-  await stopBackendServer();
+  log.info('Application quitting...');
+  destroyTray();
+  await stopServers();
 });
 
 app.on('window-all-closed', () => {
@@ -318,49 +394,189 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (mainWindow === null) {
-    createWindow();
+    createMainWindow();
   } else {
     mainWindow.show();
   }
 });
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  log.error('Uncaught exception:', error);
+  dialog.showErrorBox('Error', error.message);
+});
 ```
 
-#### 4.4 Backend Server Manager (`electron/main/server.ts`)
+### 4.3 MySQL Connection Checker (`electron/src/main/database.ts`)
+
+```typescript
+import mysql from 'mysql2/promise';
+import log from 'electron-log';
+import Store from 'electron-store';
+
+const store = new Store();
+
+interface DBConfig {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+}
+
+interface ConnectionResult {
+  success: boolean;
+  error?: string;
+}
+
+// Get database configuration
+export function getDBConfig(): DBConfig {
+  return {
+    host: store.get('db.host', 'localhost') as string,
+    port: store.get('db.port', 3306) as number,
+    user: store.get('db.user', 'root') as string,
+    password: store.get('db.password', '') as string,
+    database: store.get('db.database', 'tms_db') as string,
+  };
+}
+
+// Save database configuration
+export function saveDBConfig(config: Partial<DBConfig>): void {
+  if (config.host) store.set('db.host', config.host);
+  if (config.port) store.set('db.port', config.port);
+  if (config.user) store.set('db.user', config.user);
+  if (config.password !== undefined) store.set('db.password', config.password);
+  if (config.database) store.set('db.database', config.database);
+}
+
+// Check MySQL connection
+export async function checkMySQLConnection(): Promise<ConnectionResult> {
+  const config = getDBConfig();
+
+  log.info(`Checking MySQL connection to ${config.host}:${config.port}/${config.database}`);
+
+  try {
+    const connection = await mysql.createConnection({
+      host: config.host,
+      port: config.port,
+      user: config.user,
+      password: config.password,
+      database: config.database,
+      connectTimeout: 10000,
+    });
+
+    // Test query
+    await connection.query('SELECT 1');
+    await connection.end();
+
+    log.info('MySQL connection test successful');
+    return { success: true };
+  } catch (error: any) {
+    log.error('MySQL connection failed:', error.message);
+
+    let errorMessage = 'Unknown database error';
+
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = `Cannot connect to MySQL at ${config.host}:${config.port}. Is MySQL running?`;
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      errorMessage = 'Access denied. Check your username and password.';
+    } else if (error.code === 'ER_BAD_DB_ERROR') {
+      errorMessage = `Database '${config.database}' does not exist. Please create it first.`;
+    } else if (error.code === 'ETIMEDOUT') {
+      errorMessage = 'Connection timed out. Check if MySQL is accessible.';
+    } else {
+      errorMessage = error.message;
+    }
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+// Create database if not exists (optional helper)
+export async function ensureDatabaseExists(): Promise<ConnectionResult> {
+  const config = getDBConfig();
+
+  try {
+    const connection = await mysql.createConnection({
+      host: config.host,
+      port: config.port,
+      user: config.user,
+      password: config.password,
+    });
+
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${config.database}\``);
+    await connection.end();
+
+    log.info(`Database '${config.database}' ensured`);
+    return { success: true };
+  } catch (error: any) {
+    log.error('Failed to create database:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+```
+
+### 4.4 Server Manager (`electron/src/main/servers.ts`)
 
 ```typescript
 import { fork, ChildProcess } from 'child_process';
 import { join } from 'path';
+import { app } from 'electron';
 import log from 'electron-log';
 import waitOn from 'wait-on';
 
 let backendProcess: ChildProcess | null = null;
+let frontendProcess: ChildProcess | null = null;
 
-export async function startBackendServer(): Promise<void> {
+const isDev = process.env.NODE_ENV === 'development';
+
+// Get paths based on environment
+function getPaths() {
+  if (isDev) {
+    return {
+      backend: join(__dirname, '../../../Backend'),
+      frontend: join(__dirname, '../../../Frontend'),
+    };
+  } else {
+    // Production: resources are in app.asar.unpacked
+    const resourcesPath = join(app.getAppPath(), '..');
+    return {
+      backend: join(resourcesPath, 'backend'),
+      frontend: join(resourcesPath, 'frontend'),
+    };
+  }
+}
+
+// Start backend server
+async function startBackend(): Promise<void> {
   return new Promise((resolve, reject) => {
-    const backendPath = join(__dirname, '../../Backend');
+    const { backend } = getPaths();
+    log.info(`Starting backend from: ${backend}`);
 
-    log.info('Starting backend server...');
+    const args = isDev ? ['dev'] : ['start', '-p', '3000'];
+    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
-    // Fork the backend process
     backendProcess = fork(
-      join(backendPath, 'node_modules/.bin/next'),
-      ['start', '-p', '3000'],
+      require.resolve('next/dist/bin/next'),
+      args,
       {
-        cwd: backendPath,
+        cwd: backend,
         env: {
           ...process.env,
-          NODE_ENV: 'production',
+          NODE_ENV: isDev ? 'development' : 'production',
+          PORT: '3000',
         },
         stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+        silent: true,
       }
     );
 
     backendProcess.stdout?.on('data', (data) => {
-      log.info(`[Backend] ${data.toString()}`);
+      log.info(`[Backend] ${data.toString().trim()}`);
     });
 
     backendProcess.stderr?.on('data', (data) => {
-      log.error(`[Backend Error] ${data.toString()}`);
+      log.warn(`[Backend] ${data.toString().trim()}`);
     });
 
     backendProcess.on('error', (err) => {
@@ -368,140 +584,542 @@ export async function startBackendServer(): Promise<void> {
       reject(err);
     });
 
+    backendProcess.on('exit', (code) => {
+      log.info(`Backend process exited with code ${code}`);
+      backendProcess = null;
+    });
+
     // Wait for backend to be ready
     waitOn({
       resources: ['http://localhost:3000/api/health'],
-      timeout: 30000,
+      timeout: 60000,
+      interval: 500,
     })
       .then(() => {
-        log.info('Backend server is ready');
+        log.info('Backend server is ready on port 3000');
         resolve();
       })
       .catch((err) => {
-        log.error('Backend server failed to start:', err);
-        reject(err);
+        log.error('Backend failed to start:', err);
+        reject(new Error('Backend server failed to start within timeout'));
       });
   });
 }
 
-export async function stopBackendServer(): Promise<void> {
-  if (backendProcess) {
-    log.info('Stopping backend server...');
-    backendProcess.kill('SIGTERM');
-    backendProcess = null;
-  }
-}
-```
-
----
-
-### Phase 3: Database Integration (Week 3-4)
-
-#### 4.5 Embedded Database Options
-
-**Option A: Bundled MySQL (Recommended for Full Compatibility)**
-
-Use `mysql-server` binaries bundled with the app:
-- Windows: MariaDB Portable
-- macOS: MySQL.prefPane or Homebrew bundle
-- Linux: AppImage with MySQL
-
-**Option B: SQLite Migration (For Simpler Deployment)**
-
-```typescript
-// electron/main/utils/database.ts
-import Database from 'better-sqlite3';
-import { app } from 'electron';
-import { join } from 'path';
-import log from 'electron-log';
-
-let db: Database.Database | null = null;
-
-export function initDatabase(): void {
-  const dbPath = join(app.getPath('userData'), 'tms.db');
-
-  log.info(`Initializing database at: ${dbPath}`);
-
-  db = new Database(dbPath);
-
-  // Run migrations
-  runMigrations();
-}
-
-function runMigrations(): void {
-  // Migration logic here
-}
-
-export function getDatabase(): Database.Database {
-  if (!db) {
-    throw new Error('Database not initialized');
-  }
-  return db;
-}
-```
-
-**Option C: Docker-based MySQL (For Power Users)**
-
-```typescript
-// Launch MySQL container on startup
-import { exec } from 'child_process';
-
-async function startDockerMySQL(): Promise<void> {
+// Start frontend server
+async function startFrontend(): Promise<void> {
   return new Promise((resolve, reject) => {
-    exec(
-      'docker run -d --name tms-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=tms_db -p 3306:3306 mysql:8.0',
-      (error, stdout) => {
-        if (error) reject(error);
-        else resolve();
+    const { frontend } = getPaths();
+    log.info(`Starting frontend from: ${frontend}`);
+
+    const args = isDev ? ['dev', '-p', '8081'] : ['start', '-p', '8081'];
+
+    frontendProcess = fork(
+      require.resolve('next/dist/bin/next'),
+      args,
+      {
+        cwd: frontend,
+        env: {
+          ...process.env,
+          NODE_ENV: isDev ? 'development' : 'production',
+          PORT: '8081',
+        },
+        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+        silent: true,
       }
     );
+
+    frontendProcess.stdout?.on('data', (data) => {
+      log.info(`[Frontend] ${data.toString().trim()}`);
+    });
+
+    frontendProcess.stderr?.on('data', (data) => {
+      log.warn(`[Frontend] ${data.toString().trim()}`);
+    });
+
+    frontendProcess.on('error', (err) => {
+      log.error('Frontend process error:', err);
+      reject(err);
+    });
+
+    frontendProcess.on('exit', (code) => {
+      log.info(`Frontend process exited with code ${code}`);
+      frontendProcess = null;
+    });
+
+    // Wait for frontend to be ready
+    waitOn({
+      resources: ['http://localhost:8081'],
+      timeout: 60000,
+      interval: 500,
+    })
+      .then(() => {
+        log.info('Frontend server is ready on port 8081');
+        resolve();
+      })
+      .catch((err) => {
+        log.error('Frontend failed to start:', err);
+        reject(new Error('Frontend server failed to start within timeout'));
+      });
   });
+}
+
+// Start all servers
+export async function startServers(): Promise<void> {
+  log.info('Starting all servers...');
+
+  // Start backend first, then frontend
+  await startBackend();
+  await startFrontend();
+
+  log.info('All servers started successfully');
+}
+
+// Stop all servers
+export async function stopServers(): Promise<void> {
+  log.info('Stopping all servers...');
+
+  const killProcess = (proc: ChildProcess | null, name: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!proc) {
+        resolve();
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        log.warn(`Force killing ${name} process`);
+        proc.kill('SIGKILL');
+        resolve();
+      }, 5000);
+
+      proc.once('exit', () => {
+        clearTimeout(timeout);
+        log.info(`${name} process stopped`);
+        resolve();
+      });
+
+      proc.kill('SIGTERM');
+    });
+  };
+
+  await Promise.all([
+    killProcess(frontendProcess, 'Frontend'),
+    killProcess(backendProcess, 'Backend'),
+  ]);
+
+  frontendProcess = null;
+  backendProcess = null;
+
+  log.info('All servers stopped');
+}
+
+// Check if servers are running
+export function areServersRunning(): boolean {
+  return backendProcess !== null && frontendProcess !== null;
 }
 ```
 
----
+### 4.5 Preload Script (`electron/src/main/preload.ts`)
 
-### Phase 4: Build Configuration (Week 4)
+```typescript
+import { contextBridge, ipcRenderer } from 'electron';
 
-#### 4.6 Electron Builder Configuration (`electron/electron-builder.yml`)
+// Expose protected methods to renderer
+contextBridge.exposeInMainWorld('electronAPI', {
+  // App Information
+  getVersion: () => ipcRenderer.invoke('app:get-version'),
+  getPlatform: () => process.platform,
+  isElectron: true,
+
+  // Window Controls
+  minimize: () => ipcRenderer.invoke('window:minimize'),
+  maximize: () => ipcRenderer.invoke('window:maximize'),
+  close: () => ipcRenderer.invoke('window:close'),
+  isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+
+  // File Dialogs
+  showSaveDialog: (options: any) => ipcRenderer.invoke('dialog:save', options),
+  showOpenDialog: (options: any) => ipcRenderer.invoke('dialog:open', options),
+
+  // File Operations
+  saveFile: (filePath: string, data: Buffer) =>
+    ipcRenderer.invoke('file:save', filePath, data),
+  readFile: (filePath: string) =>
+    ipcRenderer.invoke('file:read', filePath),
+  getDownloadsPath: () => ipcRenderer.invoke('file:get-downloads-path'),
+
+  // Printing
+  print: (options?: any) => ipcRenderer.invoke('print:content', options),
+  printToPDF: (options?: any) => ipcRenderer.invoke('print:to-pdf', options),
+
+  // Notifications
+  showNotification: (title: string, body: string, options?: any) =>
+    ipcRenderer.invoke('notification:show', { title, body, ...options }),
+
+  // Database Settings
+  getDBConfig: () => ipcRenderer.invoke('db:get-config'),
+  saveDBConfig: (config: any) => ipcRenderer.invoke('db:save-config', config),
+  testDBConnection: () => ipcRenderer.invoke('db:test-connection'),
+
+  // Auto Updates
+  checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+  downloadUpdate: () => ipcRenderer.invoke('updater:download'),
+  installUpdate: () => ipcRenderer.invoke('updater:install'),
+  onUpdateAvailable: (callback: (info: any) => void) => {
+    ipcRenderer.on('updater:available', (_, info) => callback(info));
+  },
+  onUpdateProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('updater:progress', (_, progress) => callback(progress));
+  },
+
+  // Shell
+  openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
+  openPath: (path: string) => ipcRenderer.invoke('shell:open-path', path),
+  showItemInFolder: (path: string) => ipcRenderer.invoke('shell:show-in-folder', path),
+
+  // System
+  getSystemInfo: () => ipcRenderer.invoke('system:get-info'),
+});
+
+// TypeScript declaration for window.electronAPI
+declare global {
+  interface Window {
+    electronAPI: {
+      getVersion: () => Promise<string>;
+      getPlatform: () => string;
+      isElectron: boolean;
+      minimize: () => Promise<void>;
+      maximize: () => Promise<void>;
+      close: () => Promise<void>;
+      isMaximized: () => Promise<boolean>;
+      showSaveDialog: (options: any) => Promise<any>;
+      showOpenDialog: (options: any) => Promise<any>;
+      saveFile: (filePath: string, data: Buffer) => Promise<void>;
+      readFile: (filePath: string) => Promise<Buffer>;
+      getDownloadsPath: () => Promise<string>;
+      print: (options?: any) => Promise<void>;
+      printToPDF: (options?: any) => Promise<Buffer>;
+      showNotification: (title: string, body: string, options?: any) => Promise<void>;
+      getDBConfig: () => Promise<any>;
+      saveDBConfig: (config: any) => Promise<void>;
+      testDBConnection: () => Promise<{ success: boolean; error?: string }>;
+      checkForUpdates: () => Promise<void>;
+      downloadUpdate: () => Promise<void>;
+      installUpdate: () => Promise<void>;
+      onUpdateAvailable: (callback: (info: any) => void) => void;
+      onUpdateProgress: (callback: (progress: any) => void) => void;
+      openExternal: (url: string) => Promise<void>;
+      openPath: (path: string) => Promise<void>;
+      showItemInFolder: (path: string) => Promise<void>;
+      getSystemInfo: () => Promise<any>;
+    };
+  }
+}
+```
+
+### 4.6 System Tray (`electron/src/main/tray.ts`)
+
+```typescript
+import { Tray, Menu, BrowserWindow, app, nativeImage } from 'electron';
+import { join } from 'path';
+
+let tray: Tray | null = null;
+
+export function createTray(mainWindow: BrowserWindow): void {
+  const iconPath = join(__dirname, '../../resources/icon.png');
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+
+  tray = new Tray(icon);
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show TMS',
+      click: () => {
+        mainWindow.show();
+        mainWindow.focus();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Dashboard',
+      click: () => {
+        mainWindow.show();
+        mainWindow.webContents.send('navigate', '/dashboard');
+      },
+    },
+    {
+      label: 'Orders',
+      click: () => {
+        mainWindow.show();
+        mainWindow.webContents.send('navigate', '/orders');
+      },
+    },
+    {
+      label: 'Customers',
+      click: () => {
+        mainWindow.show();
+        mainWindow.webContents.send('navigate', '/customers');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Check for Updates',
+      click: () => {
+        mainWindow.webContents.send('check-updates');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: `Version ${app.getVersion()}`,
+      enabled: false,
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit TMS',
+      click: () => {
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setToolTip('TMS - Tiffin Management System');
+  tray.setContextMenu(contextMenu);
+
+  // Show window on tray click
+  tray.on('click', () => {
+    if (mainWindow.isVisible()) {
+      mainWindow.focus();
+    } else {
+      mainWindow.show();
+    }
+  });
+
+  // Double-click to show
+  tray.on('double-click', () => {
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
+export function destroyTray(): void {
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+}
+
+export function updateTrayTooltip(message: string): void {
+  if (tray) {
+    tray.setToolTip(`TMS - ${message}`);
+  }
+}
+```
+
+### 4.7 IPC Handlers (`electron/src/main/ipc/index.ts`)
+
+```typescript
+import { ipcMain, dialog, shell, app, BrowserWindow, Notification } from 'electron';
+import { writeFile, readFile } from 'fs/promises';
+import { join } from 'path';
+import log from 'electron-log';
+import { getDBConfig, saveDBConfig, checkMySQLConnection } from '../database';
+
+export function setupIPC(): void {
+  // App info
+  ipcMain.handle('app:get-version', () => app.getVersion());
+
+  // Window controls
+  ipcMain.handle('window:minimize', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+
+  ipcMain.handle('window:maximize', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window?.isMaximized()) {
+      window.unmaximize();
+    } else {
+      window?.maximize();
+    }
+  });
+
+  ipcMain.handle('window:close', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  ipcMain.handle('window:is-maximized', (event) => {
+    return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+  });
+
+  // File dialogs
+  ipcMain.handle('dialog:save', async (event, options) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return dialog.showSaveDialog(window!, {
+      title: options.title || 'Save File',
+      defaultPath: options.defaultPath || join(app.getPath('downloads'), options.fileName || 'file'),
+      filters: options.filters || [
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+  });
+
+  ipcMain.handle('dialog:open', async (event, options) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return dialog.showOpenDialog(window!, {
+      title: options.title || 'Open File',
+      defaultPath: options.defaultPath,
+      filters: options.filters,
+      properties: options.properties || ['openFile'],
+    });
+  });
+
+  // File operations
+  ipcMain.handle('file:save', async (_, filePath, data) => {
+    try {
+      await writeFile(filePath, data);
+      log.info(`File saved: ${filePath}`);
+    } catch (error: any) {
+      log.error(`Failed to save file: ${error.message}`);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('file:read', async (_, filePath) => {
+    try {
+      return await readFile(filePath);
+    } catch (error: any) {
+      log.error(`Failed to read file: ${error.message}`);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('file:get-downloads-path', () => app.getPath('downloads'));
+
+  // Printing
+  ipcMain.handle('print:content', async (event, options) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return new Promise((resolve, reject) => {
+      window?.webContents.print(
+        {
+          silent: options?.silent || false,
+          printBackground: true,
+          ...options,
+        },
+        (success, errorType) => {
+          if (success) {
+            resolve(true);
+          } else {
+            reject(new Error(errorType));
+          }
+        }
+      );
+    });
+  });
+
+  ipcMain.handle('print:to-pdf', async (event, options) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return window?.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'A4',
+      ...options,
+    });
+  });
+
+  // Notifications
+  ipcMain.handle('notification:show', (_, { title, body, ...options }) => {
+    new Notification({
+      title,
+      body,
+      icon: join(__dirname, '../../../resources/icon.png'),
+      ...options,
+    }).show();
+  });
+
+  // Database config
+  ipcMain.handle('db:get-config', () => getDBConfig());
+  ipcMain.handle('db:save-config', (_, config) => saveDBConfig(config));
+  ipcMain.handle('db:test-connection', () => checkMySQLConnection());
+
+  // Shell operations
+  ipcMain.handle('shell:open-external', (_, url) => shell.openExternal(url));
+  ipcMain.handle('shell:open-path', (_, path) => shell.openPath(path));
+  ipcMain.handle('shell:show-in-folder', (_, path) => shell.showItemInFolder(path));
+
+  // System info
+  ipcMain.handle('system:get-info', () => ({
+    platform: process.platform,
+    arch: process.arch,
+    version: app.getVersion(),
+    electronVersion: process.versions.electron,
+    nodeVersion: process.versions.node,
+    chromeVersion: process.versions.chrome,
+  }));
+
+  log.info('IPC handlers registered');
+}
+```
+
+### 4.8 Electron Builder Configuration (`electron/electron-builder.yml`)
 
 ```yaml
 appId: com.tms.desktop
 productName: TMS Desktop
 copyright: Copyright © 2024 TMS
 
+# Output directory
 directories:
   output: dist
   buildResources: resources
 
+# Files to include
 files:
-  - "main/**/*"
-  - "preload/**/*"
-  - "!node_modules/**/*"
-  - "node_modules/**/*"
+  - dist/**/*
+  - package.json
 
+# Bundle backend and frontend as extra resources (unpacked for server access)
 extraResources:
-  - from: "../Backend"
-    to: "backend"
+  - from: ../Backend/.next
+    to: backend/.next
     filter:
       - "**/*"
-      - "!node_modules/**/*"
-  - from: "../Frontend"
-    to: "frontend"
+  - from: ../Backend/node_modules
+    to: backend/node_modules
     filter:
-      - ".next/**/*"
-      - "public/**/*"
-      - "package.json"
+      - "**/*"
+  - from: ../Backend/package.json
+    to: backend/package.json
+  - from: ../Backend/public
+    to: backend/public
+    filter:
+      - "**/*"
+  - from: ../Frontend/.next
+    to: frontend/.next
+    filter:
+      - "**/*"
+  - from: ../Frontend/node_modules
+    to: frontend/node_modules
+    filter:
+      - "**/*"
+  - from: ../Frontend/package.json
+    to: frontend/package.json
+  - from: ../Frontend/public
+    to: frontend/public
+    filter:
+      - "**/*"
+
+# ASAR archive settings
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - "**/node_modules/**"
 
 # Windows Configuration
 win:
   target:
     - target: nsis
       arch: [x64]
-    - target: portable
-      arch: [x64]
   icon: resources/icon.ico
   publisherName: TMS
+  artifactName: TMS-Desktop-${version}-Windows-Setup.${ext}
 
 nsis:
   oneClick: false
@@ -512,20 +1130,19 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: TMS Desktop
+  menuCategory: TMS
+  license: LICENSE.txt
 
 # macOS Configuration
 mac:
   target:
     - target: dmg
       arch: [x64, arm64]
-    - target: zip
-      arch: [x64, arm64]
   icon: resources/icon.icns
   category: public.app-category.business
   hardenedRuntime: true
   gatekeeperAssess: false
-  entitlements: entitlements.mac.plist
-  entitlementsInherit: entitlements.mac.inherit.plist
+  artifactName: TMS-Desktop-${version}-macOS-${arch}.${ext}
 
 dmg:
   contents:
@@ -535,6 +1152,9 @@ dmg:
       y: 220
       type: link
       path: /Applications
+  window:
+    width: 540
+    height: 400
 
 # Linux Configuration
 linux:
@@ -547,485 +1167,455 @@ linux:
       arch: [x64]
   icon: resources/icons
   category: Office
-  maintainer: tms@example.com
+  maintainer: your-email@example.com
   vendor: TMS
+  artifactName: TMS-Desktop-${version}-Linux-${arch}.${ext}
+  desktop:
+    Name: TMS Desktop
+    Comment: Tiffin Management System
+    Categories: Office;Business;
+
+appImage:
+  license: LICENSE.txt
+
+deb:
+  depends:
+    - libmysqlclient21
+  afterInstall: scripts/after-install.sh
+
+rpm:
+  depends:
+    - mysql-community-libs
 
 # Auto-update configuration
 publish:
   provider: github
-  owner: your-github-username
+  owner: ParthG1810
   repo: TMS_DEV_NODEJS
   releaseType: release
 ```
 
 ---
 
-### Phase 5: Native Integrations (Week 5)
+## 5. Required Backend Changes
 
-#### 4.7 System Tray with Notifications
+### 5.1 Add Health Check Endpoint
+
+Create file: `Backend/pages/api/health.ts`
 
 ```typescript
-// electron/main/notifications.ts
-import { Notification, nativeImage } from 'electron';
-import { join } from 'path';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import mysql from 'mysql2/promise';
 
-export function showNotification(title: string, body: string): void {
-  const icon = nativeImage.createFromPath(
-    join(__dirname, '../resources/icon.png')
-  );
-
-  new Notification({
-    title,
-    body,
-    icon,
-  }).show();
+interface HealthResponse {
+  status: 'ok' | 'error';
+  timestamp: number;
+  database: 'connected' | 'disconnected';
+  version: string;
 }
 
-// Usage: New order notification
-export function notifyNewOrder(customerName: string, orderDetails: string): void {
-  showNotification(
-    `New Order from ${customerName}`,
-    orderDetails
-  );
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<HealthResponse>
+) {
+  let dbStatus: 'connected' | 'disconnected' = 'disconnected';
+
+  try {
+    const connection = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '3306'),
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'tms_db',
+    });
+
+    await connection.query('SELECT 1');
+    await connection.end();
+    dbStatus = 'connected';
+  } catch (error) {
+    dbStatus = 'disconnected';
+  }
+
+  res.status(dbStatus === 'connected' ? 200 : 503).json({
+    status: dbStatus === 'connected' ? 'ok' : 'error',
+    timestamp: Date.now(),
+    database: dbStatus,
+    version: process.env.npm_package_version || '1.0.0',
+  });
 }
 ```
 
-#### 4.8 Native File Dialog Integration
+### 5.2 Update Environment Variables
 
-```typescript
-// electron/main/dialogs.ts
-import { dialog, ipcMain, BrowserWindow } from 'electron';
+Update `Backend/.env`:
 
-ipcMain.handle('show-save-dialog', async (event, options) => {
-  const window = BrowserWindow.fromWebContents(event.sender);
+```env
+# Add these for desktop app compatibility
+NODE_ENV=production
+PORT=3000
 
-  const result = await dialog.showSaveDialog(window!, {
-    title: options.title || 'Save File',
-    defaultPath: options.defaultPath,
-    filters: options.filters || [
-      { name: 'PDF Documents', extensions: ['pdf'] },
-      { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
-      { name: 'All Files', extensions: ['*'] }
-    ],
-  });
+# Database - Local MySQL (same for all platforms)
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=tms_db
 
-  return result;
-});
-
-ipcMain.handle('show-open-dialog', async (event, options) => {
-  const window = BrowserWindow.fromWebContents(event.sender);
-
-  const result = await dialog.showOpenDialog(window!, {
-    title: options.title || 'Open File',
-    properties: options.properties || ['openFile'],
-    filters: options.filters,
-  });
-
-  return result;
-});
-```
-
-#### 4.9 Print Integration
-
-```typescript
-// electron/main/printing.ts
-import { ipcMain, BrowserWindow } from 'electron';
-
-ipcMain.handle('print-content', async (event, options) => {
-  const window = BrowserWindow.fromWebContents(event.sender);
-
-  return new Promise((resolve, reject) => {
-    window?.webContents.print(
-      {
-        silent: options.silent || false,
-        printBackground: true,
-        margins: { marginType: 'default' },
-      },
-      (success, errorType) => {
-        if (success) resolve(true);
-        else reject(new Error(errorType));
-      }
-    );
-  });
-});
-
-ipcMain.handle('print-to-pdf', async (event, options) => {
-  const window = BrowserWindow.fromWebContents(event.sender);
-
-  const pdfData = await window?.webContents.printToPDF({
-    printBackground: true,
-    margins: { marginType: 'default' },
-    pageSize: options.pageSize || 'A4',
-  });
-
-  return pdfData;
-});
+# API URLs for desktop
+DEV_API=http://localhost:3000
+PRODUCTION_API=http://localhost:3000
 ```
 
 ---
 
-### Phase 6: Auto-Update System (Week 5-6)
+## 6. Frontend Integration
 
-#### 4.10 Auto-Updater Implementation
+### 6.1 Electron Detection Utility
 
-```typescript
-// electron/main/utils/updater.ts
-import { autoUpdater } from 'electron-updater';
-import { dialog, BrowserWindow } from 'electron';
-import log from 'electron-log';
-
-export function setupAutoUpdater(): void {
-  autoUpdater.logger = log;
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on('checking-for-update', () => {
-    log.info('Checking for updates...');
-  });
-
-  autoUpdater.on('update-available', async (info) => {
-    log.info('Update available:', info.version);
-
-    const result = await dialog.showMessageBox({
-      type: 'info',
-      title: 'Update Available',
-      message: `A new version (${info.version}) is available. Would you like to download it?`,
-      buttons: ['Download', 'Later'],
-      defaultId: 0,
-    });
-
-    if (result.response === 0) {
-      autoUpdater.downloadUpdate();
-    }
-  });
-
-  autoUpdater.on('update-not-available', () => {
-    log.info('No updates available');
-  });
-
-  autoUpdater.on('download-progress', (progress) => {
-    const window = BrowserWindow.getFocusedWindow();
-    window?.setProgressBar(progress.percent / 100);
-    log.info(`Download progress: ${progress.percent.toFixed(2)}%`);
-  });
-
-  autoUpdater.on('update-downloaded', async (info) => {
-    const window = BrowserWindow.getFocusedWindow();
-    window?.setProgressBar(-1); // Remove progress bar
-
-    const result = await dialog.showMessageBox({
-      type: 'info',
-      title: 'Update Ready',
-      message: `Version ${info.version} has been downloaded. Restart now to apply the update?`,
-      buttons: ['Restart', 'Later'],
-      defaultId: 0,
-    });
-
-    if (result.response === 0) {
-      autoUpdater.quitAndInstall();
-    }
-  });
-
-  autoUpdater.on('error', (err) => {
-    log.error('Auto-updater error:', err);
-  });
-
-  // Check for updates on startup (with delay)
-  setTimeout(() => {
-    autoUpdater.checkForUpdates();
-  }, 10000);
-
-  // Check for updates every 4 hours
-  setInterval(() => {
-    autoUpdater.checkForUpdates();
-  }, 4 * 60 * 60 * 1000);
-}
-```
-
----
-
-### Phase 7: Frontend Modifications (Week 6)
-
-#### 4.11 Preload Script for IPC
+Create file: `Frontend/src/utils/electron.ts`
 
 ```typescript
-// electron/main/preload.ts
-import { contextBridge, ipcRenderer } from 'electron';
-
-contextBridge.exposeInMainWorld('electronAPI', {
-  // App info
-  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-  getPlatform: () => process.platform,
-
-  // File dialogs
-  showSaveDialog: (options: any) => ipcRenderer.invoke('show-save-dialog', options),
-  showOpenDialog: (options: any) => ipcRenderer.invoke('show-open-dialog', options),
-
-  // File operations
-  writeFile: (path: string, data: any) => ipcRenderer.invoke('write-file', path, data),
-  readFile: (path: string) => ipcRenderer.invoke('read-file', path),
-
-  // Printing
-  print: (options: any) => ipcRenderer.invoke('print-content', options),
-  printToPDF: (options: any) => ipcRenderer.invoke('print-to-pdf', options),
-
-  // Notifications
-  showNotification: (title: string, body: string) =>
-    ipcRenderer.invoke('show-notification', title, body),
-
-  // Database (if using embedded)
-  dbQuery: (sql: string, params: any[]) => ipcRenderer.invoke('db-query', sql, params),
-
-  // Updates
-  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-
-  // Window controls
-  minimize: () => ipcRenderer.invoke('window-minimize'),
-  maximize: () => ipcRenderer.invoke('window-maximize'),
-  close: () => ipcRenderer.invoke('window-close'),
-});
-```
-
-#### 4.12 Frontend Electron Detection
-
-```typescript
-// Frontend/src/utils/electron.ts
+// Check if running in Electron
 export const isElectron = (): boolean => {
   return typeof window !== 'undefined' &&
-         window.electronAPI !== undefined;
+         window.electronAPI !== undefined &&
+         window.electronAPI.isElectron === true;
 };
 
+// Get Electron API with type safety
 export const getElectronAPI = () => {
   if (!isElectron()) {
-    throw new Error('Not running in Electron');
+    return null;
   }
-  return (window as any).electronAPI;
+  return window.electronAPI;
 };
 
-// Usage example
+// Save file with native dialog (falls back to browser download)
 export const saveFileWithDialog = async (
-  content: Blob,
-  defaultName: string
+  content: Blob | Buffer,
+  fileName: string,
+  filters?: { name: string; extensions: string[] }[]
 ): Promise<boolean> => {
-  if (isElectron()) {
-    const api = getElectronAPI();
-    const result = await api.showSaveDialog({
-      defaultPath: defaultName,
-    });
+  const api = getElectronAPI();
 
-    if (!result.canceled && result.filePath) {
-      const buffer = await content.arrayBuffer();
-      await api.writeFile(result.filePath, Buffer.from(buffer));
-      return true;
+  if (api) {
+    try {
+      const result = await api.showSaveDialog({
+        fileName,
+        filters: filters || [{ name: 'All Files', extensions: ['*'] }],
+      });
+
+      if (!result.canceled && result.filePath) {
+        const buffer = content instanceof Blob
+          ? Buffer.from(await content.arrayBuffer())
+          : content;
+        await api.saveFile(result.filePath, buffer);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to save file:', error);
+      return false;
     }
-    return false;
   } else {
-    // Fallback to browser download
-    const url = URL.createObjectURL(content);
+    // Browser fallback
+    const blob = content instanceof Blob ? content : new Blob([content]);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = defaultName;
+    a.download = fileName;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
     return true;
   }
 };
+
+// Print with native dialog
+export const printContent = async (options?: any): Promise<void> => {
+  const api = getElectronAPI();
+
+  if (api) {
+    await api.print(options);
+  } else {
+    window.print();
+  }
+};
+
+// Export to PDF
+export const exportToPDF = async (fileName: string): Promise<boolean> => {
+  const api = getElectronAPI();
+
+  if (api) {
+    try {
+      const pdfData = await api.printToPDF();
+      return saveFileWithDialog(pdfData, fileName, [
+        { name: 'PDF Documents', extensions: ['pdf'] },
+      ]);
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      return false;
+    }
+  }
+  return false;
+};
+
+// Show native notification
+export const showNotification = (title: string, body: string): void => {
+  const api = getElectronAPI();
+
+  if (api) {
+    api.showNotification(title, body);
+  } else if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, { body });
+  }
+};
+```
+
+### 6.2 Desktop-Aware Components Example
+
+```typescript
+// Frontend/src/components/ExportButton.tsx
+import { useState } from 'react';
+import { Button, Menu, MenuItem } from '@mui/material';
+import { Download } from '@mui/icons-material';
+import { isElectron, saveFileWithDialog, exportToPDF } from '@/utils/electron';
+
+interface ExportButtonProps {
+  data: any;
+  fileName: string;
+}
+
+export function ExportButton({ data, fileName }: ExportButtonProps) {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleExportJSON = async () => {
+    const content = JSON.stringify(data, null, 2);
+    const blob = new Blob([content], { type: 'application/json' });
+    await saveFileWithDialog(blob, `${fileName}.json`, [
+      { name: 'JSON Files', extensions: ['json'] },
+    ]);
+    setAnchorEl(null);
+  };
+
+  const handleExportPDF = async () => {
+    if (isElectron()) {
+      await exportToPDF(`${fileName}.pdf`);
+    } else {
+      window.print();
+    }
+    setAnchorEl(null);
+  };
+
+  return (
+    <>
+      <Button
+        startIcon={<Download />}
+        onClick={(e) => setAnchorEl(e.currentTarget)}
+      >
+        Export
+      </Button>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+      >
+        <MenuItem onClick={handleExportJSON}>Export as JSON</MenuItem>
+        <MenuItem onClick={handleExportPDF}>Export as PDF</MenuItem>
+      </Menu>
+    </>
+  );
+}
 ```
 
 ---
 
-## 5. Development Workflow
+## 7. Build & Distribution
 
-### 5.1 Development Scripts
+### 7.1 Build Commands
 
-```json
-// electron/package.json
-{
-  "name": "tms-desktop",
-  "version": "1.0.0",
-  "main": "main/index.js",
-  "scripts": {
-    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
-    "dev:main": "electron .",
-    "dev:renderer": "cd ../Frontend && yarn dev",
-    "build": "tsc && npm run build:renderer",
-    "build:renderer": "cd ../Frontend && yarn build",
-    "package": "electron-builder --config electron-builder.yml",
-    "package:win": "electron-builder --win --config electron-builder.yml",
-    "package:mac": "electron-builder --mac --config electron-builder.yml",
-    "package:linux": "electron-builder --linux --config electron-builder.yml",
-    "publish": "electron-builder --publish always"
-  }
-}
+```bash
+# Development
+cd electron
+npm run dev
+
+# Build for current platform
+npm run package
+
+# Build for specific platform
+npm run package:win      # Windows
+npm run package:mac      # macOS
+npm run package:linux    # Linux
+
+# Build for all platforms
+npm run package:all
 ```
 
-### 5.2 Root Package.json Workspaces
+### 7.2 Output Files
 
-```json
-// package.json (root)
-{
-  "name": "tms-monorepo",
-  "private": true,
-  "workspaces": [
-    "Frontend",
-    "Backend",
-    "electron"
-  ],
-  "scripts": {
-    "dev:web": "concurrently \"npm run dev --workspace=Backend\" \"npm run dev --workspace=Frontend\"",
-    "dev:desktop": "npm run dev --workspace=electron",
-    "build:desktop": "npm run build --workspace=electron && npm run package --workspace=electron",
-    "build:all": "npm run build --workspace=Backend && npm run build --workspace=Frontend && npm run build --workspace=electron"
-  }
-}
-```
+| Platform | Format | File Name |
+|----------|--------|-----------|
+| Windows | NSIS Installer | `TMS-Desktop-1.0.0-Windows-Setup.exe` |
+| macOS Intel | DMG | `TMS-Desktop-1.0.0-macOS-x64.dmg` |
+| macOS ARM | DMG | `TMS-Desktop-1.0.0-macOS-arm64.dmg` |
+| Linux | AppImage | `TMS-Desktop-1.0.0-Linux-x64.AppImage` |
+| Linux | DEB | `TMS-Desktop-1.0.0-Linux-x64.deb` |
+| Linux | RPM | `TMS-Desktop-1.0.0-Linux-x64.rpm` |
 
 ---
 
-## 6. Recommendations
+## 8. Installation Guide for End Users
 
-### 6.1 High Priority Recommendations
+### 8.1 Step 1: Install MySQL
+
+**Windows:**
+1. Download MySQL Installer from https://dev.mysql.com/downloads/installer/
+2. Run installer and select "MySQL Server"
+3. Complete installation with default settings
+4. Remember your root password
+
+**macOS:**
+```bash
+brew install mysql
+brew services start mysql
+mysql_secure_installation
+```
+
+**Linux (Ubuntu):**
+```bash
+sudo apt update
+sudo apt install mysql-server
+sudo systemctl start mysql
+sudo mysql_secure_installation
+```
+
+### 8.2 Step 2: Create Database
+
+```sql
+-- Connect to MySQL
+mysql -u root -p
+
+-- Create database
+CREATE DATABASE tms_db;
+
+-- Import schema
+USE tms_db;
+SOURCE /path/to/TMS_DEV_NODEJS/database/complete_schema.sql;
+```
+
+### 8.3 Step 3: Install TMS Desktop
+
+1. Download the installer for your platform
+2. Run the installer
+3. On first launch, configure database connection:
+   - Host: localhost
+   - Port: 3306
+   - User: root
+   - Password: (your MySQL password)
+   - Database: tms_db
+
+---
+
+## 9. Recommendations
+
+### 9.1 High Priority
 
 | # | Recommendation | Rationale |
 |---|----------------|-----------|
-| 1 | **Start with Option A** | Fastest path to desktop app with minimal risk |
-| 2 | **Add health check endpoint** | Required for server startup verification |
-| 3 | **Implement proper logging** | Essential for debugging desktop issues |
-| 4 | **Use electron-store** | For persisting user preferences locally |
-| 5 | **Code sign your app** | Required for macOS Gatekeeper and Windows SmartScreen |
+| 1 | **Add MySQL installation check** | Show friendly error if MySQL not found |
+| 2 | **Implement database setup wizard** | First-run wizard to create database |
+| 3 | **Add connection settings UI** | Allow users to configure DB connection |
+| 4 | **Implement auto-backup** | Backup database to user's documents |
+| 5 | **Code sign the app** | Required for Windows/macOS distribution |
 
-### 6.2 Performance Recommendations
+### 9.2 Performance
 
 | # | Recommendation | Impact |
 |---|----------------|--------|
-| 1 | **Lazy load heavy components** | Faster startup time |
-| 2 | **Use background workers** | Prevent UI freezes during heavy operations |
-| 3 | **Implement splash screen** | Better perceived performance |
-| 4 | **Cache API responses** | Reduce server load and improve responsiveness |
-| 5 | **Use production builds** | Significant performance improvement |
+| 1 | **Add splash screen** | Better perceived startup time |
+| 2 | **Lazy load frontend routes** | Faster initial render |
+| 3 | **Cache static assets** | Reduce server load |
+| 4 | **Use production builds** | Significant performance gain |
 
-### 6.3 Security Recommendations
+### 9.3 Security
 
 | # | Recommendation | Implementation |
 |---|----------------|----------------|
-| 1 | **Enable context isolation** | `contextIsolation: true` (already recommended) |
-| 2 | **Disable node integration** | `nodeIntegration: false` (already recommended) |
-| 3 | **Use preload scripts** | For controlled IPC exposure |
-| 4 | **Validate IPC inputs** | Prevent injection attacks |
-| 5 | **Store secrets securely** | Use `electron-store` with encryption |
-
-### 6.4 Distribution Recommendations
-
-| Platform | Recommended Format | Notes |
-|----------|-------------------|-------|
-| Windows | NSIS Installer | User-friendly, supports auto-update |
-| macOS | DMG + Notarization | Required for distribution |
-| Linux | AppImage | Universal, no root required |
+| 1 | **Store DB password securely** | Use electron-store with encryption |
+| 2 | **Enable context isolation** | Already implemented in preload |
+| 3 | **Validate all IPC inputs** | Prevent injection attacks |
+| 4 | **Use HTTPS for external APIs** | Encrypt network traffic |
 
 ---
 
-## 7. File Modifications Required
+## 10. Timeline
 
-### 7.1 Backend Changes
+| Phase | Duration | Tasks |
+|-------|----------|-------|
+| **Phase 1** | Week 1 | Project setup, Electron structure, basic window |
+| **Phase 2** | Week 2 | Server management, MySQL connection check |
+| **Phase 3** | Week 3 | IPC handlers, preload script, native dialogs |
+| **Phase 4** | Week 4 | System tray, notifications, auto-updater |
+| **Phase 5** | Week 5 | Build configuration, packaging for all platforms |
+| **Phase 6** | Week 6 | Testing, bug fixes, documentation |
 
-1. **Add health check endpoint** (`Backend/pages/api/health.ts`):
-```typescript
-export default function handler(req, res) {
-  res.status(200).json({ status: 'ok', timestamp: Date.now() });
-}
-```
-
-2. **Update CORS configuration** for localhost variations
-
-3. **Make file paths configurable** for electron app data directory
-
-### 7.2 Frontend Changes
-
-1. **Add electron detection utility**
-2. **Conditionally use native dialogs** for file save/open
-3. **Add native print support** for invoices/labels
-4. **Update API URL configuration** for packaged app
+**Total: 6 weeks**
 
 ---
 
-## 8. Testing Strategy
+## 11. Framework Comparison (Reference)
 
-### 8.1 Testing Matrix
+| Feature | Electron | Tauri | NW.js | Flutter Desktop |
+|---------|----------|-------|-------|-----------------|
+| **Bundle Size** | ~150-400MB | ~3-10MB | ~100-300MB | ~20-50MB |
+| **Memory Usage** | ~200-300MB | ~30-40MB | ~150-250MB | ~50-100MB |
+| **Startup Time** | 1-2s | <0.5s | 1-2s | <1s |
+| **Code Reuse** | 95%+ | 70-80% | 95%+ | 0% (rewrite) |
+| **Learning Curve** | Low | Medium | Low | High |
+| **Node.js Support** | Full | Limited | Full | None |
+| **Best For** | Web apps | Lightweight apps | Web apps | New apps |
 
-| Test Type | Tools | Coverage |
-|-----------|-------|----------|
-| Unit Tests | Jest, React Testing Library | Components, utilities |
-| Integration Tests | Playwright, Spectron | Electron-specific flows |
-| E2E Tests | Playwright | Full user journeys |
-| Manual Testing | - | All platforms (Win/Mac/Linux) |
-
-### 8.2 Platform Testing Checklist
-
-- [ ] Windows 10/11 installation and launch
-- [ ] macOS (Intel and Apple Silicon)
-- [ ] Ubuntu/Debian Linux
-- [ ] Auto-update flow
-- [ ] Offline mode (if implemented)
-- [ ] File operations (save, open, print)
-- [ ] System tray functionality
-- [ ] Native notifications
+**Verdict:** For TMS, **Electron is the best choice** because:
+- Maximum code reuse (95%+)
+- Full Node.js support for backend
+- No learning curve for the team
+- Works with existing Next.js architecture
+- MySQL support via node mysql2 package
 
 ---
 
-## 9. Timeline Summary
+## 12. Files to Create
 
-| Phase | Duration | Deliverables |
-|-------|----------|--------------|
-| Phase 1: Setup | Week 1-2 | Project structure, dependencies |
-| Phase 2: Main Process | Week 2-3 | Electron shell, server management |
-| Phase 3: Database | Week 3-4 | Database integration strategy |
-| Phase 4: Build Config | Week 4 | Multi-platform builds |
-| Phase 5: Native Features | Week 5 | Tray, notifications, dialogs |
-| Phase 6: Auto-Update | Week 5-6 | Update system |
-| Phase 7: Frontend | Week 6 | IPC integration |
-| Phase 8: Testing | Week 7-8 | Full testing cycle |
-| Phase 9: Release | Week 8 | Distribution, documentation |
-
-**Total Estimated Duration: 8 weeks**
-
----
-
-## 10. Future Enhancements
-
-After the initial release, consider these enhancements:
-
-1. **Offline Mode**: Local SQLite with sync capability
-2. **Native Printing**: Direct thermal printer support for labels
-3. **Barcode Scanning**: USB barcode scanner integration
-4. **Keyboard Shortcuts**: Global hotkeys for common actions
-5. **Multiple Windows**: Support for multi-monitor setups
-6. **Deep Linking**: Custom protocol handler (`tms://`)
-7. **Crash Reporting**: Sentry or similar integration
-8. **Usage Analytics**: Opt-in telemetry for improvement insights
+| File | Purpose |
+|------|---------|
+| `electron/package.json` | Electron dependencies and scripts |
+| `electron/tsconfig.json` | TypeScript configuration |
+| `electron/electron-builder.yml` | Build configuration |
+| `electron/src/main/index.ts` | Main process entry |
+| `electron/src/main/preload.ts` | Preload script |
+| `electron/src/main/servers.ts` | Server manager |
+| `electron/src/main/database.ts` | MySQL connection |
+| `electron/src/main/tray.ts` | System tray |
+| `electron/src/main/menu.ts` | Application menu |
+| `electron/src/main/updater.ts` | Auto-updater |
+| `electron/src/main/ipc/index.ts` | IPC handlers |
+| `electron/src/splash/index.html` | Splash screen |
+| `electron/resources/icon.*` | App icons |
+| `Backend/pages/api/health.ts` | Health check API |
+| `Frontend/src/utils/electron.ts` | Electron utilities |
 
 ---
 
-## 11. Alternative Technologies Considered
+## 13. Conclusion
 
-| Technology | Pros | Cons | Verdict |
-|------------|------|------|---------|
-| **Electron** | Full Node.js API, mature ecosystem | Large bundle size | ✅ Selected |
-| **Tauri** | Smaller bundles, Rust backend | Learning curve, less ecosystem | Consider for v2 |
-| **NW.js** | Similar to Electron | Smaller community | Not recommended |
-| **Neutralinojs** | Very small bundles | Limited native access | Not suitable |
-| **PWA** | No packaging needed | Limited native features | Supplement only |
+This plan enables converting TMS to a desktop application with:
 
----
+- **No database changes** - Uses existing local MySQL
+- **Minimal code changes** - 95%+ code reuse
+- **Cross-platform support** - Windows, macOS, Linux
+- **Native features** - System tray, notifications, file dialogs, printing
+- **Auto-updates** - Seamless update distribution
+- **6-week timeline** - Fast time to market
 
-## 12. Conclusion
-
-Converting TMS to an Electron desktop application is a viable and recommended approach. The existing Next.js architecture maps well to Electron's capabilities, and the phased implementation approach minimizes risk while delivering value incrementally.
-
-The recommended path (Option A with embedded servers) provides:
-- **90%+ code reuse** from the existing web application
-- **Cross-platform support** (Windows, macOS, Linux)
-- **Native desktop features** (system tray, notifications, file dialogs)
-- **Auto-update capability** for easy maintenance
-- **Reasonable timeline** of 8 weeks to first release
-
-Start with the basic wrapper and progressively add native features based on user feedback and business requirements.
+The Electron approach is optimal for TMS because it preserves the existing architecture while adding desktop capabilities.
