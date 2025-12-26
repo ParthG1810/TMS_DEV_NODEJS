@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
@@ -26,9 +26,8 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  InputAdornment,
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers';
+import { useTheme } from '@mui/material/styles';
 import DashboardLayout from '../../../layouts/dashboard';
 import CustomBreadcrumbs from '../../../components/custom-breadcrumbs';
 import { PATH_DASHBOARD } from '../../../routes/paths';
@@ -49,6 +48,14 @@ import {
 } from '../../../components/table';
 import { fCurrency } from '../../../utils/formatNumber';
 import { fDateTime, fDate } from '../../../utils/formatTime';
+import { PaymentAnalytic, PaymentTableToolbar } from '../../../sections/@dashboard/payments/history/list';
+
+// ----------------------------------------------------------------------
+
+// Helper function for sumBy
+function sumBy<T>(array: T[], iteratee: (item: T) => number): number {
+  return array.reduce((sum, item) => sum + iteratee(item), 0);
+}
 
 // ----------------------------------------------------------------------
 
@@ -91,12 +98,6 @@ const TABLE_HEAD = [
   { id: 'actions', label: '', align: 'right' },
 ];
 
-const TYPE_OPTIONS = [
-  { value: 'all', label: 'All Payments' },
-  { value: 'online', label: 'Online (Interac)' },
-  { value: 'cash', label: 'Cash' },
-];
-
 // ----------------------------------------------------------------------
 
 PaymentHistoryPage.getLayout = (page: React.ReactElement) => (
@@ -106,9 +107,11 @@ PaymentHistoryPage.getLayout = (page: React.ReactElement) => (
 // ----------------------------------------------------------------------
 
 export default function PaymentHistoryPage() {
+  const theme = useTheme();
   const { themeStretch } = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     dense,
@@ -123,11 +126,15 @@ export default function PaymentHistoryPage() {
   } = useTable({ defaultOrderBy: 'payment_date', defaultOrder: 'desc' });
 
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
   const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filterName, setFilterName] = useState('');
+  const [filterPaymentType, setFilterPaymentType] = useState('');
+  const [filterAmountOperator, setFilterAmountOperator] = useState('');
+  const [filterAmountValue, setFilterAmountValue] = useState('');
   const [openDelete, setOpenDelete] = useState(false);
   const [openDeleteReason, setOpenDeleteReason] = useState(false);
   const [openDetails, setOpenDetails] = useState(false);
@@ -140,17 +147,7 @@ export default function PaymentHistoryPage() {
   const fetchPayments = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = {};
-      if (filterType !== 'all') {
-        params.payment_type = filterType;
-      }
-      if (filterStartDate) {
-        params.start_date = filterStartDate.toISOString().split('T')[0];
-      }
-      if (filterEndDate) {
-        params.end_date = filterEndDate.toISOString().split('T')[0];
-      }
-      const response = await axios.get('/api/payment-records', { params });
+      const response = await axios.get('/api/payment-records');
       if (response.data.success) {
         setPayments(response.data.data);
       }
@@ -160,16 +157,91 @@ export default function PaymentHistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterStartDate, filterEndDate, enqueueSnackbar]);
+  }, [enqueueSnackbar]);
 
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
 
-  const handleFilterType = (_event: React.SyntheticEvent, newValue: string) => {
-    setPage(0);
-    setFilterType(newValue);
+  // Calculate status counts
+  const getStatusCount = (status: string) => {
+    if (status === 'all') return payments.length;
+    return payments.filter((payment) => payment.allocation_status === status).length;
   };
+
+  const getTotalAmountByStatus = (status: string) => {
+    if (status === 'all') return sumBy(payments, (payment) => Number(payment.amount) || 0);
+    return sumBy(
+      payments.filter((payment) => payment.allocation_status === status),
+      (payment) => Number(payment.amount) || 0
+    );
+  };
+
+  const getPercentByStatus = (status: string) => {
+    if (payments.length === 0) return 0;
+    return (getStatusCount(status) / payments.length) * 100;
+  };
+
+  const TABS = [
+    { value: 'all', label: 'All', color: 'info', count: payments.length },
+    { value: 'unallocated', label: 'Unallocated', color: 'warning', count: getStatusCount('unallocated') },
+    { value: 'partial', label: 'Partial', color: 'secondary', count: getStatusCount('partial') },
+    { value: 'fully_allocated', label: 'Allocated', color: 'success', count: getStatusCount('fully_allocated') },
+    { value: 'has_excess', label: 'Has Credit', color: 'primary', count: getStatusCount('has_excess') },
+  ] as const;
+
+  const handleFilterStatus = (_event: React.SyntheticEvent, newValue: string) => {
+    setPage(0);
+    setFilterStatus(newValue);
+  };
+
+  const handleFilterName = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterName(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterStartDate = (date: Date | null) => {
+    setFilterStartDate(date);
+    setPage(0);
+  };
+
+  const handleFilterEndDate = (date: Date | null) => {
+    setFilterEndDate(date);
+    setPage(0);
+  };
+
+  const handleFilterPaymentType = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterPaymentType(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterAmountOperator = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterAmountOperator(event.target.value);
+    setPage(0);
+  };
+
+  const handleFilterAmountValue = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterAmountValue(event.target.value);
+    setPage(0);
+  };
+
+  const handleResetFilter = () => {
+    setFilterStatus('all');
+    setFilterStartDate(null);
+    setFilterEndDate(null);
+    setFilterName('');
+    setFilterPaymentType('');
+    setFilterAmountOperator('');
+    setFilterAmountValue('');
+  };
+
+  const isFiltered =
+    filterStatus !== 'all' ||
+    filterStartDate !== null ||
+    filterEndDate !== null ||
+    filterName !== '' ||
+    filterPaymentType !== '' ||
+    filterAmountOperator !== '';
 
   const handleViewDetails = async (payment: PaymentRecord) => {
     setSelectedPayment(payment);
@@ -240,14 +312,283 @@ export default function PaymentHistoryPage() {
     return <Iconify icon="mdi:cash" width={20} />;
   };
 
-  // Filter by search query
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Payment History Report</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20px;
+            }
+            h1 {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .text-right {
+              text-align: right;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Payment History Report</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Customer</th>
+                <th class="text-right">Amount</th>
+                <th class="text-right">Allocated</th>
+                <th class="text-right">Credit</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredPayments.map((payment) => `
+                <tr>
+                  <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
+                  <td>${payment.payment_type === 'online' ? 'Interac' : 'Cash'}</td>
+                  <td>${payment.customer_name}</td>
+                  <td class="text-right">$${Number(payment.amount).toFixed(2)}</td>
+                  <td class="text-right">$${Number(payment.total_allocated).toFixed(2)}</td>
+                  <td class="text-right">$${Number(payment.excess_amount).toFixed(2)}</td>
+                  <td>${payment.allocation_status}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    event.target.value = '';
+
+    if (!file.name.endsWith('.csv')) {
+      enqueueSnackbar('Please select a CSV file', { variant: 'error' });
+      return;
+    }
+
+    setImporting(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        enqueueSnackbar('CSV file is empty', { variant: 'error' });
+        setImporting(false);
+        return;
+      }
+
+      const dataLines = lines.slice(1);
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const line of dataLines) {
+        try {
+          const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+          const cleanValues = values.map((v) => v.replace(/^"|"$/g, '').trim());
+
+          if (cleanValues.length < 4) {
+            errorCount++;
+            errors.push(`Line skipped: insufficient columns`);
+            continue;
+          }
+
+          const paymentData = {
+            payment_date: cleanValues[0] || new Date().toISOString().split('T')[0],
+            payment_type: cleanValues[1] || 'cash',
+            customer_id: parseInt(cleanValues[2]) || 0,
+            amount: parseFloat(cleanValues[3]) || 0,
+            reference_number: cleanValues[4] || null,
+            notes: cleanValues[5] || null,
+          };
+
+          if (!paymentData.customer_id || !paymentData.amount) {
+            errorCount++;
+            errors.push(`Line skipped: missing required fields`);
+            continue;
+          }
+
+          await axios.post('/api/payment-records', paymentData);
+          successCount++;
+        } catch (error: any) {
+          errorCount++;
+          errors.push(error.response?.data?.error || error.message || 'Unknown error');
+        }
+      }
+
+      if (successCount > 0) {
+        enqueueSnackbar(`Imported ${successCount} payment(s) successfully`, { variant: 'success' });
+        fetchPayments();
+      }
+
+      if (errorCount > 0) {
+        const errorMsg = `${errorCount} record(s) failed. ${errors.slice(0, 3).join(', ')}${
+          errors.length > 3 ? '...' : ''
+        }`;
+        enqueueSnackbar(errorMsg, { variant: 'warning' });
+      }
+    } catch (error: any) {
+      console.error('Import error:', error);
+      enqueueSnackbar('Failed to import payments', { variant: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExport = () => {
+    const headers = [
+      'ID',
+      'Payment Date',
+      'Payment Type',
+      'Customer ID',
+      'Customer Name',
+      'Amount',
+      'Total Allocated',
+      'Excess Amount',
+      'Allocation Status',
+      'Reference Number',
+      'Notes',
+      'Created At',
+    ];
+
+    const csvData = filteredPayments.map((payment) => [
+      payment.id,
+      payment.payment_date,
+      payment.payment_type,
+      payment.customer_id,
+      `"${payment.customer_name || ''}"`,
+      payment.amount,
+      payment.total_allocated,
+      payment.excess_amount,
+      payment.allocation_status,
+      `"${payment.reference_number || ''}"`,
+      `"${payment.notes || ''}"`,
+      payment.created_at || '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map((row) => row.join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `payment-history-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    enqueueSnackbar('Payments exported successfully', { variant: 'success' });
+  };
+
+  // Filter payments
   const filteredPayments = payments.filter((payment) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      payment.customer_name.toLowerCase().includes(query) ||
-      (payment.reference_number && payment.reference_number.toLowerCase().includes(query))
-    );
+    // Status filter
+    if (filterStatus !== 'all' && payment.allocation_status !== filterStatus) return false;
+
+    // Date range filter
+    if (filterStartDate || filterEndDate) {
+      const paymentDate = new Date(payment.payment_date);
+      if (filterStartDate && paymentDate < filterStartDate) return false;
+      if (filterEndDate) {
+        const endDatePlusOne = new Date(filterEndDate);
+        endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+        if (paymentDate >= endDatePlusOne) return false;
+      }
+    }
+
+    // Payment type filter
+    if (filterPaymentType && payment.payment_type !== filterPaymentType) return false;
+
+    // Search filter
+    if (filterName) {
+      const query = filterName.toLowerCase();
+      const matchesSearch =
+        payment.customer_name.toLowerCase().includes(query) ||
+        (payment.reference_number && payment.reference_number.toLowerCase().includes(query));
+      if (!matchesSearch) return false;
+    }
+
+    // Amount filter
+    if (filterAmountOperator && filterAmountValue) {
+      const amountValue = parseFloat(filterAmountValue);
+      if (!isNaN(amountValue)) {
+        const amount = Number(payment.amount);
+        switch (filterAmountOperator) {
+          case '>':
+            if (!(amount > amountValue)) return false;
+            break;
+          case '>=':
+            if (!(amount >= amountValue)) return false;
+            break;
+          case '<':
+            if (!(amount < amountValue)) return false;
+            break;
+          case '<=':
+            if (!(amount <= amountValue)) return false;
+            break;
+          case '==':
+            if (!(amount === amountValue)) return false;
+            break;
+        }
+      }
+    }
+
+    return true;
   });
 
   const dataInPage = filteredPayments.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -259,7 +600,16 @@ export default function PaymentHistoryPage() {
         <title>Payment History | Tiffin Management</title>
       </Head>
 
-      <Container maxWidth={themeStretch ? false : 'lg'}>
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
+      <Container maxWidth={themeStretch ? false : 'xl'}>
         <CustomBreadcrumbs
           heading="Payment History"
           links={[
@@ -287,70 +637,108 @@ export default function PaymentHistoryPage() {
           }
         />
 
+        {/* Analytics Cards */}
+        <Card sx={{ mb: 5 }}>
+          <Scrollbar>
+            <Stack
+              direction="row"
+              divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+              sx={{ py: 2 }}
+            >
+              <PaymentAnalytic
+                title="Total"
+                total={payments.length}
+                percent={100}
+                price={getTotalAmountByStatus('all')}
+                icon="ic:round-receipt"
+                color={theme.palette.info.main}
+              />
+
+              <PaymentAnalytic
+                title="Unallocated"
+                total={getStatusCount('unallocated')}
+                percent={getPercentByStatus('unallocated')}
+                price={getTotalAmountByStatus('unallocated')}
+                icon="eva:clock-fill"
+                color={theme.palette.warning.main}
+              />
+
+              <PaymentAnalytic
+                title="Partial"
+                total={getStatusCount('partial')}
+                percent={getPercentByStatus('partial')}
+                price={getTotalAmountByStatus('partial')}
+                icon="eva:pie-chart-fill"
+                color={theme.palette.secondary.main}
+              />
+
+              <PaymentAnalytic
+                title="Allocated"
+                total={getStatusCount('fully_allocated')}
+                percent={getPercentByStatus('fully_allocated')}
+                price={getTotalAmountByStatus('fully_allocated')}
+                icon="eva:checkmark-circle-2-fill"
+                color={theme.palette.success.main}
+              />
+
+              <PaymentAnalytic
+                title="Has Credit"
+                total={getStatusCount('has_excess')}
+                percent={getPercentByStatus('has_excess')}
+                price={getTotalAmountByStatus('has_excess')}
+                icon="eva:star-fill"
+                color={theme.palette.primary.main}
+              />
+            </Stack>
+          </Scrollbar>
+        </Card>
+
         <Card>
+          {/* Status Tabs */}
           <Tabs
-            value={filterType}
-            onChange={handleFilterType}
+            value={filterStatus}
+            onChange={handleFilterStatus}
             sx={{
               px: 2,
               bgcolor: 'background.neutral',
             }}
           >
-            {TYPE_OPTIONS.map((tab) => (
-              <Tab key={tab.value} value={tab.value} label={tab.label} />
+            {TABS.map((tab) => (
+              <Tab
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                icon={
+                  <Label color={tab.color} sx={{ mr: 1 }}>
+                    {tab.count}
+                  </Label>
+                }
+              />
             ))}
           </Tabs>
 
           <Divider />
 
-          {/* Filters */}
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={2}
-            sx={{ p: 2.5 }}
-            alignItems="center"
-          >
-            <TextField
-              size="small"
-              placeholder="Search by customer or reference..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ minWidth: 250 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Iconify icon="eva:search-outline" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <DatePicker
-              label="Start Date"
-              value={filterStartDate}
-              onChange={(newValue) => setFilterStartDate(newValue)}
-              renderInput={(params) => <TextField {...params} size="small" sx={{ minWidth: 150 }} />}
-            />
-            <DatePicker
-              label="End Date"
-              value={filterEndDate}
-              onChange={(newValue) => setFilterEndDate(newValue)}
-              renderInput={(params) => <TextField {...params} size="small" sx={{ minWidth: 150 }} />}
-            />
-            {(filterStartDate || filterEndDate || searchQuery) && (
-              <Button
-                variant="soft"
-                onClick={() => {
-                  setFilterStartDate(null);
-                  setFilterEndDate(null);
-                  setSearchQuery('');
-                }}
-              >
-                Clear Filters
-              </Button>
-            )}
-          </Stack>
-
-          <Divider />
+          {/* Toolbar */}
+          <PaymentTableToolbar
+            isFiltered={isFiltered}
+            filterName={filterName}
+            filterStartDate={filterStartDate}
+            filterEndDate={filterEndDate}
+            filterPaymentType={filterPaymentType}
+            filterAmountOperator={filterAmountOperator}
+            filterAmountValue={filterAmountValue}
+            onFilterName={handleFilterName}
+            onFilterStartDate={handleFilterStartDate}
+            onFilterEndDate={handleFilterEndDate}
+            onFilterPaymentType={handleFilterPaymentType}
+            onFilterAmountOperator={handleFilterAmountOperator}
+            onFilterAmountValue={handleFilterAmountValue}
+            onResetFilter={handleResetFilter}
+            onPrint={handlePrint}
+            onImport={handleImport}
+            onExport={handleExport}
+          />
 
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
@@ -576,14 +964,12 @@ export default function PaymentHistoryPage() {
                     <Typography variant="body2" color="text.secondary">Allocated</Typography>
                     <Typography variant="subtitle2">{fCurrency(selectedPayment.total_allocated)}</Typography>
                   </Stack>
-                  {/* Show credit used from allocations */}
                   {Math.round(paymentAllocations.reduce((sum, a) => sum + (a.credit_amount || 0), 0) * 100) / 100 > 0 && (
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="body2" color="text.secondary">Credit Used</Typography>
                       <Chip size="small" label={fCurrency(Math.round(paymentAllocations.reduce((sum, a) => sum + (a.credit_amount || 0), 0) * 100) / 100)} color="info" />
                     </Stack>
                   )}
-                  {/* Show excess amount that became customer credit */}
                   {selectedPayment.excess_amount > 0 && (
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="body2" color="text.secondary">Excess (New Credit)</Typography>
