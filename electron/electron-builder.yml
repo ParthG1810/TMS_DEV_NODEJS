@@ -44,6 +44,7 @@ extraResources:
 asar: true
 asarUnpack:
   - "**/*.node"
+  - "**/node_modules/**"
 
 # Windows Configuration
 win:
