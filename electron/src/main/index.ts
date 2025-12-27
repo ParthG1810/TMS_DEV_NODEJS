@@ -113,22 +113,9 @@ function createMainWindow(): void {
     mainWindow = null;
   });
 
-  // Handle external links and print windows
+  // Handle window.open() requests
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Allow about:blank for print windows
-    if (url === 'about:blank' || url === '') {
-      return {
-        action: 'allow',
-        overrideBrowserWindowOptions: {
-          webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-          },
-        },
-      };
-    }
-
-    // Open external URLs and special protocols in default handler
+    // Open external URLs in default browser/app
     if (
       url.startsWith('http://') ||
       url.startsWith('https://') ||
@@ -136,8 +123,19 @@ function createMainWindow(): void {
       url.startsWith('tel:')
     ) {
       shell.openExternal(url);
+      return { action: 'deny' };
     }
-    return { action: 'deny' };
+
+    // Allow all other URLs (about:blank, blob:, data:, etc.) for print windows
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+        },
+      },
+    };
   });
 
   // Load the login page
