@@ -245,11 +245,19 @@ export default function PrintLabelsPage() {
 </html>
     `;
 
-    // Open new window and print
-    const printWindow = window.open('', '_blank');
+    // Use Blob URL for better print preview support
+    const blob = new Blob([printDocument], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+
     if (printWindow) {
-      printWindow.document.write(printDocument);
-      printWindow.document.close();
+      // Clean up blob URL after window closes
+      printWindow.onafterprint = () => {
+        printWindow.close();
+        URL.revokeObjectURL(url);
+      };
+    } else {
+      URL.revokeObjectURL(url);
     }
   };
 
