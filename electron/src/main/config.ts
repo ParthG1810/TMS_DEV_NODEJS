@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const ElectronStore = require("electron-store");
+import Store from "electron-store";
 import { app } from "electron";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
@@ -116,27 +115,17 @@ const schema = {
   setupComplete: { type: "boolean" as const },
 };
 
-// Store interface for type safety
-interface ConfigStore {
-  get<K extends keyof AppConfig>(key: K, defaultValue?: AppConfig[K]): AppConfig[K];
-  set<K extends keyof AppConfig>(key: K, value: AppConfig[K]): void;
-  set(object: Partial<AppConfig>): void;
-  store: AppConfig;
-  path: string;
-  clear(): void;
-}
-
 // Create store instance
-let store: ConfigStore | null = null;
+let store: Store<AppConfig> | null = null;
 
-function getStore(): ConfigStore {
+function getStore(): Store<AppConfig> {
   if (!store) {
-    store = new ElectronStore({
+    store = new Store<AppConfig>({
       name: "config",
       defaults: DEFAULT_CONFIG,
       schema,
       encryptionKey: "tms-desktop-config-v1", // Encrypts sensitive data
-    }) as ConfigStore;
+    });
   }
   return store;
 }
