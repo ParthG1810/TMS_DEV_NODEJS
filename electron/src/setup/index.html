@@ -108,7 +108,7 @@
                 <button
                   type="button"
                   class="toggle-password"
-                  onclick="togglePassword('dbPassword')"
+                  id="toggleDbPassword"
                 >
                   <svg
                     class="eye-icon"
@@ -131,7 +131,6 @@
               type="button"
               id="testDbBtn"
               class="btn btn-secondary"
-              onclick="testDatabaseConnection()"
             >
               <span class="btn-text">Test Connection</span>
               <span class="btn-loading hidden">Testing...</span>
@@ -149,7 +148,7 @@
         <form id="settingsForm" class="config-form">
           <!-- Google OAuth (Collapsible) -->
           <div class="settings-section collapsible">
-            <h3 class="collapsible-header" onclick="toggleSection(this)">
+            <h3 class="collapsible-header" id="oauthHeader">
               <span>Google OAuth (Optional)</span>
               <svg class="chevron" viewBox="0 0 24 24" width="20" height="20">
                 <path
@@ -254,7 +253,6 @@
         <button
           id="prevBtn"
           class="btn btn-text"
-          onclick="prevStep()"
           style="visibility: hidden"
         >
           ← Back
@@ -263,12 +261,11 @@
           <button
             id="resetBtn"
             class="btn btn-text"
-            onclick="resetToDefaults()"
           >
             Reset to Defaults
           </button>
         </div>
-        <button id="nextBtn" class="btn btn-primary" onclick="nextStep()">
+        <button id="nextBtn" class="btn btn-primary">
           Next →
         </button>
       </footer>

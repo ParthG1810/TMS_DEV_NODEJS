@@ -17,6 +17,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (error) {
     console.error("Failed to load config:", error);
   }
+
+  // Attach event listeners (CSP blocks inline onclick handlers)
+  document.getElementById("nextBtn").addEventListener("click", nextStep);
+  document.getElementById("prevBtn").addEventListener("click", prevStep);
+  document.getElementById("resetBtn").addEventListener("click", resetToDefaults);
+  document.getElementById("testDbBtn").addEventListener("click", testDatabaseConnection);
+  document.getElementById("toggleDbPassword").addEventListener("click", () => togglePassword("dbPassword"));
+  document.getElementById("oauthHeader").addEventListener("click", function() {
+    toggleSection(this);
+  });
 });
 
 // Populate form with config values
@@ -299,11 +309,3 @@ function toggleSection(header) {
   const section = header.closest(".collapsible");
   section.classList.toggle("open");
 }
-
-// Expose functions to window for onclick handlers
-window.togglePassword = togglePassword;
-window.toggleSection = toggleSection;
-window.testDatabaseConnection = testDatabaseConnection;
-window.nextStep = nextStep;
-window.prevStep = prevStep;
-window.resetToDefaults = resetToDefaults;
