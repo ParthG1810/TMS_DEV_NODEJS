@@ -2,6 +2,7 @@ import { spawn, fork, ChildProcess } from 'child_process';
 import { join } from 'path';
 import { app } from 'electron';
 import log from 'electron-log';
+import { getConfig } from './config';
 
 let backendProcess: ChildProcess | null = null;
 let frontendProcess: ChildProcess | null = null;
@@ -79,25 +80,44 @@ function waitForProcessReady(proc: ChildProcess, readyPattern: RegExp, timeout: 
 // Start backend server
 async function startBackend(): Promise<void> {
   const { backend } = getPaths();
+  const config = getConfig();
+  const backendPort = config.server.backendPort;
 
-  // Check if port 3000 is available
-  const portAvailable = await isPortAvailable(3000);
+  // Check if port is available
+  const portAvailable = await isPortAvailable(backendPort);
   if (!portAvailable) {
-    throw new Error('Port 3000 is already in use. Please close any other applications using this port.');
+    throw new Error(`Port ${backendPort} is already in use. Please close any other applications using this port.`);
   }
 
   log.info(`Starting backend from: ${backend}`);
+  log.info(`Backend port: ${backendPort}`);
+
+  // Build environment variables from config
+  const envVars = {
+    ...process.env,
+    NODE_ENV: isDev ? 'development' : 'production',
+    PORT: String(backendPort),
+    // Database config
+    DB_HOST: config.database.host,
+    DB_PORT: String(config.database.port),
+    DB_USER: config.database.user,
+    DB_PASSWORD: config.database.password,
+    DB_NAME: config.database.name,
+    // Google OAuth config
+    GOOGLE_CLIENT_ID: config.google.clientId,
+    GOOGLE_CLIENT_SECRET: config.google.clientSecret,
+    GOOGLE_REDIRECT_URI: config.google.redirectUri,
+    // JWT config
+    JWT_SECRET: config.jwt.secret,
+    JWT_EXPIRES_IN: config.jwt.expiresIn,
+  };
 
   if (isDev) {
     // Development: use npm run dev
     const npmCmd = getNpmCommand();
     backendProcess = spawn(npmCmd, ['run', 'dev'], {
       cwd: backend,
-      env: {
-        ...process.env,
-        NODE_ENV: 'development',
-        PORT: '3000',
-      },
+      env: envVars,
       shell: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -110,10 +130,8 @@ async function startBackend(): Promise<void> {
     backendProcess = spawn(process.execPath, [serverPath], {
       cwd: backend,
       env: {
-        ...process.env,
+        ...envVars,
         ELECTRON_RUN_AS_NODE: '1',
-        NODE_ENV: 'production',
-        PORT: '3000',
       },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -148,10 +166,11 @@ async function startBackend(): Promise<void> {
   });
 
   // Wait for backend to output ready message
-  // Patterns: "Ready on http://...", "Listening on port 3000", "started server on"
+  // Patterns: "Ready on http://...", "Listening on port", "started server on"
   try {
-    await waitForProcessReady(backendProcess, /ready\s+on|listening\s+on|started\s+server|port\s*:?\s*3000/i, 60000);
-    log.info('Backend server is ready on port 3000');
+    const portPattern = new RegExp(`ready\\s+on|listening\\s+on|started\\s+server|port\\s*:?\\s*${backendPort}`, 'i');
+    await waitForProcessReady(backendProcess, portPattern, 60000);
+    log.info(`Backend server is ready on port ${backendPort}`);
   } catch (err) {
     log.error('Backend failed to start:', err);
     throw new Error('Backend server failed to start. Please check the logs for details.');
@@ -161,25 +180,35 @@ async function startBackend(): Promise<void> {
 // Start frontend server
 async function startFrontend(): Promise<void> {
   const { frontend } = getPaths();
+  const config = getConfig();
+  const frontendPort = config.server.frontendPort;
+  const backendPort = config.server.backendPort;
 
-  // Check if port 8081 is available
-  const portAvailable = await isPortAvailable(8081);
+  // Check if port is available
+  const portAvailable = await isPortAvailable(frontendPort);
   if (!portAvailable) {
-    throw new Error('Port 8081 is already in use. Please close any other applications using this port.');
+    throw new Error(`Port ${frontendPort} is already in use. Please close any other applications using this port.`);
   }
 
   log.info(`Starting frontend from: ${frontend}`);
+  log.info(`Frontend port: ${frontendPort}`);
+
+  // Build environment variables
+  const envVars = {
+    ...process.env,
+    NODE_ENV: isDev ? 'development' : 'production',
+    PORT: String(frontendPort),
+    // API URL for frontend to connect to backend
+    HOST_API_KEY: `http://localhost:${backendPort}`,
+    NEXT_PUBLIC_API_URL: `http://localhost:${backendPort}`,
+  };
 
   if (isDev) {
     // Development: use npm run dev
     const npmCmd = getNpmCommand();
     frontendProcess = spawn(npmCmd, ['run', 'dev'], {
       cwd: frontend,
-      env: {
-        ...process.env,
-        NODE_ENV: 'development',
-        PORT: '8081',
-      },
+      env: envVars,
       shell: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -192,10 +221,8 @@ async function startFrontend(): Promise<void> {
     frontendProcess = spawn(process.execPath, [serverPath], {
       cwd: frontend,
       env: {
-        ...process.env,
+        ...envVars,
         ELECTRON_RUN_AS_NODE: '1',
-        NODE_ENV: 'production',
-        PORT: '8081',
       },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -229,10 +256,11 @@ async function startFrontend(): Promise<void> {
   });
 
   // Wait for frontend to output ready message
-  // Patterns: "Ready on http://...", "Listening on port 8081", "started server on"
+  // Patterns: "Ready on http://...", "Listening on port", "started server on"
   try {
-    await waitForProcessReady(frontendProcess, /ready\s+on|listening\s+on|started\s+server|port\s*:?\s*8081/i, 60000);
-    log.info('Frontend server is ready on port 8081');
+    const portPattern = new RegExp(`ready\\s+on|listening\\s+on|started\\s+server|port\\s*:?\\s*${frontendPort}`, 'i');
+    await waitForProcessReady(frontendProcess, portPattern, 60000);
+    log.info(`Frontend server is ready on port ${frontendPort}`);
   } catch (err) {
     log.error('Frontend failed to start:', err);
     throw new Error('Frontend server failed to start. Please check the logs for details.');

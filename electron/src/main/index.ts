@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, shell, globalShortcut } from 'electron';
 import { join } from 'path';
 import log from 'electron-log';
 import { startServers, stopServers } from './servers';
@@ -7,6 +7,8 @@ import { createTray, destroyTray } from './tray';
 import { setupAutoUpdater } from './updater';
 import { createApplicationMenu } from './menu';
 import { setupIPC } from './ipc';
+import { isSetupRequired, getConfig, initializeConfig, getConfigPath } from './config';
+import { showSetupWizard, registerSetupIPC, closeSetupWizard } from './setupWizard';
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -25,8 +27,17 @@ let splashWindow: BrowserWindow | null = null;
 let isQuitting = false;
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-const FRONTEND_URL = 'http://localhost:8081';
-const LOGIN_URL = `${FRONTEND_URL}/auth/login`;
+
+// Get frontend URL from config
+function getFrontendUrl(): string {
+  const config = getConfig();
+  return `http://localhost:${config.server.frontendPort}`;
+}
+
+// Check for command line flags
+function hasSetupFlag(): boolean {
+  return process.argv.includes('--setup') || process.argv.includes('--reset-config');
+}
 
 // Create splash screen
 function createSplashWindow(): void {
@@ -58,6 +69,8 @@ function createMainWindow(): void {
     ? join(__dirname, '../../resources/icon.png')
     : join(process.resourcesPath, 'icon.png');
 
+  const config = getConfig();
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -88,7 +101,8 @@ function createMainWindow(): void {
   });
 
   mainWindow.on('close', (event) => {
-    if (!isQuitting && process.platform === 'darwin') {
+    const cfg = getConfig();
+    if (!isQuitting && cfg.app.minimizeToTray) {
       event.preventDefault();
       mainWindow?.hide();
     }
@@ -104,8 +118,9 @@ function createMainWindow(): void {
     return { action: 'deny' };
   });
 
-  // Load the login page directly
-  mainWindow.loadURL(LOGIN_URL);
+  // Load the login page
+  const loginUrl = `${getFrontendUrl()}/auth/login`;
+  mainWindow.loadURL(loginUrl);
 
   // DevTools in development
   if (isDev) {
@@ -113,23 +128,31 @@ function createMainWindow(): void {
   }
 }
 
-// Show MySQL connection error dialog
+// Show MySQL connection error dialog with reconfigure option
 async function showMySQLError(error: string): Promise<void> {
+  const config = getConfig();
+  const dbInfo = `${config.database.user}@${config.database.host}:${config.database.port}/${config.database.name}`;
+
   const result = await dialog.showMessageBox({
     type: 'error',
     title: 'Database Connection Failed',
     message: 'Unable to connect to MySQL database',
-    detail: `${error}\n\nPlease ensure:\n1. MySQL is installed and running\n2. Database 'tms_db' exists\n3. Check your database credentials`,
-    buttons: ['Retry', 'Configure Database', 'Quit'],
+    detail: `${error}\n\nCurrent config: ${dbInfo}\n\nConfig file: ${getConfigPath()}`,
+    buttons: ['Retry', 'Reconfigure', 'Open Config Folder', 'Quit'],
     defaultId: 0,
-    cancelId: 2,
+    cancelId: 3,
   });
 
   if (result.response === 0) {
     // Retry
-    await initialize();
+    await startApp();
   } else if (result.response === 1) {
-    // Open settings folder
+    // Reconfigure - show setup wizard
+    await showSetupWizard(async () => {
+      await startApp();
+    });
+  } else if (result.response === 2) {
+    // Open config folder
     shell.openPath(app.getPath('userData'));
     await showMySQLError(error);
   } else {
@@ -140,26 +163,27 @@ async function showMySQLError(error: string): Promise<void> {
 
 // Show startup error
 async function showStartupError(error: string): Promise<void> {
-  await dialog.showMessageBox({
+  const result = await dialog.showMessageBox({
     type: 'error',
     title: 'Startup Error',
     message: 'Failed to start TMS Desktop',
-    detail: error,
-    buttons: ['Quit'],
+    detail: `${error}\n\nWould you like to reconfigure the application?`,
+    buttons: ['Reconfigure', 'Quit'],
+    defaultId: 0,
   });
-  app.quit();
+
+  if (result.response === 0) {
+    await showSetupWizard(async () => {
+      await startApp();
+    });
+  } else {
+    app.quit();
+  }
 }
 
-// Initialize application
-async function initialize(): Promise<void> {
-  log.info('='.repeat(50));
-  log.info('Starting TMS Desktop Application...');
-  log.info(`App version: ${app.getVersion()}`);
-  log.info(`Electron version: ${process.versions.electron}`);
-  log.info(`Node version: ${process.versions.node}`);
-  log.info(`Platform: ${process.platform} ${process.arch}`);
-  log.info(`Dev mode: ${isDev}`);
-  log.info('='.repeat(50));
+// Start the main application (after setup is complete)
+async function startApp(): Promise<void> {
+  log.info('Starting main application...');
 
   // Show splash screen
   createSplashWindow();
@@ -210,12 +234,49 @@ async function initialize(): Promise<void> {
 
     log.info('TMS Desktop Application started successfully!');
   } catch (error: any) {
-    log.error('Initialization error:', error);
+    log.error('Startup error:', error);
     if (splashWindow && !splashWindow.isDestroyed()) {
       splashWindow.destroy();
       splashWindow = null;
     }
     await showStartupError(error.message || 'Unknown error occurred');
+  }
+}
+
+// Initialize application
+async function initialize(): Promise<void> {
+  log.info('='.repeat(50));
+  log.info('Starting TMS Desktop Application...');
+  log.info(`App version: ${app.getVersion()}`);
+  log.info(`Electron version: ${process.versions.electron}`);
+  log.info(`Node version: ${process.versions.node}`);
+  log.info(`Platform: ${process.platform} ${process.arch}`);
+  log.info(`Dev mode: ${isDev}`);
+  log.info(`Config path: ${getConfigPath()}`);
+  log.info('='.repeat(50));
+
+  // Register setup wizard IPC handlers
+  registerSetupIPC();
+
+  // Initialize config (loads defaults from .env if first run)
+  initializeConfig();
+
+  // Check if setup is required
+  const setupRequired = isSetupRequired();
+  const forceSetup = hasSetupFlag();
+
+  log.info(`Setup required: ${setupRequired}, Force setup: ${forceSetup}`);
+
+  if (setupRequired || forceSetup) {
+    // Show setup wizard
+    log.info('Showing setup wizard...');
+    await showSetupWizard(async () => {
+      log.info('Setup complete, starting app...');
+      await startApp();
+    });
+  } else {
+    // Start app directly
+    await startApp();
   }
 }
 
@@ -235,6 +296,7 @@ app.on('before-quit', async (event) => {
     event.preventDefault();
     isQuitting = true;
     log.info('Application quitting...');
+    closeSetupWizard();
     destroyTray();
     await stopServers();
     app.quit();
@@ -266,4 +328,4 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Export for use in other modules
-export { mainWindow };
+export { mainWindow, showSetupWizard };

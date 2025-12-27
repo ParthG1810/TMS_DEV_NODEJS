@@ -1,5 +1,6 @@
 import { Menu, shell, app, BrowserWindow, dialog } from 'electron';
 import log from 'electron-log';
+import { showSetupWizard } from './setupWizard';
 
 const isMac = process.platform === 'darwin';
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
@@ -18,7 +19,7 @@ export function createApplicationMenu(): void {
               {
                 label: 'Preferences...',
                 accelerator: 'CmdOrCtrl+,',
-                click: () => navigateTo('/dashboard/settings'),
+                click: () => showSetupWizard(),
               },
               { type: 'separator' as const },
               { role: 'services' as const },
@@ -69,6 +70,16 @@ export function createApplicationMenu(): void {
           },
         },
         { type: 'separator' },
+        ...(!isMac
+          ? [
+              {
+                label: 'Settings',
+                accelerator: 'CmdOrCtrl+,',
+                click: () => showSetupWizard(),
+              },
+              { type: 'separator' as const },
+            ]
+          : []),
         isMac ? { role: 'close' as const } : { role: 'quit' as const },
       ],
     },

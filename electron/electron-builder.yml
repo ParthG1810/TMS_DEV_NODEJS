@@ -10,6 +10,7 @@ files:
   - dist/**/*
   - package.json
   - src/splash/**/*
+  - src/setup/**/*
 
 extraResources:
   # Backend standalone build (self-contained, no node_modules needed)

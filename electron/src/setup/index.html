@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+  <title>TMS Desktop - Setup</title>
+  <link rel="stylesheet" href="setup.css">
+</head>
+<body>
+  <div class="setup-container">
+    <!-- Header -->
+    <header class="setup-header">
+      <div class="logo">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <rect width="48" height="48" rx="12" fill="#2563eb"/>
+          <path d="M14 16h20v4H14v-4zm0 8h20v4H14v-4zm0 8h14v4H14v-4z" fill="white"/>
+        </svg>
+      </div>
+      <h1>TMS Desktop Setup</h1>
+      <p class="subtitle">Configure your Tiffin Management System</p>
+    </header>
+
+    <!-- Progress Steps -->
+    <div class="progress-steps">
+      <div class="step active" data-step="1">
+        <div class="step-number">1</div>
+        <div class="step-label">Database</div>
+      </div>
+      <div class="step-line"></div>
+      <div class="step" data-step="2">
+        <div class="step-number">2</div>
+        <div class="step-label">Settings</div>
+      </div>
+      <div class="step-line"></div>
+      <div class="step" data-step="3">
+        <div class="step-number">3</div>
+        <div class="step-label">Complete</div>
+      </div>
+    </div>
+
+    <!-- Step 1: Database Configuration -->
+    <section class="step-content active" id="step1">
+      <h2>Database Configuration</h2>
+      <p class="step-description">Configure your MySQL database connection</p>
+
+      <form id="dbForm" class="config-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="dbHost">Host</label>
+            <input type="text" id="dbHost" name="host" value="localhost" required>
+          </div>
+          <div class="form-group small">
+            <label for="dbPort">Port</label>
+            <input type="number" id="dbPort" name="port" value="3306" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="dbName">Database Name</label>
+          <input type="text" id="dbName" name="name" value="tms_db" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="dbUser">Username</label>
+            <input type="text" id="dbUser" name="user" value="root" required>
+          </div>
+          <div class="form-group">
+            <label for="dbPassword">Password</label>
+            <div class="password-input">
+              <input type="password" id="dbPassword" name="password" value="">
+              <button type="button" class="toggle-password" onclick="togglePassword('dbPassword')">
+                <svg class="eye-icon" viewBox="0 0 24 24" width="20" height="20">
+                  <path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="test-connection">
+          <button type="button" id="testDbBtn" class="btn btn-secondary" onclick="testDatabaseConnection()">
+            <span class="btn-text">Test Connection</span>
+            <span class="btn-loading hidden">Testing...</span>
+          </button>
+          <span id="dbStatus" class="status-message"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Step 2: Advanced Settings -->
+    <section class="step-content" id="step2">
+      <h2>Application Settings</h2>
+      <p class="step-description">Optional: Configure additional settings</p>
+
+      <form id="settingsForm" class="config-form">
+        <!-- Server Ports -->
+        <div class="settings-section">
+          <h3>Server Ports</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="backendPort">Backend Port</label>
+              <input type="number" id="backendPort" name="backendPort" value="3000">
+            </div>
+            <div class="form-group">
+              <label for="frontendPort">Frontend Port</label>
+              <input type="number" id="frontendPort" name="frontendPort" value="8081">
+            </div>
+          </div>
+        </div>
+
+        <!-- Google OAuth (Collapsible) -->
+        <div class="settings-section collapsible">
+          <h3 class="collapsible-header" onclick="toggleSection(this)">
+            <span>Google OAuth (Optional)</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+            </svg>
+          </h3>
+          <div class="collapsible-content">
+            <p class="helper-text">Required for Gmail integration and email notifications</p>
+            <div class="form-group">
+              <label for="googleClientId">Client ID</label>
+              <input type="text" id="googleClientId" name="googleClientId" placeholder="your-client-id.apps.googleusercontent.com">
+            </div>
+            <div class="form-group">
+              <label for="googleClientSecret">Client Secret</label>
+              <input type="password" id="googleClientSecret" name="googleClientSecret" placeholder="Enter client secret">
+            </div>
+          </div>
+        </div>
+
+        <!-- App Preferences -->
+        <div class="settings-section">
+          <h3>Preferences</h3>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="minimizeToTray" name="minimizeToTray" checked>
+              <span class="checkmark"></span>
+              Minimize to system tray when closed
+            </label>
+          </div>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="checkUpdates" name="checkUpdates" checked>
+              <span class="checkmark"></span>
+              Check for updates automatically
+            </label>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Step 3: Complete -->
+    <section class="step-content" id="step3">
+      <div class="complete-section">
+        <div class="success-icon">
+          <svg viewBox="0 0 24 24" width="80" height="80">
+            <circle cx="12" cy="12" r="11" fill="#22c55e"/>
+            <path fill="white" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+          </svg>
+        </div>
+        <h2>Setup Complete!</h2>
+        <p class="step-description">Your TMS Desktop is ready to use</p>
+
+        <div class="summary-card">
+          <h3>Configuration Summary</h3>
+          <div class="summary-row">
+            <span class="label">Database:</span>
+            <span id="summaryDb" class="value">-</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">Backend Port:</span>
+            <span id="summaryBackend" class="value">-</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">Frontend Port:</span>
+            <span id="summaryFrontend" class="value">-</span>
+          </div>
+        </div>
+
+        <p class="help-text">
+          You can change these settings anytime from<br>
+          <strong>Menu → Settings</strong> or <strong>Tray Icon → Settings</strong>
+        </p>
+      </div>
+    </section>
+
+    <!-- Footer Navigation -->
+    <footer class="setup-footer">
+      <button id="prevBtn" class="btn btn-text" onclick="prevStep()" style="visibility: hidden;">
+        ← Back
+      </button>
+      <div class="footer-center">
+        <button id="resetBtn" class="btn btn-text" onclick="resetToDefaults()">
+          Reset to Defaults
+        </button>
+      </div>
+      <button id="nextBtn" class="btn btn-primary" onclick="nextStep()">
+        Next →
+      </button>
+    </footer>
+  </div>
+
+  <script src="setup.js"></script>
+</body>
+</html>
