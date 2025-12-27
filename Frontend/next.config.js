@@ -46,8 +46,8 @@ module.exports = withTM({
     return config;
   },
   env: {
-    // HOST
-    HOST_API_KEY: 'http://localhost:47847',
+    // HOST - Default API URL (can be overridden by runtime env vars)
+    HOST_API_KEY: process.env.HOST_API_KEY || 'http://localhost:47847',
     // MAPBOX
     MAPBOX_API: '',
     // FIREBASE
@@ -66,11 +66,13 @@ module.exports = withTM({
     AUTH0_CLIENT_ID: '',
   },
   // Proxy /uploads requests to backend server
+  // Uses runtime env var if available, falls back to default port
   async rewrites() {
+    const backendUrl = process.env.HOST_API_KEY || 'http://localhost:47847';
     return [
       {
         source: '/uploads/:path*',
-        destination: 'http://localhost:47847/uploads/:path*',
+        destination: `${backendUrl}/uploads/:path*`,
       },
     ];
   },
