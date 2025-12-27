@@ -47,7 +47,7 @@ const DEFAULT_CONFIG: AppConfig = {
     port: 3306,
     user: 'root',
     password: '',
-    name: 'tms_db',
+    name: 'tms_database',
   },
   server: {
     backendPort: 47847,

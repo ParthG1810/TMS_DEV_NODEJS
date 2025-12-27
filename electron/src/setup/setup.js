@@ -25,7 +25,7 @@ function populateForm(cfg) {
   if (cfg.database) {
     document.getElementById('dbHost').value = cfg.database.host || 'localhost';
     document.getElementById('dbPort').value = cfg.database.port || 3306;
-    document.getElementById('dbName').value = cfg.database.name || 'tms_db';
+    document.getElementById('dbName').value = cfg.database.name || 'tms_database';
     document.getElementById('dbUser').value = cfg.database.user || 'root';
     document.getElementById('dbPassword').value = cfg.database.password || '';
   }

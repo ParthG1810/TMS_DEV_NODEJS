@@ -100,7 +100,7 @@ Make sure the Gmail OAuth database table exists:
 
 ```bash
 cd /home/user/TMS_DEV_NODEJS/database
-mysql -u root -p tms_db < migrations/013_gmail_oauth_settings.sql
+mysql -u root -p tms_database < migrations/013_gmail_oauth_settings.sql
 ```
 
 ## Step 3: Test the OAuth Flow

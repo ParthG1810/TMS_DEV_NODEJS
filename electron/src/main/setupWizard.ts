@@ -150,7 +150,7 @@ export function registerSetupIPC(): void {
         port: defaults.database?.port || 3306,
         user: defaults.database?.user || 'root',
         password: defaults.database?.password || '',
-        name: defaults.database?.name || 'tms_db',
+        name: defaults.database?.name || 'tms_database',
       },
       server: {
         backendPort: defaults.server?.backendPort || 47847,
