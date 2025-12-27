@@ -1,4 +1,4 @@
-import Store from 'electron-store';
+import Store = require('electron-store');
 import { app } from 'electron';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
