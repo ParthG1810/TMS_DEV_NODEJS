@@ -284,7 +284,14 @@ async function resetToDefaults() {
 // Toggle password visibility
 function togglePassword(inputId) {
   const input = document.getElementById(inputId);
-  input.type = input.type === "password" ? "text" : "password";
+  const button = input.parentElement.querySelector('.toggle-password');
+  if (input.type === "password") {
+    input.type = "text";
+    button.classList.add('visible');
+  } else {
+    input.type = "password";
+    button.classList.remove('visible');
+  }
 }
 
 // Toggle collapsible section
@@ -292,3 +299,11 @@ function toggleSection(header) {
   const section = header.closest(".collapsible");
   section.classList.toggle("open");
 }
+
+// Expose functions to window for onclick handlers
+window.togglePassword = togglePassword;
+window.toggleSection = toggleSection;
+window.testDatabaseConnection = testDatabaseConnection;
+window.nextStep = nextStep;
+window.prevStep = prevStep;
+window.resetToDefaults = resetToDefaults;
