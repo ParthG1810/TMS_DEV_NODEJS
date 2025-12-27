@@ -95,21 +95,6 @@
       <p class="step-description">Optional: Configure additional settings</p>
 
       <form id="settingsForm" class="config-form">
-        <!-- Server Ports -->
-        <div class="settings-section">
-          <h3>Server Ports</h3>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="backendPort">Backend Port</label>
-              <input type="number" id="backendPort" name="backendPort" value="3000">
-            </div>
-            <div class="form-group">
-              <label for="frontendPort">Frontend Port</label>
-              <input type="number" id="frontendPort" name="frontendPort" value="8081">
-            </div>
-          </div>
-        </div>
-
         <!-- Google OAuth (Collapsible) -->
         <div class="settings-section collapsible">
           <h3 class="collapsible-header" onclick="toggleSection(this)">
@@ -171,12 +156,8 @@
             <span id="summaryDb" class="value">-</span>
           </div>
           <div class="summary-row">
-            <span class="label">Backend Port:</span>
-            <span id="summaryBackend" class="value">-</span>
-          </div>
-          <div class="summary-row">
-            <span class="label">Frontend Port:</span>
-            <span id="summaryFrontend" class="value">-</span>
+            <span class="label">Google OAuth:</span>
+            <span id="summaryOAuth" class="value">Not configured</span>
           </div>
         </div>
 

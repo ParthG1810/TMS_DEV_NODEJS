@@ -4,6 +4,10 @@ let currentStep = 1;
 const totalSteps = 3;
 let config = {};
 
+// Fixed ports (not user-configurable)
+const BACKEND_PORT = 47847;
+const FRONTEND_PORT = 47848;
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   // Load current config from main process
@@ -26,12 +30,6 @@ function populateForm(cfg) {
     document.getElementById('dbPassword').value = cfg.database.password || '';
   }
 
-  // Server
-  if (cfg.server) {
-    document.getElementById('backendPort').value = cfg.server.backendPort || 3000;
-    document.getElementById('frontendPort').value = cfg.server.frontendPort || 8081;
-  }
-
   // Google OAuth
   if (cfg.google) {
     document.getElementById('googleClientId').value = cfg.google.clientId || '';
@@ -47,6 +45,8 @@ function populateForm(cfg) {
 
 // Collect form data
 function collectFormData() {
+  const googleClientId = document.getElementById('googleClientId').value;
+
   return {
     database: {
       host: document.getElementById('dbHost').value,
@@ -55,14 +55,10 @@ function collectFormData() {
       user: document.getElementById('dbUser').value,
       password: document.getElementById('dbPassword').value,
     },
-    server: {
-      backendPort: parseInt(document.getElementById('backendPort').value, 10),
-      frontendPort: parseInt(document.getElementById('frontendPort').value, 10),
-    },
     google: {
-      clientId: document.getElementById('googleClientId').value,
+      clientId: googleClientId,
       clientSecret: document.getElementById('googleClientSecret').value,
-      redirectUri: `http://localhost:${document.getElementById('backendPort').value}/api/gmail/callback`,
+      redirectUri: `http://localhost:${BACKEND_PORT}/api/gmail/callback`,
     },
     app: {
       minimizeToTray: document.getElementById('minimizeToTray').checked,
@@ -232,8 +228,10 @@ async function saveAndShowSummary() {
     // Update summary
     document.getElementById('summaryDb').textContent =
       `${formData.database.user}@${formData.database.host}:${formData.database.port}/${formData.database.name}`;
-    document.getElementById('summaryBackend').textContent = formData.server.backendPort;
-    document.getElementById('summaryFrontend').textContent = formData.server.frontendPort;
+
+    // Show OAuth status
+    const oauthConfigured = formData.google.clientId && formData.google.clientSecret;
+    document.getElementById('summaryOAuth').textContent = oauthConfigured ? 'Configured' : 'Not configured';
   } catch (error) {
     console.error('Failed to save config:', error);
   }

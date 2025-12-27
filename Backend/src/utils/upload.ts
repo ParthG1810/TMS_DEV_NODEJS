@@ -8,7 +8,7 @@ import { UploadedFile } from 'src/types';
 // ----------------------------------------------------------------------
 
 // Backend server URL for serving uploaded files
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:47847';
 
 // Allowed image MIME types
 const ALLOWED_MIME_TYPES = [

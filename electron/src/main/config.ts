@@ -50,13 +50,13 @@ const DEFAULT_CONFIG: AppConfig = {
     name: 'tms_db',
   },
   server: {
-    backendPort: 3000,
-    frontendPort: 8081,
+    backendPort: 47847,
+    frontendPort: 47848,
   },
   google: {
     clientId: '',
     clientSecret: '',
-    redirectUri: 'http://localhost:3000/api/gmail/callback',
+    redirectUri: 'http://localhost:47847/api/gmail/callback',
   },
   jwt: {
     secret: 'your-secret-key-change-in-production',

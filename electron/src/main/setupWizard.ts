@@ -153,13 +153,13 @@ export function registerSetupIPC(): void {
         name: defaults.database?.name || 'tms_db',
       },
       server: {
-        backendPort: defaults.server?.backendPort || 3000,
-        frontendPort: defaults.server?.frontendPort || 8081,
+        backendPort: defaults.server?.backendPort || 47847,
+        frontendPort: defaults.server?.frontendPort || 47848,
       },
       google: {
         clientId: defaults.google?.clientId || '',
         clientSecret: defaults.google?.clientSecret || '',
-        redirectUri: defaults.google?.redirectUri || 'http://localhost:3000/api/gmail/callback',
+        redirectUri: defaults.google?.redirectUri || 'http://localhost:47847/api/gmail/callback',
       },
       jwt: {
         secret: defaults.jwt?.secret || 'your-secret-key-change-in-production',

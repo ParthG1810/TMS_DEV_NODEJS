@@ -8,7 +8,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   env: {
-    DEV_API: 'http://localhost:3000',
+    DEV_API: 'http://localhost:47847',
     PRODUCTION_API: 'https://api-dev-minimal-v4.vercel.app',
   },
   // Add CORS headers to allow frontend to access backend resources

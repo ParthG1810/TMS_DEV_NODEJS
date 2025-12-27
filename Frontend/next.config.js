@@ -47,7 +47,7 @@ module.exports = withTM({
   },
   env: {
     // HOST
-    HOST_API_KEY: 'http://localhost:3000',
+    HOST_API_KEY: 'http://localhost:47847',
     // MAPBOX
     MAPBOX_API: '',
     // FIREBASE
@@ -70,7 +70,7 @@ module.exports = withTM({
     return [
       {
         source: '/uploads/:path*',
-        destination: 'http://localhost:3000/uploads/:path*',
+        destination: 'http://localhost:47847/uploads/:path*',
       },
     ];
   },
