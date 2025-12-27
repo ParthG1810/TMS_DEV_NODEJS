@@ -6,6 +6,7 @@ import {
   CustomerOrderWithDetails,
   CreateCustomerOrderRequest,
   ApiResponse,
+  DayName,
 } from 'src/types';
 
 // ----------------------------------------------------------------------
@@ -170,19 +171,19 @@ async function handleCreateCustomerOrder(
     } = req.body as any; // Use any to allow flexible type handling
 
     // Robust handling of selected_days - ensure it's always an array
-    let daysArray: string[] = [];
+    let daysArray: DayName[] = [];
 
     if (Array.isArray(selected_days)) {
       // Already an array - use as is
-      daysArray = selected_days;
+      daysArray = selected_days as DayName[];
     } else if (typeof selected_days === 'string') {
       // String format - could be comma-separated or JSON string
       try {
         // Try parsing as JSON first
-        daysArray = JSON.parse(selected_days);
+        daysArray = JSON.parse(selected_days) as DayName[];
       } catch {
         // If JSON parse fails, treat as comma-separated string
-        daysArray = selected_days.split(',').map((day: string) => day.trim()).filter(Boolean);
+        daysArray = selected_days.split(',').map((day: string) => day.trim()).filter(Boolean) as DayName[];
       }
     }
 
@@ -246,7 +247,7 @@ async function handleCreateCustomerOrder(
 
     // Auto-create calendar entries for all plan days with status 'T' (delivered)
     // This pre-populates the billing calendar so customers only need to mark absences
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayNames: DayName[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     // Parse dates as local dates (not UTC) to avoid timezone issues
     const [startYear, startMonth, startDay] = formattedStartDate.split('-').map(Number);

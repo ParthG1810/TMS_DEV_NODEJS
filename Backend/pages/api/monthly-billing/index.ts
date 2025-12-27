@@ -79,7 +79,7 @@ async function handleGet(
     // Fetch order-level breakdown for each billing record
     const billingIds = billings.map(b => b.id);
     const customerIds = billings.map(b => b.customer_id);
-    const billingMonths = [...new Set(billings.map(b => b.billing_month))];
+    const billingMonths = Array.from(new Set(billings.map(b => b.billing_month)));
 
     // Get order billing details for all relevant customers and months
     let orderDetails: any[] = [];

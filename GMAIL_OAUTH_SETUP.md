@@ -55,10 +55,15 @@ This guide will help you configure Gmail OAuth for your TMS application to enabl
 3. Choose **Application type**: **Web application**
 4. Give it a name: "TMS Web Client"
 5. **Add Authorized JavaScript origins** (optional):
-   - `http://localhost:3000`
+   - `http://localhost:47847`
+   - `http://localhost:47849`
+   - `http://localhost:47851`
    - Your production domain (when ready)
-6. **Add Authorized redirect URIs**:
-   - Development: `http://localhost:3000/api/gmail/callback`
+6. **Add Authorized redirect URIs** (add all for port fallback support):
+   - Development:
+     - `http://localhost:47847/api/gmail/callback`
+     - `http://localhost:47849/api/gmail/callback`
+     - `http://localhost:47851/api/gmail/callback`
    - Production: `https://your-domain.com/api/gmail/callback`
 7. Click **"Create"**
 8. **Save the credentials**:
@@ -76,11 +81,13 @@ Open `/home/user/TMS_DEV_NODEJS/Backend/.env` and update these variables:
 # Gmail OAuth Configuration
 GOOGLE_CLIENT_ID=YOUR_CLIENT_ID_HERE.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=YOUR_CLIENT_SECRET_HERE
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/gmail/callback
+GOOGLE_REDIRECT_URI=http://localhost:47847/api/gmail/callback
 
 # Next.js Public API URL (used for OAuth redirects)
-NEXT_PUBLIC_API_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:47847
 ```
+
+> **Note**: The Electron app uses uncommon ports (47847, 47849, 47851) with automatic fallback to avoid conflicts. Add all three redirect URIs to Google Cloud Console.
 
 **Important**:
 - Replace `YOUR_CLIENT_ID_HERE` with your actual Client ID from Google Cloud Console
@@ -109,7 +116,7 @@ npm run dev
 
 The Gmail OAuth flow is accessible through your payment settings page:
 
-1. Navigate to: `http://localhost:3000/dashboard/payments/settings`
+1. Navigate to: `http://localhost:47847/dashboard/payments/settings`
 2. Look for the **"Gmail Connection"** section
 3. Click **"Connect Gmail Account"**
 4. You will be redirected to Google's consent screen
@@ -132,7 +139,7 @@ After successful OAuth:
 You can trigger a manual sync using the API:
 
 ```bash
-curl http://localhost:3000/api/gmail/sync
+curl http://localhost:47847/api/gmail/sync
 ```
 
 Or click the **"Sync Now"** button in the UI.
@@ -140,7 +147,7 @@ Or click the **"Sync Now"** button in the UI.
 ### 4.2 Check Sync Status
 
 ```bash
-curl http://localhost:3000/api/gmail/status
+curl http://localhost:47847/api/gmail/status
 ```
 
 This will return:
@@ -169,7 +176,7 @@ This will return:
 **Solution**:
 - Go to Google Cloud Console > Credentials
 - Edit your OAuth 2.0 Client
-- Ensure `http://localhost:3000/api/gmail/callback` is in the Authorized redirect URIs
+- Ensure `http://localhost:47847/api/gmail/callback` is in the Authorized redirect URIs
 - Save and try again
 
 #### 3. "This app hasn't been verified"

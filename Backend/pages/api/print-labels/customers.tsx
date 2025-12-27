@@ -85,7 +85,7 @@ async function handleGetCustomersForPrint(
           );
 
           // Get meal plan names
-          const mealPlanNames = [...new Set(activeOrders.map((o) => o.meal_plan_name))].join(', ');
+          const mealPlanNames = Array.from(new Set(activeOrders.map((o) => o.meal_plan_name))).join(', ');
 
           return {
             ...customer,

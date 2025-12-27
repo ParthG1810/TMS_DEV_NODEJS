@@ -8,7 +8,13 @@ import { UploadedFile } from 'src/types';
 // ----------------------------------------------------------------------
 
 // Backend server URL for serving uploaded files
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+// Uses runtime PORT env var if available, falls back to default
+const getBackendUrl = () => {
+  if (process.env.NEXT_PUBLIC_BACKEND_URL) return process.env.NEXT_PUBLIC_BACKEND_URL;
+  const port = process.env.PORT || '47847';
+  return `http://localhost:${port}`;
+};
+const BACKEND_URL = getBackendUrl();
 
 // Allowed image MIME types
 const ALLOWED_MIME_TYPES = [

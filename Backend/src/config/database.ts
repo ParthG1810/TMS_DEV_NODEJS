@@ -33,9 +33,9 @@ pool.getConnection()
  * @param params - Array of parameters to bind to the query
  * @returns Query results
  */
-export const query = async (sql: string, params?: any[]) => {
+export const query = async <T = any>(sql: string, params?: any[]): Promise<T> => {
   const [rows] = await pool.execute(sql, params);
-  return rows;
+  return rows as T;
 };
 
 /**

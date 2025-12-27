@@ -2,8 +2,10 @@
 
 ## Base URL
 
-- **Development**: `http://localhost:3000`
+- **Development**: `http://localhost:47847`
 - **Production**: `https://your-production-url.com`
+
+> **Note**: The Electron app uses port 47847 as default, with fallback to 47849 and 47851 if ports are in use.
 
 All API endpoints are prefixed with `/api`.
 
@@ -500,7 +502,7 @@ All endpoints follow a consistent error response format:
 ### Create Product
 
 ```bash
-curl -X POST http://localhost:3000/api/products \
+curl -X POST http://localhost:47847/api/products \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Tomatoes",
@@ -520,13 +522,13 @@ curl -X POST http://localhost:3000/api/products \
 ### Get All Products
 
 ```bash
-curl http://localhost:3000/api/products
+curl http://localhost:47847/api/products
 ```
 
 ### Create Recipe with Images
 
 ```bash
-curl -X POST http://localhost:3000/api/recipes \
+curl -X POST http://localhost:47847/api/recipes \
   -F "name=Pasta Pomodoro" \
   -F "description=Classic Italian pasta" \
   -F 'ingredients=[{"product_id": 1, "quantity": 500}]' \
@@ -537,7 +539,7 @@ curl -X POST http://localhost:3000/api/recipes \
 ### Get All Recipes
 
 ```bash
-curl http://localhost:3000/api/recipes
+curl http://localhost:47847/api/recipes
 ```
 
 ---

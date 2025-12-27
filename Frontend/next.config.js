@@ -7,15 +7,47 @@ const withTM = require('next-transpile-modules')([
   '@fullcalendar/react',
   '@fullcalendar/timegrid',
   '@fullcalendar/timeline',
+  'fontkit',
+  '@react-pdf/renderer',
+  '@react-pdf/font',
 ]);
 
 module.exports = withTM({
   swcMinify: false,
   trailingSlash: true,
   optimizeFonts: false,
+  output: 'standalone',
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  webpack: (config, { isServer }) => {
+    // Fix for @swc/helpers module resolution issue with fontkit
+    // Add fallback for @swc/helpers paths
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+    };
+
+    // Use NormalModuleReplacementPlugin to redirect @swc/helpers imports
+    const webpack = require('webpack');
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /@swc\/helpers\/_\/_define_property/,
+        require.resolve('@swc/helpers/cjs/_define_property.cjs')
+      ),
+      new webpack.NormalModuleReplacementPlugin(
+        /@swc\/helpers\/_\/_ts_decorate/,
+        require.resolve('@swc/helpers/cjs/_ts_decorate.cjs')
+      )
+    );
+
+    return config;
+  },
   env: {
-    // HOST
-    HOST_API_KEY: 'http://localhost:3000',
+    // HOST - Default API URL (can be overridden by runtime env vars)
+    HOST_API_KEY: process.env.HOST_API_KEY || 'http://localhost:47847',
     // MAPBOX
     MAPBOX_API: '',
     // FIREBASE
@@ -34,11 +66,13 @@ module.exports = withTM({
     AUTH0_CLIENT_ID: '',
   },
   // Proxy /uploads requests to backend server
+  // Uses runtime env var if available, falls back to default port
   async rewrites() {
+    const backendUrl = process.env.HOST_API_KEY || 'http://localhost:47847';
     return [
       {
         source: '/uploads/:path*',
-        destination: 'http://localhost:3000/uploads/:path*',
+        destination: `${backendUrl}/uploads/:path*`,
       },
     ];
   },

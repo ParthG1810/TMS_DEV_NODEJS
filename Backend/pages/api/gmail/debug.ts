@@ -129,9 +129,9 @@ export default async function handler(
           const headers = firstMsg.data.payload?.headers || [];
           testResult.firstMessage = {
             id: firstMsg.data.id,
-            from: headers.find(h => h.name === 'From')?.value,
-            subject: headers.find(h => h.name === 'Subject')?.value,
-            date: headers.find(h => h.name === 'Date')?.value,
+            from: headers.find((h: { name?: string; value?: string }) => h.name === 'From')?.value,
+            subject: headers.find((h: { name?: string; value?: string }) => h.name === 'Subject')?.value,
+            date: headers.find((h: { name?: string; value?: string }) => h.name === 'Date')?.value,
           };
         }
 

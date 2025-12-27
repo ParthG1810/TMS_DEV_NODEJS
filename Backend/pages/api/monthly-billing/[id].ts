@@ -92,7 +92,7 @@ async function handleGet(
  */
 async function handlePut(
   req: NextApiRequest,
-  res: NextApiResponse<ApiResponse<MonthlyBillingWithDetails>>,
+  res: NextApiResponse<ApiResponse<MonthlyBillingWithDetails | null>>,
   id: number
 ) {
   try {
@@ -111,7 +111,6 @@ async function handlePut(
         return res.status(200).json({
           success: true,
           data: null,
-          message: 'Billing record does not exist, no action needed',
         });
       }
 

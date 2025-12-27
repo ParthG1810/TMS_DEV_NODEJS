@@ -984,7 +984,12 @@ export interface CreateCashPaymentRequest {
   payer_name?: string;
   amount: number;
   payment_date: string;
+  payment_type?: string;
+  payment_source?: string;
+  interac_transaction_id?: string;
+  reference_number?: string;
   notes?: string;
+  created_by?: string;
 }
 
 /**
