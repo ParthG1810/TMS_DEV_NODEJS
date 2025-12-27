@@ -113,9 +113,25 @@ function createMainWindow(): void {
     mainWindow = null;
   });
 
-  // Handle external links
+  // Handle external links and print windows
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    // Allow about:blank for print windows
+    if (url === 'about:blank' || url === '') {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+          },
+        },
+      };
+    }
+
+    // Open external URLs in default browser
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+    }
     return { action: 'deny' };
   });
 
