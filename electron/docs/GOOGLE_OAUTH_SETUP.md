@@ -38,7 +38,7 @@ Before starting, ensure you have:
 
 - A Google account (Gmail)
 - Access to [Google Cloud Console](https://console.cloud.google.com/)
-- Your application's redirect URL ready (default: `http://localhost:3000/api/gmail/callback`)
+- Your application's redirect URL ready (default: `http://localhost:47847/api/gmail/callback`)
 
 ---
 
@@ -201,9 +201,14 @@ Select **"Web application"**
 Enter `TMS Desktop Client` (or any name you prefer)
 
 **Authorized JavaScript origins:**
-Click **"+ Add URI"** and add:
+Click **"+ Add URI"** and add all port fallback options:
 ```
-http://localhost:3000
+http://localhost:47847
+http://localhost:47849
+http://localhost:47851
+http://localhost:47848
+http://localhost:47850
+http://localhost:47852
 ```
 
 For production, also add your production URL:
@@ -212,15 +217,19 @@ https://your-production-domain.com
 ```
 
 **Authorized redirect URIs:**
-Click **"+ Add URI"** and add:
+Click **"+ Add URI"** and add all port fallback options:
 ```
-http://localhost:3000/api/gmail/callback
+http://localhost:47847/api/gmail/callback
+http://localhost:47849/api/gmail/callback
+http://localhost:47851/api/gmail/callback
 ```
 
 For production, also add:
 ```
 https://your-production-domain.com/api/gmail/callback
 ```
+
+> **Why multiple ports?** The TMS Desktop app uses port fallback - if 47847 is busy, it tries 47849, then 47851. Add all three to avoid "redirect_uri_mismatch" errors.
 
 ### 4.4 Create and Save Credentials
 
@@ -252,10 +261,10 @@ Open `Backend/.env` in a text editor and add your credentials:
 # Gmail OAuth Configuration
 GOOGLE_CLIENT_ID=your-client-id-here.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-your-client-secret-here
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/gmail/callback
+GOOGLE_REDIRECT_URI=http://localhost:47847/api/gmail/callback
 
 # Next.js Public URL (must match redirect URI domain)
-NEXT_PUBLIC_API_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:47847
 ```
 
 ### 5.2 Example with Real Values
@@ -264,9 +273,11 @@ NEXT_PUBLIC_API_URL=http://localhost:3000
 # Gmail OAuth Configuration
 GOOGLE_CLIENT_ID=123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-AbCdEfGhIjKlMnOpQrStUvWxYz
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/gmail/callback
-NEXT_PUBLIC_API_URL=http://localhost:3000
+GOOGLE_REDIRECT_URI=http://localhost:47847/api/gmail/callback
+NEXT_PUBLIC_API_URL=http://localhost:47847
 ```
+
+> **Note:** While .env uses the primary port (47847), make sure all fallback redirect URIs are added to Google Cloud Console.
 
 ### 5.3 Security Best Practices
 
@@ -383,7 +394,21 @@ After successful authentication:
 |----------|---------------|
 | `GOOGLE_CLIENT_ID` | `123456789012-abc...xyz.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | `GOCSPX-AbCdEf...` |
-| `GOOGLE_REDIRECT_URI` | `http://localhost:3000/api/gmail/callback` |
+| `GOOGLE_REDIRECT_URI` | `http://localhost:47847/api/gmail/callback` |
+
+### Port Fallback Configuration
+
+The TMS Desktop app uses these ports (add all to Google Cloud Console):
+
+| Server | Primary | Fallback 1 | Fallback 2 |
+|--------|---------|------------|------------|
+| Backend | 47847 | 47849 | 47851 |
+| Frontend | 47848 | 47850 | 47852 |
+
+**Redirect URIs to add:**
+- `http://localhost:47847/api/gmail/callback`
+- `http://localhost:47849/api/gmail/callback`
+- `http://localhost:47851/api/gmail/callback`
 
 ### Useful Links
 

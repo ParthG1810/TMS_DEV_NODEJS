@@ -357,9 +357,9 @@ Edit the `.env` file with your values:
 # Environment
 NODE_ENV=development
 
-# Server Configuration
-PORT=3000
-DEV_API=http://localhost:3000
+# Server Configuration (ports are auto-configured by Electron app)
+PORT=47847
+DEV_API=http://localhost:47847
 PRODUCTION_API=https://your-production-url.com
 
 # Database Configuration (REQUIRED - Update these!)
@@ -376,10 +376,10 @@ JWT_EXPIRES_IN=3d
 # Gmail OAuth (Optional - see docs/GOOGLE_OAUTH_SETUP.md)
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/gmail/callback
+GOOGLE_REDIRECT_URI=http://localhost:47847/api/gmail/callback
 
 # Next.js Public URL
-NEXT_PUBLIC_API_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:47847
 ```
 
 ### 5.4 Generate JWT Secret
@@ -421,9 +421,11 @@ npm run dev
 ```
 
 This starts:
-- Backend API server on `http://localhost:8081`
-- Frontend on `http://localhost:3000`
+- Backend API server on `http://localhost:47847` (with fallback to 47849, 47851)
+- Frontend on `http://localhost:47848` (with fallback to 47850, 47852)
 - Electron window
+
+> **Note**: The app uses uncommon ports to avoid conflicts with development tools. If a port is in use, it automatically tries the next available port from the fallback list.
 
 ### 7.2 Run Components Separately
 
@@ -615,13 +617,19 @@ sudo dnf install -y mesa-libGL mesa-dri-drivers
 
 ### 9.4 Port Already in Use
 
-**Error: Port 3000 is already in use**
+The Electron app automatically handles port conflicts by trying fallback ports:
+- Backend: 47847 → 47849 → 47851
+- Frontend: 47848 → 47850 → 47852
+
+If all ports are in use, you can manually free them:
+
+**Find and kill process using a port:**
 ```bash
-# Find process using port 3000
-sudo lsof -i :3000
+# Find process using port 47847
+sudo lsof -i :47847
 
 # Or using ss
-ss -tulpn | grep 3000
+ss -tulpn | grep 47847
 
 # Kill process
 kill -9 <PID>
