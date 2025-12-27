@@ -7,6 +7,14 @@ import { getConfig } from './config';
 let backendProcess: ChildProcess | null = null;
 let frontendProcess: ChildProcess | null = null;
 
+// Track actual ports being used (may differ from config if fallback was needed)
+let activeBackendPort: number | null = null;
+let activeFrontendPort: number | null = null;
+
+// Port fallback options (3 ports each)
+const BACKEND_PORT_OPTIONS = [47847, 47849, 47851];
+const FRONTEND_PORT_OPTIONS = [47848, 47850, 47852];
+
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 // Get paths based on environment
@@ -50,6 +58,24 @@ async function isPortAvailable(port: number): Promise<boolean> {
   });
 }
 
+// Find first available port from options list
+async function findAvailablePort(portOptions: number[], serverName: string): Promise<number> {
+  for (const port of portOptions) {
+    const available = await isPortAvailable(port);
+    if (available) {
+      log.info(`${serverName}: Port ${port} is available`);
+      return port;
+    }
+    log.info(`${serverName}: Port ${port} is in use, trying next...`);
+  }
+
+  // All ports are in use
+  throw new Error(
+    `All ${serverName} ports are in use (${portOptions.join(', ')}). ` +
+    `Please close other applications using these ports.`
+  );
+}
+
 // Wait for process to output ready message
 function waitForProcessReady(proc: ChildProcess, readyPattern: RegExp, timeout: number = 60000): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -78,16 +104,13 @@ function waitForProcessReady(proc: ChildProcess, readyPattern: RegExp, timeout: 
 }
 
 // Start backend server
-async function startBackend(): Promise<void> {
+async function startBackend(): Promise<number> {
   const { backend } = getPaths();
   const config = getConfig();
-  const backendPort = config.server.backendPort;
 
-  // Check if port is available
-  const portAvailable = await isPortAvailable(backendPort);
-  if (!portAvailable) {
-    throw new Error(`Port ${backendPort} is already in use. Please close any other applications using this port.`);
-  }
+  // Find an available port from options
+  const backendPort = await findAvailablePort(BACKEND_PORT_OPTIONS, 'Backend');
+  activeBackendPort = backendPort;
 
   log.info(`Starting backend from: ${backend}`);
   log.info(`Backend port: ${backendPort}`);
@@ -175,23 +198,21 @@ async function startBackend(): Promise<void> {
     log.error('Backend failed to start:', err);
     throw new Error('Backend server failed to start. Please check the logs for details.');
   }
+
+  return backendPort;
 }
 
 // Start frontend server
-async function startFrontend(): Promise<void> {
+async function startFrontend(backendPort: number): Promise<number> {
   const { frontend } = getPaths();
   const config = getConfig();
-  const frontendPort = config.server.frontendPort;
-  const backendPort = config.server.backendPort;
 
-  // Check if port is available
-  const portAvailable = await isPortAvailable(frontendPort);
-  if (!portAvailable) {
-    throw new Error(`Port ${frontendPort} is already in use. Please close any other applications using this port.`);
-  }
+  // Find an available port from options
+  const frontendPort = await findAvailablePort(FRONTEND_PORT_OPTIONS, 'Frontend');
+  activeFrontendPort = frontendPort;
 
   log.info(`Starting frontend from: ${frontend}`);
-  log.info(`Frontend port: ${frontendPort}`);
+  log.info(`Frontend port: ${frontendPort}, connecting to backend on port: ${backendPort}`);
 
   // Build environment variables
   const envVars = {
@@ -265,20 +286,24 @@ async function startFrontend(): Promise<void> {
     log.error('Frontend failed to start:', err);
     throw new Error('Frontend server failed to start. Please check the logs for details.');
   }
+
+  return frontendPort;
 }
 
 // Start all servers
-export async function startServers(): Promise<void> {
+export async function startServers(): Promise<{ backendPort: number; frontendPort: number }> {
   log.info('Starting all servers...');
 
   try {
     // Start backend first
-    await startBackend();
+    const backendPort = await startBackend();
 
-    // Then start frontend
-    await startFrontend();
+    // Then start frontend (pass backend port so it knows where to connect)
+    const frontendPort = await startFrontend(backendPort);
 
-    log.info('All servers started successfully');
+    log.info(`All servers started successfully (Backend: ${backendPort}, Frontend: ${frontendPort})`);
+
+    return { backendPort, frontendPort };
   } catch (error) {
     // If any server fails, stop all
     await stopServers();
@@ -326,6 +351,8 @@ export async function stopServers(): Promise<void> {
 
   frontendProcess = null;
   backendProcess = null;
+  activeBackendPort = null;
+  activeFrontendPort = null;
 
   log.info('All servers stopped');
 }
@@ -344,9 +371,29 @@ export function areServersRunning(): boolean {
 export function getServerStatus(): {
   backend: 'running' | 'stopped';
   frontend: 'running' | 'stopped';
+  backendPort: number | null;
+  frontendPort: number | null;
 } {
   return {
     backend: backendProcess && !backendProcess.killed ? 'running' : 'stopped',
     frontend: frontendProcess && !frontendProcess.killed ? 'running' : 'stopped',
+    backendPort: activeBackendPort,
+    frontendPort: activeFrontendPort,
+  };
+}
+
+// Get active ports
+export function getActivePorts(): { backendPort: number | null; frontendPort: number | null } {
+  return {
+    backendPort: activeBackendPort,
+    frontendPort: activeFrontendPort,
+  };
+}
+
+// Get port options for reference
+export function getPortOptions(): { backend: number[]; frontend: number[] } {
+  return {
+    backend: BACKEND_PORT_OPTIONS,
+    frontend: FRONTEND_PORT_OPTIONS,
   };
 }

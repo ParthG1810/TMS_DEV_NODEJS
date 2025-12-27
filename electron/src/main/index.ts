@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, shell, globalShortcut } from 'electron';
 import { join } from 'path';
 import log from 'electron-log';
-import { startServers, stopServers } from './servers';
+import { startServers, stopServers, getActivePorts } from './servers';
 import { checkMySQLConnection } from './database';
 import { createTray, destroyTray } from './tray';
 import { setupAutoUpdater } from './updater';
@@ -28,10 +28,11 @@ let isQuitting = false;
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
-// Get frontend URL from config
+// Get frontend URL from active port (fallback to config if not started yet)
 function getFrontendUrl(): string {
-  const config = getConfig();
-  return `http://localhost:${config.server.frontendPort}`;
+  const ports = getActivePorts();
+  const port = ports.frontendPort || getConfig().server.frontendPort;
+  return `http://localhost:${port}`;
 }
 
 // Check for command line flags
@@ -205,8 +206,8 @@ async function startApp(): Promise<void> {
 
     // Step 2: Start backend and frontend servers
     log.info('Step 2: Starting servers...');
-    await startServers();
-    log.info('Servers started successfully');
+    const { backendPort, frontendPort } = await startServers();
+    log.info(`Servers started successfully (Backend: ${backendPort}, Frontend: ${frontendPort})`);
 
     // Step 3: Create main window
     log.info('Step 3: Creating main window...');
