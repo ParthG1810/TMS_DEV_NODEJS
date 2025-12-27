@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "npm run build && concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:electron\"",
-    "dev:electron": "wait-on http://localhost:8081 http://localhost:3000 && electron .",
+    "dev:electron": "wait-on http://localhost:47848 http://localhost:47847 && electron .",
     "dev:backend": "cd ../Backend && npm run dev",
     "dev:frontend": "cd ../Frontend && npm run dev",
     "build": "tsc -p tsconfig.json",
@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "electron-log": "^5.2.4",
+    "electron-store": "^8.1.0",
     "electron-updater": "^6.3.9",
     "mysql2": "^3.11.5"
   },

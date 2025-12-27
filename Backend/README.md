@@ -70,7 +70,7 @@ DB_PORT=3306
 npm run dev
 ```
 
-The API will be available at `http://localhost:3000`
+The API will be available at `http://localhost:47847`
 
 ## Project Structure
 
@@ -153,10 +153,10 @@ mysql -u root -p tms_database < backup.sql
 
 ```bash
 # Get all products
-curl http://localhost:3000/api/products
+curl http://localhost:47847/api/products
 
 # Create product
-curl -X POST http://localhost:3000/api/products \
+curl -X POST http://localhost:47847/api/products \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Tomatoes",
@@ -175,7 +175,7 @@ curl -X POST http://localhost:3000/api/products \
 
 ```bash
 # Create recipe with images
-curl -X POST http://localhost:3000/api/recipes \
+curl -X POST http://localhost:47847/api/recipes \
   -F "name=Pasta Pomodoro" \
   -F "description=Classic pasta" \
   -F 'ingredients=[{"product_id": 1, "quantity": 500}]' \
@@ -238,11 +238,11 @@ mysql -u root -p -e "SELECT 1;"
 ### Port Already in Use
 
 ```bash
-# Kill process on port 3000
-lsof -ti:3000 | xargs kill -9
+# Kill process on port 47847
+lsof -ti:47847 | xargs kill -9
 
 # Or use different port
-PORT=3001 npm run dev
+PORT=47849 npm run dev
 ```
 
 ### Image Upload Fails

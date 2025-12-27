@@ -1,6 +1,7 @@
 import { Tray, Menu, BrowserWindow, app, nativeImage } from 'electron';
 import { join } from 'path';
 import log from 'electron-log';
+import { showSetupWizard } from './setupWizard';
 
 let tray: Tray | null = null;
 let mainWindowRef: BrowserWindow | null = null;
@@ -119,6 +120,12 @@ export function updateTrayMenu(): void {
       ],
     },
     { type: 'separator' },
+    {
+      label: 'Settings',
+      click: () => {
+        showSetupWizard();
+      },
+    },
     {
       label: 'Check for Updates',
       click: () => {

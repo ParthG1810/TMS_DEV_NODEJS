@@ -30,8 +30,8 @@ Before running or building the application, ensure you have the following instal
 
 ```
 TMS_DEV_NODEJS/
-├── Backend/          # Next.js Backend API server (port 8081)
-├── Frontend/         # Next.js Frontend application (port 3000)
+├── Backend/          # Next.js Backend API server (port 47847)
+├── Frontend/         # Next.js Frontend application (port 47848)
 └── electron/         # Electron desktop wrapper
     ├── src/          # Electron main process source
     ├── dist/         # Compiled Electron TypeScript
@@ -87,9 +87,13 @@ npm run dev
 ```
 
 This starts:
-- Backend on `http://localhost:8081`
-- Frontend on `http://localhost:3000`
+- Backend on `http://localhost:47847`
+- Frontend on `http://localhost:47848`
 - Electron window connecting to both
+
+> **Port Fallback:** If the primary ports are in use, the app automatically tries fallback ports:
+> - Backend: 47847 → 47849 → 47851
+> - Frontend: 47848 → 47850 → 47852
 
 ### Option 2: Run Separately
 
@@ -363,7 +367,7 @@ Open `Backend/.env` in a text editor and configure the following:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NODE_ENV` | Environment mode | `development` |
-| `PORT` | Backend server port | `3000` |
+| `PORT` | Backend server port | `47847` |
 | `JWT_SECRET` | Secret key for JWT tokens | `your-secret-key` |
 | `JWT_EXPIRES_IN` | JWT token expiry | `3d` |
 
@@ -398,8 +402,8 @@ mysql -u root -p -e "CREATE DATABASE tms_database CHARACTER SET utf8mb4 COLLATE 
 NODE_ENV=development
 
 # Server Configuration
-PORT=3000
-DEV_API=http://localhost:3000
+PORT=47847
+DEV_API=http://localhost:47847
 PRODUCTION_API=https://your-production-url.com
 
 # Database Configuration (REQUIRED)
@@ -414,12 +418,16 @@ JWT_SECRET=change-this-to-a-random-string-in-production
 JWT_EXPIRES_IN=3d
 
 # Gmail OAuth (Optional)
+# Add all redirect URIs to Google Cloud Console for port fallback support:
+# - http://localhost:47847/api/gmail/callback
+# - http://localhost:47849/api/gmail/callback
+# - http://localhost:47851/api/gmail/callback
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/gmail/callback
+GOOGLE_REDIRECT_URI=http://localhost:47847/api/gmail/callback
 
 # Next.js Public URL
-NEXT_PUBLIC_API_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:47847
 ```
 
 ---
