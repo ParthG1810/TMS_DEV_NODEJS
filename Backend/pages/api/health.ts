@@ -20,10 +20,7 @@ interface HealthResponse {
   };
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<HealthResponse>
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse<HealthResponse>) {
   const startTime = Date.now();
 
   // Database check
@@ -36,8 +33,8 @@ export default async function handler(
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '3306', 10),
       user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'tms_db',
+      password: process.env.DB_PASSWORD || 'Mysql',
+      database: process.env.DB_NAME || 'TmsDb_Dev',
       connectTimeout: 5000,
     });
 
