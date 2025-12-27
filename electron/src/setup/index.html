@@ -172,12 +172,31 @@
               </div>
               <div class="form-group">
                 <label for="googleClientSecret">Client Secret</label>
-                <input
-                  type="password"
-                  id="googleClientSecret"
-                  name="googleClientSecret"
-                  placeholder="Enter client secret"
-                />
+                <div class="password-input">
+                  <input
+                    type="password"
+                    id="googleClientSecret"
+                    name="googleClientSecret"
+                    placeholder="Enter client secret"
+                  />
+                  <button
+                    type="button"
+                    class="toggle-password"
+                    id="toggleClientSecret"
+                  >
+                    <svg
+                      class="eye-icon"
+                      viewBox="0 0 24 24"
+                      width="20"
+                      height="20"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

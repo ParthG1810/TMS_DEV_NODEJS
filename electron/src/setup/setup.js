@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("resetBtn").addEventListener("click", resetToDefaults);
   document.getElementById("testDbBtn").addEventListener("click", testDatabaseConnection);
   document.getElementById("toggleDbPassword").addEventListener("click", () => togglePassword("dbPassword"));
+  document.getElementById("toggleClientSecret").addEventListener("click", () => togglePassword("googleClientSecret"));
   document.getElementById("oauthHeader").addEventListener("click", function() {
     toggleSection(this);
   });
