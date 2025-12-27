@@ -233,9 +233,6 @@ export default function MealPlansPage() {
   };
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -307,14 +304,25 @@ export default function MealPlansPage() {
       </html>
     `;
 
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.focus();
+    // Use Blob URL for better print preview support
+    const blob = new Blob([printContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
 
-    setTimeout(() => {
+    if (!printWindow) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    printWindow.onload = () => {
+      printWindow.focus();
       printWindow.print();
+    };
+
+    printWindow.onafterprint = () => {
       printWindow.close();
-    }, 250);
+      URL.revokeObjectURL(url);
+    };
   };
 
   const handleImport = () => {

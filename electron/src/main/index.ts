@@ -113,10 +113,29 @@ function createMainWindow(): void {
     mainWindow = null;
   });
 
-  // Handle external links
+  // Handle window.open() requests
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
+    // Open external URLs in default browser/app
+    if (
+      url.startsWith('http://') ||
+      url.startsWith('https://') ||
+      url.startsWith('mailto:') ||
+      url.startsWith('tel:')
+    ) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+
+    // Allow all other URLs (about:blank, blob:, data:, etc.) for print windows
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+        },
+      },
+    };
   });
 
   // Load the login page
