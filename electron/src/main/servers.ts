@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, fork, ChildProcess } from 'child_process';
 import { join } from 'path';
 import { app } from 'electron';
 import log from 'electron-log';
@@ -76,11 +76,6 @@ function waitForProcessReady(proc: ChildProcess, readyPattern: RegExp, timeout: 
   });
 }
 
-// Get node command based on platform
-function getNodeCommand(): string {
-  return process.platform === 'win32' ? 'node.exe' : 'node';
-}
-
 // Start backend server
 async function startBackend(): Promise<void> {
   const { backend } = getPaths();
@@ -93,32 +88,36 @@ async function startBackend(): Promise<void> {
 
   log.info(`Starting backend from: ${backend}`);
 
-  let command: string;
-  let args: string[];
-  let cwd: string;
-
   if (isDev) {
     // Development: use npm run dev
-    command = getNpmCommand();
-    args = ['run', 'dev'];
-    cwd = backend;
+    const npmCmd = getNpmCommand();
+    backendProcess = spawn(npmCmd, ['run', 'dev'], {
+      cwd: backend,
+      env: {
+        ...process.env,
+        NODE_ENV: 'development',
+        PORT: '3000',
+      },
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
   } else {
-    // Production: use standalone server.js
-    command = getNodeCommand();
-    args = ['server.js'];
-    cwd = backend;
-  }
+    // Production: use Electron as Node.js to run standalone server.js
+    // ELECTRON_RUN_AS_NODE makes Electron behave as a Node.js process
+    const serverPath = join(backend, 'server.js');
+    log.info(`Running backend server: ${serverPath}`);
 
-  backendProcess = spawn(command, args, {
-    cwd,
-    env: {
-      ...process.env,
-      NODE_ENV: isDev ? 'development' : 'production',
-      PORT: '3000',
-    },
-    shell: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+    backendProcess = spawn(process.execPath, [serverPath], {
+      cwd: backend,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        NODE_ENV: 'production',
+        PORT: '3000',
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  }
 
   backendProcess.stdout?.on('data', (data: Buffer) => {
     const message = data.toString().trim();
@@ -171,32 +170,36 @@ async function startFrontend(): Promise<void> {
 
   log.info(`Starting frontend from: ${frontend}`);
 
-  let command: string;
-  let args: string[];
-  let cwd: string;
-
   if (isDev) {
     // Development: use npm run dev
-    command = getNpmCommand();
-    args = ['run', 'dev'];
-    cwd = frontend;
+    const npmCmd = getNpmCommand();
+    frontendProcess = spawn(npmCmd, ['run', 'dev'], {
+      cwd: frontend,
+      env: {
+        ...process.env,
+        NODE_ENV: 'development',
+        PORT: '8081',
+      },
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
   } else {
-    // Production: use standalone server.js
-    command = getNodeCommand();
-    args = ['server.js'];
-    cwd = frontend;
-  }
+    // Production: use Electron as Node.js to run standalone server.js
+    // ELECTRON_RUN_AS_NODE makes Electron behave as a Node.js process
+    const serverPath = join(frontend, 'server.js');
+    log.info(`Running frontend server: ${serverPath}`);
 
-  frontendProcess = spawn(command, args, {
-    cwd,
-    env: {
-      ...process.env,
-      NODE_ENV: isDev ? 'development' : 'production',
-      PORT: '8081',
-    },
-    shell: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+    frontendProcess = spawn(process.execPath, [serverPath], {
+      cwd: frontend,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        NODE_ENV: 'production',
+        PORT: '8081',
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  }
 
   frontendProcess.stdout?.on('data', (data: Buffer) => {
     const message = data.toString().trim();
