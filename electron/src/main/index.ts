@@ -128,8 +128,13 @@ function createMainWindow(): void {
       };
     }
 
-    // Open external URLs in default browser
-    if (url.startsWith('http://') || url.startsWith('https://')) {
+    // Open external URLs and special protocols in default handler
+    if (
+      url.startsWith('http://') ||
+      url.startsWith('https://') ||
+      url.startsWith('mailto:') ||
+      url.startsWith('tel:')
+    ) {
       shell.openExternal(url);
     }
     return { action: 'deny' };
