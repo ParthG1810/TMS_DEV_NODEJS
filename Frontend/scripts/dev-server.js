@@ -85,8 +85,10 @@ async function isPortAvailable(port) {
     const server = net.createServer();
     server.once('error', () => resolve(false));
     server.once('listening', () => {
-      server.close();
-      resolve(true);
+      server.close(() => {
+        // Small delay after closing to ensure the port is fully released
+        setTimeout(() => resolve(true), 100);
+      });
     });
     server.listen(port, '127.0.0.1');
   });
@@ -101,7 +103,7 @@ async function findAvailablePort() {
     console.log(`Found stale Frontend server on port ${primaryPort}, killing it...`);
     killProcessOnPort(primaryPort);
     // Wait for port to be released
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
   for (const port of PORT_OPTIONS) {
@@ -115,23 +117,88 @@ async function findAvailablePort() {
   throw new Error(`All ports are in use: ${PORT_OPTIONS.join(', ')}`);
 }
 
-async function main() {
-  try {
-    const port = await findAvailablePort();
+async function startServer(port) {
+  return new Promise((resolve, reject) => {
     console.log(`Starting Frontend dev server on port ${port}...\n`);
 
     const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     const child = spawn(npmCmd, ['run', 'next-dev', '--', '-p', String(port)], {
-      stdio: 'inherit',
+      stdio: ['inherit', 'pipe', 'pipe'],
       shell: true,
       env: { ...process.env, PORT: String(port) },
     });
 
-    child.on('exit', (code) => process.exit(code || 0));
-  } catch (err) {
-    console.error('Error:', err.message);
-    process.exit(1);
+    let started = false;
+    let output = '';
+
+    const handleOutput = (data) => {
+      const text = data.toString();
+      output += text;
+      process.stdout.write(text);
+
+      // Check if server started successfully
+      if (text.includes('ready') || text.includes('started server')) {
+        started = true;
+        resolve({ child, port });
+      }
+
+      // Check if port is already in use
+      if (text.includes('already in use') || text.includes('EADDRINUSE')) {
+        child.kill();
+        reject(new Error(`Port ${port} is already in use`));
+      }
+    };
+
+    child.stdout.on('data', handleOutput);
+    child.stderr.on('data', handleOutput);
+
+    child.on('exit', (code) => {
+      if (!started) {
+        reject(new Error(`Server exited with code ${code}`));
+      }
+    });
+
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      if (!started) {
+        child.kill();
+        reject(new Error('Server startup timeout'));
+      }
+    }, 30000);
+  });
+}
+
+async function main() {
+  for (const port of PORT_OPTIONS) {
+    const available = await isPortAvailable(port);
+    if (!available) {
+      // Check if it's our stale server
+      const isStale = await isOurStaleServer(port);
+      if (isStale) {
+        console.log(`Found stale Frontend server on port ${port}, killing it...`);
+        killProcessOnPort(port);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else {
+        console.log(`✗ Port ${port} is in use by other software, trying next...`);
+        continue;
+      }
+    }
+
+    console.log(`✓ Port ${port} is available`);
+
+    try {
+      const { child } = await startServer(port);
+      child.on('exit', (code) => process.exit(code || 0));
+      // Keep the main process running
+      return;
+    } catch (err) {
+      console.log(`Failed to start on port ${port}: ${err.message}`);
+      console.log('Trying next port...\n');
+    }
   }
+
+  console.error(`All ports are in use: ${PORT_OPTIONS.join(', ')}`);
+  process.exit(1);
 }
 
 main();
