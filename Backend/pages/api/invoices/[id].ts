@@ -321,8 +321,8 @@ async function handleUpdate(
       [newAmountPaid, newBalance, newStatus, id]
     );
 
-    // If fully paid, update linked order_billing and customer_orders
-    if (newStatus === 'paid') {
+    // Update linked customer_orders payment_status based on invoice status
+    if (newStatus === 'paid' || newStatus === 'partial_paid') {
       // Get linked order_ids
       const linkedOrders = await query<any[]>(
         'SELECT order_id FROM order_billing WHERE invoice_id = ?',
@@ -333,8 +333,8 @@ async function handleUpdate(
         const orderIds = linkedOrders.map(o => o.order_id);
         const placeholders = orderIds.map(() => '?').join(', ');
         await query(
-          `UPDATE customer_orders SET payment_status = 'paid' WHERE id IN (${placeholders})`,
-          orderIds
+          `UPDATE customer_orders SET payment_status = ? WHERE id IN (${placeholders})`,
+          [newStatus, ...orderIds]
         );
       }
     }
