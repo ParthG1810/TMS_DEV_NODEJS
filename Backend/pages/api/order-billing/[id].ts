@@ -217,9 +217,9 @@ async function handleUpdate(
       [currentBilling.order_id]
     );
   } else if (status === 'approved') {
-    // Approved - set order to approved
+    // Approved - set order to finalized (matches the status shown as "Approved (Locked)" in Orders page)
     await query(
-      `UPDATE customer_orders SET payment_status = 'approved' WHERE id = ?`,
+      `UPDATE customer_orders SET payment_status = 'finalized' WHERE id = ?`,
       [currentBilling.order_id]
     );
 
