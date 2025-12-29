@@ -189,10 +189,12 @@ function createMainWindow(): void {
   });
 
   mainWindow.on('close', (event) => {
-    const cfg = getConfig();
-    if (!isQuitting && cfg.app.minimizeToTray) {
+    // Always quit the app when window is closed (don't minimize to tray)
+    // This ensures servers are properly cleaned up
+    if (!isQuitting) {
       event.preventDefault();
-      mainWindow?.hide();
+      isQuitting = true;
+      app.quit();
     }
   });
 
