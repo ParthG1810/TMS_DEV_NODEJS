@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, shell, globalShortcut } from 'electron';
 import { join } from 'path';
+import { execSync } from 'child_process';
 import log from 'electron-log';
 import { startServers, stopServers, getActivePorts } from './servers';
 import { checkMySQLConnection } from './database';
@@ -15,9 +16,97 @@ log.transports.file.level = 'info';
 log.transports.console.level = 'debug';
 log.transports.file.maxSize = 10 * 1024 * 1024; // 10MB
 
+// Kill stale Electron instances before acquiring lock
+function killStaleInstances(): void {
+  try {
+    const currentPid = process.pid;
+    log.info(`Current process PID: ${currentPid}`);
+
+    if (process.platform === 'win32') {
+      // Windows: Find electron.exe or tms-desktop.exe processes
+      try {
+        // Check for both electron.exe (dev) and TMS Desktop.exe (production)
+        const appNames = ['electron.exe', 'TMS Desktop.exe', 'tms-desktop.exe'];
+
+        for (const appName of appNames) {
+          try {
+            const result = execSync(`tasklist /FI "IMAGENAME eq ${appName}" /FO CSV /NH`, {
+              encoding: 'utf8',
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+
+            const lines = result.trim().split('\n').filter(line => line.includes(appName));
+
+            for (const line of lines) {
+              const match = line.match(new RegExp(`"${appName.replace('.', '\\.')}"\\s*,\\s*"(\\d+)"`, 'i'));
+              if (match) {
+                const pid = parseInt(match[1]);
+                // Don't kill ourselves
+                if (pid !== currentPid) {
+                  try {
+                    execSync(`taskkill /PID ${pid} /F`, { stdio: 'pipe' });
+                    log.info(`Killed stale ${appName} process ${pid}`);
+                  } catch (e) {
+                    // Process might already be gone
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // No processes found for this app name
+          }
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    } else {
+      // Linux/Mac: Find electron processes
+      try {
+        const result = execSync('pgrep -f "electron|tms-desktop"', {
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+
+        const pids = result.trim().split('\n').filter(Boolean);
+
+        for (const pidStr of pids) {
+          const pid = parseInt(pidStr);
+          if (pid !== currentPid) {
+            try {
+              execSync(`kill -9 ${pid}`, { stdio: 'pipe' });
+              log.info(`Killed stale Electron process ${pid}`);
+            } catch (e) {
+              // Process might already be gone
+            }
+          }
+        }
+      } catch (e) {
+        // No processes found
+      }
+    }
+  } catch (error) {
+    log.warn('Could not check for stale instances:', error);
+  }
+}
+
+// Kill stale instances before trying to acquire lock
+killStaleInstances();
+
+// Give a moment for processes to fully terminate (synchronous delay)
+try {
+  if (process.platform === 'win32') {
+    execSync('ping -n 1 127.0.0.1 >nul', { stdio: 'ignore' });
+  } else {
+    execSync('sleep 0.5', { stdio: 'ignore' });
+  }
+} catch (e) {
+  // Ignore delay errors
+}
+
 // Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
+  log.warn('Another instance is already running. Exiting.');
   app.quit();
   process.exit(0);
 }
