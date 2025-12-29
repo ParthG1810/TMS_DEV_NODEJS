@@ -193,11 +193,12 @@ async function handleUpdate(
   );
 
   // Update customer_orders payment_status based on new status
+  // Also update any child orders (orders with parent_order_id = this order)
   if (status === 'calculating') {
-    // Rejected - set order back to calculating
+    // Rejected - set order and its children back to calculating
     await query(
-      `UPDATE customer_orders SET payment_status = 'calculating' WHERE id = ?`,
-      [currentBilling.order_id]
+      `UPDATE customer_orders SET payment_status = 'calculating' WHERE id = ? OR parent_order_id = ?`,
+      [currentBilling.order_id, currentBilling.order_id]
     );
 
     // Delete any notifications related to this order billing
@@ -211,16 +212,16 @@ async function handleUpdate(
       console.error('Error deleting notifications on reject:', notificationError);
     }
   } else if (status === 'finalized') {
-    // Finalized - set order to pending
+    // Finalized - set order and its children to pending
     await query(
-      `UPDATE customer_orders SET payment_status = 'pending' WHERE id = ?`,
-      [currentBilling.order_id]
+      `UPDATE customer_orders SET payment_status = 'pending' WHERE id = ? OR parent_order_id = ?`,
+      [currentBilling.order_id, currentBilling.order_id]
     );
   } else if (status === 'approved') {
-    // Approved - set order to finalized (matches the status shown as "Approved (Locked)" in Orders page)
+    // Approved - set order and its children to finalized (matches the status shown as "Approved (Locked)" in Orders page)
     await query(
-      `UPDATE customer_orders SET payment_status = 'finalized' WHERE id = ?`,
-      [currentBilling.order_id]
+      `UPDATE customer_orders SET payment_status = 'finalized' WHERE id = ? OR parent_order_id = ?`,
+      [currentBilling.order_id, currentBilling.order_id]
     );
 
     // Create notification for approval
