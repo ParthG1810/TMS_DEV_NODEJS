@@ -88,6 +88,17 @@ export function createApplicationMenu(): void {
     {
       label: 'Edit',
       submenu: [
+        {
+          label: 'Back',
+          accelerator: 'Alt+Left',
+          click: () => {
+            const window = BrowserWindow.getFocusedWindow();
+            if (window && window.webContents.canGoBack()) {
+              window.webContents.goBack();
+            }
+          },
+        },
+        { type: 'separator' },
         { role: 'undo' },
         { role: 'redo' },
         { type: 'separator' },
