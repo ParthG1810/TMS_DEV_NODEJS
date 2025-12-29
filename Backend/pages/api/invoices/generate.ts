@@ -234,12 +234,12 @@ export default async function handler(
       [invoiceId, ...order_billing_ids]
     );
 
-    // Update customer_orders payment_status to 'pending' for all linked orders
+    // Update customer_orders payment_status to 'finalized' for all linked orders
     const orderIds = orderBillings.map(ob => ob.order_id);
     const orderPlaceholders = orderIds.map(() => '?').join(', ');
     await query(
       `UPDATE customer_orders
-       SET payment_status = 'pending'
+       SET payment_status = 'finalized'
        WHERE id IN (${orderPlaceholders})`,
       orderIds
     );

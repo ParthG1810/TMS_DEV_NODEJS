@@ -366,6 +366,42 @@ export default async function handler(
       }
     }
 
+    // Update customer_orders payment_status based on invoice payment_status
+    // For each invoice that was paid or partially paid, update the linked customer_orders
+    if (invoiceIds.length > 0) {
+      const invoicePlaceholders = invoiceIds.map(() => '?').join(',');
+
+      // Get all invoice payment statuses and their linked order_ids
+      const [invoiceOrders]: any = await connection.query(`
+        SELECT i.id as invoice_id, i.payment_status, ob.order_id
+        FROM invoices i
+        INNER JOIN order_billing ob ON ob.invoice_id = i.id
+        WHERE i.id IN (${invoicePlaceholders})
+      `, invoiceIds);
+
+      // Group orders by their new payment status
+      const ordersByStatus: { [status: string]: number[] } = {};
+      for (const row of invoiceOrders) {
+        const status = row.payment_status;
+        if (!ordersByStatus[status]) {
+          ordersByStatus[status] = [];
+        }
+        ordersByStatus[status].push(row.order_id);
+      }
+
+      // Update customer_orders for each status group
+      for (const [status, orderIds] of Object.entries(ordersByStatus)) {
+        if (orderIds.length > 0) {
+          const orderPlaceholders = orderIds.map(() => '?').join(',');
+          await connection.query(`
+            UPDATE customer_orders
+            SET payment_status = ?
+            WHERE id IN (${orderPlaceholders})
+          `, [status, ...orderIds]);
+        }
+      }
+    }
+
     await connection.commit();
 
     let message = `Successfully allocated $${totalAllocated.toFixed(2)} to ${allocations.length} invoice(s).`;
