@@ -410,7 +410,7 @@ app.on('before-quit', async (event) => {
   if (!isQuitting) {
     event.preventDefault();
     isQuitting = true;
-    log.info('Application quitting...');
+    log.info('Application quitting - cleaning up servers...');
     closeSetupWizard();
     destroyTray();
 
@@ -428,7 +428,22 @@ app.on('before-quit', async (event) => {
       log.error('Error killing server ports:', err);
     }
 
+    // Give processes time to fully terminate
+    log.info('Waiting for processes to terminate...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    log.info('Cleanup complete, exiting...');
     app.quit();
+  }
+});
+
+// Also clean up on process exit (fallback)
+process.on('exit', () => {
+  log.info('Process exiting - final cleanup...');
+  try {
+    killAllServerPorts();
+  } catch (err) {
+    // Ignore errors during exit
   }
 });
 
