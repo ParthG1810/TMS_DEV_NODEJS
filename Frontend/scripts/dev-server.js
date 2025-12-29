@@ -85,12 +85,33 @@ async function isPortAvailable(port) {
     const server = net.createServer();
     server.once('error', () => resolve(false));
     server.once('listening', () => {
-      server.close(() => {
-        // Small delay after closing to ensure the port is fully released
-        setTimeout(() => resolve(true), 100);
-      });
+      server.close(() => resolve(true));
     });
     server.listen(port, '127.0.0.1');
+  });
+}
+
+/**
+ * Quick check if port is in use (without binding)
+ * Uses a connection attempt instead of binding
+ */
+async function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(1000);
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true); // Port is in use (something is listening)
+    });
+    socket.once('timeout', () => {
+      socket.destroy();
+      resolve(false); // Timeout means nothing listening
+    });
+    socket.once('error', () => {
+      socket.destroy();
+      resolve(false); // Error means port is available
+    });
+    socket.connect(port, '127.0.0.1');
   });
 }
 
@@ -119,17 +140,17 @@ async function findAvailablePort() {
 
 async function startServer(port) {
   return new Promise((resolve, reject) => {
-    console.log(`Starting Frontend dev server on port ${port}...\n`);
-
     const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
+    // Use stdio: 'pipe' for all streams so we can capture output
     const child = spawn(npmCmd, ['run', 'next-dev', '--', '-p', String(port)], {
-      stdio: ['inherit', 'pipe', 'pipe'],
+      stdio: 'pipe',
       shell: true,
       env: { ...process.env, PORT: String(port) },
     });
 
     let started = false;
-    let portInUse = false;
+    let rejected = false;
     let allOutput = '';
 
     const handleOutput = (data) => {
@@ -138,37 +159,51 @@ async function startServer(port) {
       process.stdout.write(text);
 
       // Check if server started successfully
-      if (text.includes('ready') || text.includes('started server')) {
+      if (!started && (text.includes('ready') || text.includes('started server'))) {
         started = true;
         resolve({ child, port });
       }
 
-      // Check if port is already in use
-      if (text.includes('already in use') || text.includes('EADDRINUSE')) {
-        portInUse = true;
+      // Check if port is already in use - reject immediately
+      if (!rejected && (text.includes('already in use') || text.includes('EADDRINUSE'))) {
+        rejected = true;
+        child.kill();
+        reject(new Error(`Port ${port} is already in use`));
       }
     };
 
     child.stdout.on('data', handleOutput);
     child.stderr.on('data', handleOutput);
 
-    child.on('exit', (code) => {
-      if (started) return; // Already resolved
-
-      // Check if port was in use (either detected in output or implied by quick exit)
-      if (portInUse || allOutput.includes('already in use') || allOutput.includes('EADDRINUSE')) {
-        reject(new Error(`Port ${port} is already in use`));
-      } else if (code !== 0) {
-        reject(new Error(`Server exited with code ${code}`));
-      } else {
-        // Exited with code 0 but never started - likely port issue
-        reject(new Error(`Server exited unexpectedly (port ${port} may be in use)`));
+    child.on('error', (err) => {
+      if (!started && !rejected) {
+        rejected = true;
+        reject(new Error(`Failed to spawn: ${err.message}`));
       }
+    });
+
+    child.on('exit', (code) => {
+      if (started || rejected) return; // Already handled
+
+      // Give a small delay to ensure all output is processed
+      setTimeout(() => {
+        if (started || rejected) return;
+
+        rejected = true;
+        if (allOutput.includes('already in use') || allOutput.includes('EADDRINUSE')) {
+          reject(new Error(`Port ${port} is already in use`));
+        } else if (code !== 0) {
+          reject(new Error(`Server exited with code ${code}`));
+        } else {
+          reject(new Error(`Server exited unexpectedly`));
+        }
+      }, 100);
     });
 
     // Timeout after 30 seconds
     setTimeout(() => {
-      if (!started) {
+      if (!started && !rejected) {
+        rejected = true;
         child.kill();
         reject(new Error('Server startup timeout'));
       }
@@ -178,18 +213,20 @@ async function startServer(port) {
 
 async function main() {
   for (const port of PORT_OPTIONS) {
-    // First check: is port available?
-    let available = await isPortAvailable(port);
-    if (!available) {
+    // Check if something is actively listening on this port
+    const inUse = await isPortInUse(port);
+
+    if (inUse) {
       // Check if it's our stale server
       const isStale = await isOurStaleServer(port);
       if (isStale) {
         console.log(`Found stale Frontend server on port ${port}, killing it...`);
         killProcessOnPort(port);
         await new Promise(resolve => setTimeout(resolve, 2000));
-        // Re-check availability
-        available = await isPortAvailable(port);
-        if (!available) {
+
+        // Verify it's now available
+        const stillInUse = await isPortInUse(port);
+        if (stillInUse) {
           console.log(`✗ Port ${port} still in use after killing stale server, trying next...`);
           continue;
         }
@@ -199,16 +236,7 @@ async function main() {
       }
     }
 
-    console.log(`✓ Port ${port} is available`);
-
-    // Second check: verify port is still available right before starting
-    // (small delay to let the previous check's socket fully close)
-    await new Promise(resolve => setTimeout(resolve, 200));
-    const stillAvailable = await isPortAvailable(port);
-    if (!stillAvailable) {
-      console.log(`✗ Port ${port} became unavailable, trying next...`);
-      continue;
-    }
+    console.log(`✓ Port ${port} appears available, attempting to start...`);
 
     try {
       const { child } = await startServer(port);
@@ -216,7 +244,7 @@ async function main() {
       // Keep the main process running
       return;
     } catch (err) {
-      console.log(`Failed to start on port ${port}: ${err.message}`);
+      console.log(`\nFailed to start on port ${port}: ${err.message}`);
       console.log('Trying next port...\n');
     }
   }
