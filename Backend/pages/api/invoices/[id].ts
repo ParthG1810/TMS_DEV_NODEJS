@@ -321,7 +321,7 @@ async function handleUpdate(
       [newAmountPaid, newBalance, newStatus, id]
     );
 
-    // Update linked customer_orders payment_status based on invoice status
+    // Update linked customer_orders payment_status based on invoice status (including child orders)
     if (newStatus === 'paid' || newStatus === 'partial_paid') {
       // Get linked order_ids
       const linkedOrders = await query<any[]>(
@@ -333,8 +333,8 @@ async function handleUpdate(
         const orderIds = linkedOrders.map(o => o.order_id);
         const placeholders = orderIds.map(() => '?').join(', ');
         await query(
-          `UPDATE customer_orders SET payment_status = ? WHERE id IN (${placeholders})`,
-          [newStatus, ...orderIds]
+          `UPDATE customer_orders SET payment_status = ? WHERE id IN (${placeholders}) OR parent_order_id IN (${placeholders})`,
+          [newStatus, ...orderIds, ...orderIds]
         );
       }
     }
@@ -405,11 +405,11 @@ async function handleDelete(
       billingIds
     );
 
-    // Reset customer_orders payment_status back to pending
+    // Reset customer_orders payment_status back to pending (including child orders)
     const orderPlaceholders = orderIds.map(() => '?').join(', ');
     await query(
-      `UPDATE customer_orders SET payment_status = 'pending' WHERE id IN (${orderPlaceholders})`,
-      orderIds
+      `UPDATE customer_orders SET payment_status = 'pending' WHERE id IN (${orderPlaceholders}) OR parent_order_id IN (${orderPlaceholders})`,
+      [...orderIds, ...orderIds]
     );
   }
 

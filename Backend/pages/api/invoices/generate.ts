@@ -234,14 +234,14 @@ export default async function handler(
       [invoiceId, ...order_billing_ids]
     );
 
-    // Update customer_orders payment_status to 'finalized' for all linked orders
+    // Update customer_orders payment_status to 'finalized' for all linked orders AND their child orders
     const orderIds = orderBillings.map(ob => ob.order_id);
     const orderPlaceholders = orderIds.map(() => '?').join(', ');
     await query(
       `UPDATE customer_orders
        SET payment_status = 'finalized'
-       WHERE id IN (${orderPlaceholders})`,
-      orderIds
+       WHERE id IN (${orderPlaceholders}) OR parent_order_id IN (${orderPlaceholders})`,
+      [...orderIds, ...orderIds]
     );
 
     // Fetch the created invoice with details
