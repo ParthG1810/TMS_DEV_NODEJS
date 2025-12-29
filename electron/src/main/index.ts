@@ -33,6 +33,7 @@ function killStaleInstances(): void {
             const result = execSync(`tasklist /FI "IMAGENAME eq ${appName}" /FO CSV /NH`, {
               encoding: 'utf8',
               stdio: ['pipe', 'pipe', 'pipe'],
+              timeout: 5000, // 5 second timeout
             });
 
             const lines = result.trim().split('\n').filter(line => line.includes(appName));
@@ -44,7 +45,7 @@ function killStaleInstances(): void {
                 // Don't kill ourselves
                 if (pid !== currentPid) {
                   try {
-                    execSync(`taskkill /PID ${pid} /F`, { stdio: 'pipe' });
+                    execSync(`taskkill /PID ${pid} /F`, { stdio: 'pipe', timeout: 5000 });
                     log.info(`Killed stale ${appName} process ${pid}`);
                   } catch (e) {
                     // Process might already be gone
@@ -53,7 +54,7 @@ function killStaleInstances(): void {
               }
             }
           } catch (e) {
-            // No processes found for this app name
+            // No processes found for this app name or timeout
           }
         }
       } catch (e) {
@@ -65,6 +66,7 @@ function killStaleInstances(): void {
         const result = execSync('pgrep -f "electron|tms-desktop"', {
           encoding: 'utf8',
           stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000,
         });
 
         const pids = result.trim().split('\n').filter(Boolean);
@@ -73,7 +75,7 @@ function killStaleInstances(): void {
           const pid = parseInt(pidStr);
           if (pid !== currentPid) {
             try {
-              execSync(`kill -9 ${pid}`, { stdio: 'pipe' });
+              execSync(`kill -9 ${pid}`, { stdio: 'pipe', timeout: 5000 });
               log.info(`Killed stale Electron process ${pid}`);
             } catch (e) {
               // Process might already be gone
@@ -81,9 +83,10 @@ function killStaleInstances(): void {
           }
         }
       } catch (e) {
-        // No processes found
+        // No processes found or timeout
       }
     }
+    log.info('Stale instance check complete');
   } catch (error) {
     log.warn('Could not check for stale instances:', error);
   }
