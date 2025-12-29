@@ -129,11 +129,12 @@ async function startServer(port) {
     });
 
     let started = false;
-    let output = '';
+    let portInUse = false;
+    let allOutput = '';
 
     const handleOutput = (data) => {
       const text = data.toString();
-      output += text;
+      allOutput += text;
       process.stdout.write(text);
 
       // Check if server started successfully
@@ -144,8 +145,7 @@ async function startServer(port) {
 
       // Check if port is already in use
       if (text.includes('already in use') || text.includes('EADDRINUSE')) {
-        child.kill();
-        reject(new Error(`Port ${port} is already in use`));
+        portInUse = true;
       }
     };
 
@@ -153,8 +153,16 @@ async function startServer(port) {
     child.stderr.on('data', handleOutput);
 
     child.on('exit', (code) => {
-      if (!started) {
+      if (started) return; // Already resolved
+
+      // Check if port was in use (either detected in output or implied by quick exit)
+      if (portInUse || allOutput.includes('already in use') || allOutput.includes('EADDRINUSE')) {
+        reject(new Error(`Port ${port} is already in use`));
+      } else if (code !== 0) {
         reject(new Error(`Server exited with code ${code}`));
+      } else {
+        // Exited with code 0 but never started - likely port issue
+        reject(new Error(`Server exited unexpectedly (port ${port} may be in use)`));
       }
     });
 
@@ -170,7 +178,8 @@ async function startServer(port) {
 
 async function main() {
   for (const port of PORT_OPTIONS) {
-    const available = await isPortAvailable(port);
+    // First check: is port available?
+    let available = await isPortAvailable(port);
     if (!available) {
       // Check if it's our stale server
       const isStale = await isOurStaleServer(port);
@@ -178,6 +187,12 @@ async function main() {
         console.log(`Found stale Frontend server on port ${port}, killing it...`);
         killProcessOnPort(port);
         await new Promise(resolve => setTimeout(resolve, 2000));
+        // Re-check availability
+        available = await isPortAvailable(port);
+        if (!available) {
+          console.log(`✗ Port ${port} still in use after killing stale server, trying next...`);
+          continue;
+        }
       } else {
         console.log(`✗ Port ${port} is in use by other software, trying next...`);
         continue;
@@ -185,6 +200,15 @@ async function main() {
     }
 
     console.log(`✓ Port ${port} is available`);
+
+    // Second check: verify port is still available right before starting
+    // (small delay to let the previous check's socket fully close)
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const stillAvailable = await isPortAvailable(port);
+    if (!stillAvailable) {
+      console.log(`✗ Port ${port} became unavailable, trying next...`);
+      continue;
+    }
 
     try {
       const { child } = await startServer(port);
