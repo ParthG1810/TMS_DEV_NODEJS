@@ -293,29 +293,6 @@ export default async function handler(
       console.error('Error deleting notifications on invoice generation:', notificationError);
     }
 
-    // Create a notification for the generated invoice
-    try {
-      const billingMonth = orderBillings[0].billing_month;
-      await query(
-        `INSERT INTO payment_notifications (
-          notification_type, customer_id, billing_month,
-          title, message, priority, action_url
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          'invoice_generated',
-          customerIdNum,
-          billingMonth,
-          `Invoice Generated - ${customer.name}`,
-          `Invoice ${invoiceNumber} has been generated for ${customer.name}. Total: CAD $${totalAmount.toFixed(2)}`,
-          'low',
-          `/dashboard/tiffin/invoices`,
-        ]
-      );
-    } catch (notificationError) {
-      console.error('Error creating invoice notification:', notificationError);
-    }
-
     console.log(`[Invoice Generate] Created invoice ${invoiceNumber} for customer ${customerIdNum} with ${orderBillings.length} order(s), total: ${totalAmount}`);
 
     return res.status(201).json({
