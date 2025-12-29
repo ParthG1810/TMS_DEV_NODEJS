@@ -248,7 +248,8 @@ export default function InteracTransactionsPage() {
         customer_id: selectedCustomer.id,
       });
       enqueueSnackbar('Customer confirmed', { variant: 'success' });
-      setOpenCustomerMatch(false);
+      // Navigate first - dialog closes automatically when we navigate away
+      // This avoids "Abort fetching component" race condition
       router.push(`/dashboard/payments/allocate?transactionId=${selectedTransaction.id}`);
     } catch (error: any) {
       console.error('Error confirming customer:', error);
