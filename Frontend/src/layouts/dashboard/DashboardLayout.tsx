@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 // @mui
 import { Box } from '@mui/material';
 // hooks
@@ -7,6 +8,8 @@ import useResponsive from '../../hooks/useResponsive';
 import AuthGuard from '../../auth/AuthGuard';
 // components
 import { useSettingsContext } from '../../components/settings';
+// electron
+import { setupNavigationListener } from '../../utils/electron';
 //
 import Main from './Main';
 import Header from './header';
@@ -22,10 +25,18 @@ type Props = {
 
 export default function DashboardLayout({ children }: Props) {
   const { themeLayout } = useSettingsContext();
+  const router = useRouter();
 
   const isDesktop = useResponsive('up', 'lg');
 
   const [open, setOpen] = useState(false);
+
+  // Setup Electron menu navigation listener
+  useEffect(() => {
+    setupNavigationListener((path) => {
+      router.push(path);
+    });
+  }, [router]);
 
   const isNavHorizontal = themeLayout === 'horizontal';
 
