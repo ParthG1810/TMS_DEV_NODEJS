@@ -196,6 +196,52 @@ function waitForProcessReady(proc: ChildProcess, readyPattern: RegExp, timeout: 
   });
 }
 
+// Wait for process to output ready message and extract the actual port
+function waitForServerPort(proc: ChildProcess, expectedPort: number, timeout: number = 60000): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Timeout waiting for server to start'));
+    }, timeout);
+
+    // Patterns to detect server started and extract port:
+    // - "started server on 0.0.0.0:47850"
+    // - "ready - started server on 0.0.0.0:47850, url: http://localhost:47850"
+    // - "Ready on http://localhost:47850"
+    const portExtractPattern = /(?:started\s+server\s+on\s+[\d.]+:(\d+)|ready\s+on\s+https?:\/\/[^:]+:(\d+)|localhost:(\d+))/i;
+
+    const checkOutput = (data: Buffer) => {
+      const message = data.toString();
+
+      // Try to extract port from "started server" or "ready on" message
+      const match = message.match(portExtractPattern);
+      if (match) {
+        const actualPort = parseInt(match[1] || match[2] || match[3], 10);
+        if (actualPort && !isNaN(actualPort)) {
+          clearTimeout(timeoutId);
+          resolve(actualPort);
+          return;
+        }
+      }
+
+      // Fallback: if we see generic ready patterns, use expected port
+      if (/ready\s+on|listening\s+on|started\s+server/i.test(message)) {
+        clearTimeout(timeoutId);
+        resolve(expectedPort);
+      }
+    };
+
+    proc.stdout?.on('data', checkOutput);
+    proc.stderr?.on('data', checkOutput);
+
+    proc.once('exit', (code) => {
+      clearTimeout(timeoutId);
+      if (code !== 0) {
+        reject(new Error(`Process exited with code ${code}`));
+      }
+    });
+  });
+}
+
 // Start backend server
 async function startBackend(): Promise<number> {
   const { backend } = getPaths();
@@ -281,18 +327,20 @@ async function startBackend(): Promise<number> {
     backendProcess = null;
   });
 
-  // Wait for backend to output ready message
-  // Patterns: "Ready on http://...", "Listening on port", "started server on"
+  // Wait for backend to output ready message and extract actual port
+  // The dev-server.js may use a different port if the expected one is in use
   try {
-    const portPattern = new RegExp(`ready\\s+on|listening\\s+on|started\\s+server|port\\s*:?\\s*${backendPort}`, 'i');
-    await waitForProcessReady(backendProcess, portPattern, 60000);
-    log.info(`Backend server is ready on port ${backendPort}`);
+    const actualPort = await waitForServerPort(backendProcess, backendPort, 60000);
+    if (actualPort !== backendPort) {
+      log.info(`Backend started on fallback port ${actualPort} instead of ${backendPort}`);
+      activeBackendPort = actualPort;
+    }
+    log.info(`Backend server is ready on port ${actualPort}`);
+    return actualPort;
   } catch (err) {
     log.error('Backend failed to start:', err);
     throw new Error('Backend server failed to start. Please check the logs for details.');
   }
-
-  return backendPort;
 }
 
 // Start frontend server
@@ -369,18 +417,20 @@ async function startFrontend(backendPort: number): Promise<number> {
     frontendProcess = null;
   });
 
-  // Wait for frontend to output ready message
-  // Patterns: "Ready on http://...", "Listening on port", "started server on"
+  // Wait for frontend to output ready message and extract actual port
+  // The dev-server.js may use a different port if the expected one is in use
   try {
-    const portPattern = new RegExp(`ready\\s+on|listening\\s+on|started\\s+server|port\\s*:?\\s*${frontendPort}`, 'i');
-    await waitForProcessReady(frontendProcess, portPattern, 60000);
-    log.info(`Frontend server is ready on port ${frontendPort}`);
+    const actualPort = await waitForServerPort(frontendProcess, frontendPort, 60000);
+    if (actualPort !== frontendPort) {
+      log.info(`Frontend started on fallback port ${actualPort} instead of ${frontendPort}`);
+      activeFrontendPort = actualPort;
+    }
+    log.info(`Frontend server is ready on port ${actualPort}`);
+    return actualPort;
   } catch (err) {
     log.error('Frontend failed to start:', err);
     throw new Error('Frontend server failed to start. Please check the logs for details.');
   }
-
-  return frontendPort;
 }
 
 // Start all servers
