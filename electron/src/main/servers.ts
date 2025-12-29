@@ -90,39 +90,51 @@ function isOurStaleFrontendServer(port: number): Promise<boolean> {
 // Kill process LISTENING on a specific port (only our stale servers)
 function killProcessOnPort(port: number): boolean {
   try {
+    log.info(`Attempting to kill process on port ${port}...`);
     if (process.platform === 'win32') {
-      // Windows: find process LISTENING on the specific port
-      // Use findstr with LISTENING to only get servers, not clients
-      const result = execSync(`netstat -ano | findstr LISTENING | findstr :${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-      const lines = result.trim().split('\n');
-      const killedPids = new Set<string>();
+      // Windows: Use PowerShell for more reliable port detection
+      try {
+        // First try: Use netstat directly with better parsing
+        const result = execSync(
+          `netstat -ano | findstr ":${port}" | findstr "LISTENING"`,
+          { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 }
+        );
+        const lines = result.trim().split('\n').filter(Boolean);
+        const killedPids = new Set<string>();
 
-      for (const line of lines) {
-        // Parse: TCP    0.0.0.0:47847    0.0.0.0:0    LISTENING    12345
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 5) {
-          const localAddr = parts[1]; // e.g., "0.0.0.0:47847" or "127.0.0.1:47847"
-          const pid = parts[parts.length - 1];
+        log.info(`Found ${lines.length} listening processes on port ${port}`);
 
-          // Only kill if it's actually listening on our exact port
-          if (localAddr.endsWith(`:${port}`) && pid && pid !== '0' && !killedPids.has(pid)) {
-            killedPids.add(pid);
-            try {
-              execSync(`taskkill /PID ${pid} /F`, { stdio: 'pipe' });
-              log.info(`Killed stale process ${pid} on port ${port}`);
-            } catch (e) {
-              // Process might already be gone
+        for (const line of lines) {
+          // Parse: TCP    0.0.0.0:47847    0.0.0.0:0    LISTENING    12345
+          const parts = line.trim().split(/\s+/);
+          if (parts.length >= 5) {
+            const localAddr = parts[1]; // e.g., "0.0.0.0:47847" or "127.0.0.1:47847"
+            const pid = parts[parts.length - 1];
+
+            // Only kill if it's actually listening on our exact port
+            if (localAddr.endsWith(`:${port}`) && pid && pid !== '0' && !killedPids.has(pid)) {
+              killedPids.add(pid);
+              try {
+                // Use /T to kill entire process tree, /F to force
+                execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'pipe', timeout: 5000 });
+                log.info(`Killed process tree ${pid} on port ${port}`);
+              } catch (e: any) {
+                log.warn(`Failed to kill PID ${pid}: ${e.message}`);
+              }
             }
           }
         }
+      } catch (e: any) {
+        // No process found on port or timeout
+        log.info(`No listening process found on port ${port} (or already killed)`);
       }
     } else {
       // Linux/Mac: use lsof and kill
-      const result = execSync(`lsof -ti:${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const result = execSync(`lsof -ti:${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 });
       const pids = result.trim().split('\n').filter(Boolean);
       for (const pid of pids) {
         try {
-          execSync(`kill -9 ${pid}`, { stdio: 'pipe' });
+          execSync(`kill -9 ${pid}`, { stdio: 'pipe', timeout: 5000 });
           log.info(`Killed stale process ${pid} on port ${port}`);
         } catch (e) {
           // Process might already be gone
@@ -130,8 +142,8 @@ function killProcessOnPort(port: number): boolean {
       }
     }
     return true;
-  } catch (e) {
-    // No process found on port
+  } catch (e: any) {
+    log.info(`No process found on port ${port}: ${e.message}`);
     return false;
   }
 }
