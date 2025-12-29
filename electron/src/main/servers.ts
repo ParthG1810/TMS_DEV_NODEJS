@@ -1,7 +1,8 @@
-import { spawn, fork, ChildProcess } from 'child_process';
+import { spawn, fork, ChildProcess, execSync } from 'child_process';
 import { join } from 'path';
 import { app } from 'electron';
 import log from 'electron-log';
+import http from 'http';
 import { getConfig } from './config';
 
 let backendProcess: ChildProcess | null = null;
@@ -58,15 +59,97 @@ async function isPortAvailable(port: number): Promise<boolean> {
   });
 }
 
-// Find first available port from options list
-async function findAvailablePort(portOptions: number[], serverName: string): Promise<number> {
+// Check if a port has our stale Backend server (via /api/health)
+function isOurStaleBackendServer(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get(`http://localhost:${port}/api/health`, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+// Check if a port has our stale Frontend server (via HTTP response)
+function isOurStaleFrontendServer(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get(`http://localhost:${port}/`, (res) => {
+      resolve(res.statusCode === 200 || res.statusCode === 304);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+// Kill process on a specific port
+function killProcessOnPort(port: number): boolean {
+  try {
+    if (process.platform === 'win32') {
+      // Windows: find and kill process using the port
+      const result = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const lines = result.trim().split('\n');
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && pid !== '0') {
+          try {
+            execSync(`taskkill /PID ${pid} /F`, { stdio: 'pipe' });
+            log.info(`Killed stale process ${pid} on port ${port}`);
+          } catch (e) {
+            // Process might already be gone
+          }
+        }
+      }
+    } else {
+      // Linux/Mac: use lsof and kill
+      const result = execSync(`lsof -ti:${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const pids = result.trim().split('\n').filter(Boolean);
+      for (const pid of pids) {
+        try {
+          execSync(`kill -9 ${pid}`, { stdio: 'pipe' });
+          log.info(`Killed stale process ${pid} on port ${port}`);
+        } catch (e) {
+          // Process might already be gone
+        }
+      }
+    }
+    return true;
+  } catch (e) {
+    // No process found on port
+    return false;
+  }
+}
+
+// Find first available port from options list, killing stale processes if needed
+async function findAvailablePort(
+  portOptions: number[],
+  serverName: string,
+  isStaleServerCheck: (port: number) => Promise<boolean>
+): Promise<number> {
+  const primaryPort = portOptions[0];
+
+  // Check if primary port has our stale server
+  const isStale = await isStaleServerCheck(primaryPort);
+  if (isStale) {
+    log.info(`${serverName}: Found stale server on port ${primaryPort}, killing it...`);
+    killProcessOnPort(primaryPort);
+    // Wait for port to be released
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
   for (const port of portOptions) {
     const available = await isPortAvailable(port);
     if (available) {
       log.info(`${serverName}: Port ${port} is available`);
       return port;
     }
-    log.info(`${serverName}: Port ${port} is in use, trying next...`);
+    log.info(`${serverName}: Port ${port} is in use by other software, trying next...`);
   }
 
   // All ports are in use
@@ -108,8 +191,8 @@ async function startBackend(): Promise<number> {
   const { backend } = getPaths();
   const config = getConfig();
 
-  // Find an available port from options
-  const backendPort = await findAvailablePort(BACKEND_PORT_OPTIONS, 'Backend');
+  // Find an available port from options (kills stale backend servers if detected)
+  const backendPort = await findAvailablePort(BACKEND_PORT_OPTIONS, 'Backend', isOurStaleBackendServer);
   activeBackendPort = backendPort;
 
   log.info(`Starting backend from: ${backend}`);
@@ -207,8 +290,8 @@ async function startFrontend(backendPort: number): Promise<number> {
   const { frontend } = getPaths();
   const config = getConfig();
 
-  // Find an available port from options
-  const frontendPort = await findAvailablePort(FRONTEND_PORT_OPTIONS, 'Frontend');
+  // Find an available port from options (kills stale frontend servers if detected)
+  const frontendPort = await findAvailablePort(FRONTEND_PORT_OPTIONS, 'Frontend', isOurStaleFrontendServer);
   activeFrontendPort = frontendPort;
 
   log.info(`Starting frontend from: ${frontend}`);
