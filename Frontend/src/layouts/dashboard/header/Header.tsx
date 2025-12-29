@@ -17,6 +17,7 @@ import Searchbar from './Searchbar';
 import AccountPopover from './AccountPopover';
 import LanguagePopover from './LanguagePopover';
 import NotificationsPopover from './NotificationsPopover';
+import GmailSyncButton from './GmailSyncButton';
 
 // ----------------------------------------------------------------------
 
@@ -57,6 +58,8 @@ export default function Header({ onOpenNav }: Props) {
         spacing={{ xs: 0.5, sm: 1.5 }}
       >
         <LanguagePopover />
+
+        <GmailSyncButton />
 
         <NotificationsPopover />
 
