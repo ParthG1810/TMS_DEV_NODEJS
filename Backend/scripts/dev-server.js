@@ -2,12 +2,72 @@
 /**
  * Dev server with port fallback
  * Tries ports in order: 47847, 47849, 47851
+ * Kills stale processes from previous runs (detected via /api/health)
  */
 
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const net = require('net');
+const http = require('http');
 
 const PORT_OPTIONS = [47847, 47849, 47851];
+
+/**
+ * Check if a process on the port is our stale Backend server
+ * by checking if /api/health endpoint responds
+ */
+function isOurStaleServer(port) {
+  return new Promise((resolve) => {
+    const req = http.get(`http://localhost:${port}/api/health`, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+/**
+ * Kill process on a specific port
+ */
+function killProcessOnPort(port) {
+  try {
+    if (process.platform === 'win32') {
+      // Windows: find and kill process using the port
+      const result = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const lines = result.trim().split('\n');
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && pid !== '0') {
+          try {
+            execSync(`taskkill /PID ${pid} /F`, { stdio: 'pipe' });
+            console.log(`Killed stale process ${pid} on port ${port}`);
+          } catch (e) {
+            // Process might already be gone
+          }
+        }
+      }
+    } else {
+      // Linux/Mac: use lsof and kill
+      const result = execSync(`lsof -ti:${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const pids = result.trim().split('\n').filter(Boolean);
+      for (const pid of pids) {
+        try {
+          execSync(`kill -9 ${pid}`, { stdio: 'pipe' });
+          console.log(`Killed stale process ${pid} on port ${port}`);
+        } catch (e) {
+          // Process might already be gone
+        }
+      }
+    }
+    return true;
+  } catch (e) {
+    // No process found on port
+    return false;
+  }
+}
 
 async function isPortAvailable(port) {
   return new Promise((resolve) => {
@@ -22,13 +82,24 @@ async function isPortAvailable(port) {
 }
 
 async function findAvailablePort() {
+  const primaryPort = PORT_OPTIONS[0];
+
+  // Check if primary port has our stale server
+  const isStale = await isOurStaleServer(primaryPort);
+  if (isStale) {
+    console.log(`Found stale Backend server on port ${primaryPort}, killing it...`);
+    killProcessOnPort(primaryPort);
+    // Wait for port to be released
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
   for (const port of PORT_OPTIONS) {
     const available = await isPortAvailable(port);
     if (available) {
       console.log(`✓ Port ${port} is available`);
       return port;
     }
-    console.log(`✗ Port ${port} is in use, trying next...`);
+    console.log(`✗ Port ${port} is in use by other software, trying next...`);
   }
   throw new Error(`All ports are in use: ${PORT_OPTIONS.join(', ')}`);
 }
