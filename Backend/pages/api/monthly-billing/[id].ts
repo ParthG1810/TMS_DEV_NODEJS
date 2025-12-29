@@ -183,6 +183,18 @@ async function handlePut(
         [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
       );
 
+      // Also update order_billing status to 'pending' for this customer and billing month
+      await query(
+        `
+          UPDATE order_billing
+          SET status = 'pending',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE customer_id = ?
+            AND billing_month = ?
+        `,
+        [customer_id, billing_month]
+      );
+
       // Delete any existing notifications for this billing (in case of re-finalize)
       await query(
         'DELETE FROM payment_notifications WHERE billing_id = ? AND notification_type = ?',
@@ -293,6 +305,19 @@ async function handlePut(
             [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
           );
 
+          // Reset order_billing status back to 'calculating' for this customer and billing month
+          await query(
+            `
+              UPDATE order_billing
+              SET status = 'calculating',
+                  finalized_at = NULL,
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE customer_id = ?
+                AND billing_month = ?
+            `,
+            [customer_id, billing_month]
+          );
+
           // Trigger recalculation by clearing finalized_at and finalized_by
           await query(
             `
@@ -307,9 +332,9 @@ async function handlePut(
         }
       }
 
-      // Handle approval: update customer orders to 'finalized' status
+      // Handle approval: update customer orders and order_billing to 'finalized' status
       if (isApproval) {
-        console.log('Approval triggered - updating customer orders to finalized');
+        console.log('Approval triggered - updating customer orders and order_billing to finalized');
 
         // Get billing info for customer_id and billing_month
         const billingInfo = await query<any[]>(
@@ -342,6 +367,21 @@ async function handlePut(
           );
 
           console.log('Customer orders update result:', result);
+
+          // Also update order_billing status to 'finalized' for this customer and billing month
+          const orderBillingResult = await query(
+            `
+              UPDATE order_billing
+              SET status = 'finalized',
+                  finalized_at = CURRENT_TIMESTAMP,
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE customer_id = ?
+                AND billing_month = ?
+            `,
+            [customer_id, billing_month]
+          );
+
+          console.log('Order billing update result:', orderBillingResult);
         } else {
           console.log('No billing info found for id:', id);
         }

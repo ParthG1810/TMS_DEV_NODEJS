@@ -86,6 +86,8 @@ interface BillingRecord {
 
 // Status options moved to TABS array inside component for dynamic counts
 
+const STATUS_OPTIONS = ['all', 'calculating', 'pending', 'finalized', 'paid', 'partial_paid'];
+
 // ----------------------------------------------------------------------
 
 BillingStatusPage.getLayout = (page: React.ReactElement) => (
