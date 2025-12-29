@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, shell, globalShortcut } from 'electron';
 import { join } from 'path';
 import { execSync } from 'child_process';
 import log from 'electron-log';
-import { startServers, stopServers, getActivePorts } from './servers';
+import { startServers, stopServers, getActivePorts, killAllServerPorts } from './servers';
 import { checkMySQLConnection } from './database';
 import { createTray, destroyTray } from './tray';
 import { setupAutoUpdater } from './updater';
@@ -92,24 +92,19 @@ function killStaleInstances(): void {
 // Kill stale instances before trying to acquire lock
 killStaleInstances();
 
-// Give a moment for processes to fully terminate (synchronous delay)
-try {
-  if (process.platform === 'win32') {
-    execSync('ping -n 1 127.0.0.1 >nul', { stdio: 'ignore' });
-  } else {
-    execSync('sleep 0.5', { stdio: 'ignore' });
-  }
-} catch (e) {
-  // Ignore delay errors
-}
+log.info('Requesting single instance lock...');
 
 // Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();
+log.info(`Single instance lock acquired: ${gotTheLock}`);
+
 if (!gotTheLock) {
   log.warn('Another instance is already running. Exiting.');
   app.quit();
   process.exit(0);
 }
+
+log.info('Registering app.whenReady handler...');
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
@@ -390,7 +385,13 @@ async function initialize(): Promise<void> {
 }
 
 // App lifecycle events
-app.whenReady().then(initialize);
+log.info('About to call app.whenReady()...');
+app.whenReady().then(() => {
+  log.info('app.whenReady() resolved - calling initialize()');
+  initialize();
+}).catch((err) => {
+  log.error('app.whenReady() error:', err);
+});
 
 app.on('second-instance', () => {
   log.info('Second instance detected, focusing main window');
@@ -407,7 +408,21 @@ app.on('before-quit', async (event) => {
     log.info('Application quitting...');
     closeSetupWizard();
     destroyTray();
-    await stopServers();
+
+    // Stop servers and clean up ports
+    try {
+      await stopServers();
+    } catch (err) {
+      log.error('Error stopping servers:', err);
+    }
+
+    // Force kill any remaining processes on server ports
+    try {
+      killAllServerPorts();
+    } catch (err) {
+      log.error('Error killing server ports:', err);
+    }
+
     app.quit();
   }
 });

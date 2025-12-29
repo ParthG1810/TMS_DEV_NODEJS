@@ -519,12 +519,36 @@ export async function stopServers(): Promise<void> {
     stopProcess(backendProcess, 'Backend'),
   ]);
 
+  // Also kill any processes on active ports (in case servers were started externally)
+  if (activeBackendPort) {
+    log.info(`Cleaning up Backend port ${activeBackendPort}...`);
+    killProcessOnPort(activeBackendPort);
+  }
+  if (activeFrontendPort) {
+    log.info(`Cleaning up Frontend port ${activeFrontendPort}...`);
+    killProcessOnPort(activeFrontendPort);
+  }
+
   frontendProcess = null;
   backendProcess = null;
   activeBackendPort = null;
   activeFrontendPort = null;
 
   log.info('All servers stopped');
+}
+
+// Kill all server processes on known ports (for cleanup)
+export function killAllServerPorts(): void {
+  log.info('Killing all processes on server ports...');
+
+  for (const port of BACKEND_PORT_OPTIONS) {
+    killProcessOnPort(port);
+  }
+  for (const port of FRONTEND_PORT_OPTIONS) {
+    killProcessOnPort(port);
+  }
+
+  log.info('Port cleanup complete');
 }
 
 // Check if servers are running
