@@ -270,6 +270,8 @@ async function handlePut(
 
       // Handle rejection: delete notifications and reset related statuses
       if (isRejection) {
+        console.log('Rejection triggered - resetting statuses to calculating');
+
         // Get billing info for customer_id and billing_month
         const billingInfo = await query<any[]>(
           'SELECT customer_id, billing_month FROM monthly_billing WHERE id = ?',
@@ -278,6 +280,7 @@ async function handlePut(
 
         if (billingInfo.length > 0) {
           const { customer_id, billing_month } = billingInfo[0];
+          console.log('Rejection for customer:', customer_id, 'billing_month:', billing_month);
 
           // Delete all notifications related to this billing
           await query(
@@ -291,7 +294,7 @@ async function handlePut(
           const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
           const lastDayStr = `${billing_month}-${String(lastDay).padStart(2, '0')}`;
 
-          await query(
+          const customerOrdersResult = await query(
             `
               UPDATE customer_orders
               SET payment_status = 'calculating',
@@ -304,9 +307,10 @@ async function handlePut(
             `,
             [customer_id, lastDayStr, firstDay, firstDay, lastDayStr]
           );
+          console.log('Customer orders reset result:', customerOrdersResult);
 
           // Reset order_billing status back to 'calculating' for this customer and billing month
-          await query(
+          const orderBillingResult = await query(
             `
               UPDATE order_billing
               SET status = 'calculating',
@@ -317,6 +321,7 @@ async function handlePut(
             `,
             [customer_id, billing_month]
           );
+          console.log('Order billing reset result:', orderBillingResult);
 
           // Trigger recalculation by clearing finalized_at and finalized_by
           await query(
@@ -330,6 +335,8 @@ async function handlePut(
             [id]
           );
         }
+      } else {
+        console.log('Rejection NOT triggered, isRejection:', isRejection);
       }
 
       // Handle approval: update customer orders and order_billing to 'finalized' status
