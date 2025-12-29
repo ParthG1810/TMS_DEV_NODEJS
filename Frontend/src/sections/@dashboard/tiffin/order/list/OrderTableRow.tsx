@@ -52,8 +52,8 @@ export default function OrderTableRow({
   const [openConfirm, setOpenConfirm] = useState(false);
 
   // Check if order is locked based on payment status
-  // Status flow: calculating → pending → finalized → paid/partial_paid
-  const isLocked = payment_status && ['finalized', 'paid', 'partial_paid'].includes(payment_status);
+  // Status flow: calculating → pending → approved → finalized → paid/partial_paid
+  const isLocked = payment_status && ['approved', 'finalized', 'paid', 'partial_paid'].includes(payment_status);
   const isPending = payment_status === 'pending';
   const isCalculating = !payment_status || payment_status === 'calculating';
 
@@ -67,12 +67,20 @@ export default function OrderTableRow({
         tooltip: 'Billing is pending approval - cannot delete',
       };
     }
-    if (payment_status === 'finalized') {
+    if (payment_status === 'approved') {
       return {
         label: 'Approved (Locked)',
         color: 'info' as const,
         icon: 'eva:lock-outline',
         tooltip: 'Billing approved - order is locked',
+      };
+    }
+    if (payment_status === 'finalized') {
+      return {
+        label: 'Invoiced (Locked)',
+        color: 'primary' as const,
+        icon: 'eva:file-text-outline',
+        tooltip: 'Invoice generated - order is locked',
       };
     }
     if (payment_status === 'paid') {
