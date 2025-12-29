@@ -112,6 +112,7 @@ export default function InvoiceDetailPage() {
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [customerCredit, setCustomerCredit] = useState<number>(0);
 
   // Settings for PDF
   const [companyName, setCompanyName] = useState('TIFFIN MANAGEMENT SYSTEM');
@@ -131,7 +132,20 @@ export default function InvoiceDetailPage() {
       const response = await axios.get(`/api/invoices/${id}`);
 
       if (response.data.success) {
-        setInvoice(response.data.data);
+        const invoiceData = response.data.data;
+        setInvoice(invoiceData);
+
+        // Fetch customer credit if invoice has balance due
+        if (invoiceData.balance_due > 0 && invoiceData.customer_id) {
+          try {
+            const creditResponse = await axios.get(`/api/customers/${invoiceData.customer_id}/credit`);
+            if (creditResponse.data.success) {
+              setCustomerCredit(creditResponse.data.data.total_available || 0);
+            }
+          } catch (creditError) {
+            console.log('No credit available or error fetching credit');
+          }
+        }
       } else {
         enqueueSnackbar(response.data.error || 'Failed to load invoice', {
           variant: 'error',
@@ -521,6 +535,40 @@ export default function InvoiceDetailPage() {
                     {fCurrency(invoice.balance_due)}
                   </Typography>
                 </Box>
+
+                {/* Pay with Credit button - show if customer has available credit and invoice has balance */}
+                {customerCredit > 0 && invoice.balance_due > 0 && (
+                  <>
+                    <Divider />
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Available Credit
+                      </Typography>
+                      <Typography variant="body1" color="success.main">
+                        {fCurrency(customerCredit)}
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      fullWidth
+                      startIcon={<Iconify icon="eva:credit-card-fill" />}
+                      onClick={() =>
+                        router.push(
+                          `${PATH_DASHBOARD.payments.allocate}?customerId=${invoice.customer_id}`
+                        )
+                      }
+                    >
+                      Pay with Credit
+                    </Button>
+                  </>
+                )}
               </Stack>
             </Card>
           </Grid>

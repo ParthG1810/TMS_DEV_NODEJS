@@ -97,7 +97,10 @@ export default function PaymentAllocationPage() {
   const { themeStretch } = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
-  const { transactionId } = router.query;
+  const { transactionId, creditId, customerId: queryCustomerId } = router.query;
+
+  // Determine mode: 'payment' (transactionId) or 'credit-only' (creditId + customerId)
+  const isCreditOnlyMode = !transactionId && (creditId || queryCustomerId);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -109,8 +112,68 @@ export default function PaymentAllocationPage() {
   const [totalCreditApplied, setTotalCreditApplied] = useState(0);
   const [remainingAmount, setRemainingAmount] = useState(0);
   const [customerCredit, setCustomerCredit] = useState<CreditSummary | null>(null);
+  const [customerName, setCustomerName] = useState<string>('');
 
   const fetchData = useCallback(async () => {
+    // Credit-only mode: creditId or customerId present, no transactionId
+    if (isCreditOnlyMode) {
+      const custId = queryCustomerId as string;
+      if (!custId) {
+        enqueueSnackbar('Customer ID is required', { variant: 'error' });
+        router.push(PATH_DASHBOARD.payments.credit);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Fetch customer credit
+        const creditResponse = await axios.get(`/api/customers/${custId}/credit`);
+        if (!creditResponse.data.success || creditResponse.data.data.total_available <= 0) {
+          enqueueSnackbar('No available credit for this customer', { variant: 'warning' });
+          router.push(PATH_DASHBOARD.payments.credit);
+          return;
+        }
+        setCustomerCredit(creditResponse.data.data);
+
+        // Fetch unpaid invoices for the customer
+        const invoicesResponse = await axios.get('/api/monthly-billing', {
+          params: {
+            customer_id: custId,
+            status: 'unpaid,partial_paid',
+            limit: 100,
+          },
+        });
+
+        if (invoicesResponse.data.success) {
+          const unpaidInvoices = invoicesResponse.data.data.invoices || [];
+          setInvoices(unpaidInvoices);
+
+          // Get customer name from first invoice
+          if (unpaidInvoices.length > 0) {
+            setCustomerName(unpaidInvoices[0].customer_name);
+          } else {
+            // Fetch customer details if no invoices
+            try {
+              const customerResponse = await axios.get(`/api/customers/${custId}`);
+              if (customerResponse.data.success) {
+                setCustomerName(customerResponse.data.data.name);
+              }
+            } catch {
+              // Ignore customer fetch error
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error('Error fetching credit data:', error);
+        enqueueSnackbar('Failed to load data', { variant: 'error' });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Payment mode: transactionId present
     if (!transactionId) return;
 
     try {
@@ -194,7 +257,7 @@ export default function PaymentAllocationPage() {
     } finally {
       setLoading(false);
     }
-  }, [transactionId, enqueueSnackbar, router]);
+  }, [transactionId, isCreditOnlyMode, queryCustomerId, enqueueSnackbar, router]);
 
   useEffect(() => {
     fetchData();
@@ -277,8 +340,8 @@ export default function PaymentAllocationPage() {
     const invoice = invoices.find(i => i.id === invoiceId);
     if (!invoice) return;
 
-    // Get payment allocation for this invoice
-    const paymentAllocation = selectedInvoices.get(invoiceId) || 0;
+    // Get payment allocation for this invoice (only in payment mode)
+    const paymentAllocation = isCreditOnlyMode ? 0 : (selectedInvoices.get(invoiceId) || 0);
     // Credit can only fill the remaining balance after payment allocation
     const remainingBalanceAfterPayment = Math.max(0, invoice.balance_due - paymentAllocation);
 
@@ -305,6 +368,55 @@ export default function PaymentAllocationPage() {
   };
 
   const handleSubmit = async () => {
+    // Credit-only mode: apply credit to invoices
+    if (isCreditOnlyMode) {
+      if (creditAllocations.size === 0) {
+        enqueueSnackbar('Please allocate credit to at least one invoice', { variant: 'warning' });
+        return;
+      }
+
+      const custId = queryCustomerId as string;
+      if (!custId) {
+        enqueueSnackbar('Customer ID is required', { variant: 'error' });
+        return;
+      }
+
+      try {
+        setSubmitting(true);
+
+        // Build allocations array for credit-only API
+        const allocations: { invoice_id: number; amount: number }[] = [];
+        creditAllocations.forEach((amount, invoiceId) => {
+          if (amount > 0) {
+            allocations.push({ invoice_id: invoiceId, amount });
+          }
+        });
+
+        const response = await axios.post('/api/customer-credit/apply', {
+          customer_id: parseInt(custId, 10),
+          allocations,
+        });
+
+        if (response.data.success) {
+          const { total_applied, allocations: appliedAllocations } = response.data.data;
+          enqueueSnackbar(
+            `Successfully applied ${fCurrency(total_applied)} credit to ${appliedAllocations.length} invoice(s)`,
+            { variant: 'success' }
+          );
+          router.push(PATH_DASHBOARD.payments.credit);
+        } else {
+          throw new Error(response.data.error);
+        }
+      } catch (error: any) {
+        console.error('Error applying credit:', error);
+        enqueueSnackbar(error.response?.data?.error || error.message || 'Failed to apply credit', { variant: 'error' });
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Payment mode: allocate payment to invoices
     if (!transaction || selectedInvoices.size === 0) return;
 
     const customerId = transaction.confirmed_customer_id || transaction.auto_matched_customer_id;
@@ -394,7 +506,7 @@ export default function PaymentAllocationPage() {
     );
   }
 
-  if (!transaction) {
+  if (!isCreditOnlyMode && !transaction) {
     return (
       <Container maxWidth={themeStretch ? false : 'lg'}>
         <Typography>Transaction not found</Typography>
@@ -402,125 +514,206 @@ export default function PaymentAllocationPage() {
     );
   }
 
+  if (isCreditOnlyMode && !customerCredit) {
+    return (
+      <Container maxWidth={themeStretch ? false : 'lg'}>
+        <Typography>No credit available</Typography>
+      </Container>
+    );
+  }
+
   return (
     <>
       <Head>
-        <title>Allocate Payment | Tiffin Management</title>
+        <title>{isCreditOnlyMode ? 'Apply Credit' : 'Allocate Payment'} | Tiffin Management</title>
       </Head>
 
       <Container maxWidth={themeStretch ? false : 'lg'}>
         <CustomBreadcrumbs
-          heading="Allocate Payment"
-          links={[
-            { name: 'Dashboard', href: PATH_DASHBOARD.root },
-            { name: 'Payments', href: PATH_DASHBOARD.payments.root },
-            { name: 'Interac Transactions', href: PATH_DASHBOARD.payments.interac },
-            { name: 'Allocate' },
-          ]}
+          heading={isCreditOnlyMode ? 'Apply Credit to Invoices' : 'Allocate Payment'}
+          links={
+            isCreditOnlyMode
+              ? [
+                  { name: 'Dashboard', href: PATH_DASHBOARD.root },
+                  { name: 'Payments', href: PATH_DASHBOARD.payments.root },
+                  { name: 'Customer Credit', href: PATH_DASHBOARD.payments.credit },
+                  { name: 'Apply Credit' },
+                ]
+              : [
+                  { name: 'Dashboard', href: PATH_DASHBOARD.root },
+                  { name: 'Payments', href: PATH_DASHBOARD.payments.root },
+                  { name: 'Interac Transactions', href: PATH_DASHBOARD.payments.interac },
+                  { name: 'Allocate' },
+                ]
+          }
         />
 
         <Grid container spacing={3}>
-          {/* Payment Details */}
+          {/* Sidebar - Credit Details or Payment Details */}
           <Grid item xs={12} md={4}>
             <Card sx={{ p: 3, position: 'sticky', top: 80 }}>
-              <Typography variant="h6" gutterBottom>
-                Payment Details
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
+              {isCreditOnlyMode ? (
+                <>
+                  <Typography variant="h6" gutterBottom>
+                    Credit Details
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
 
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Customer
-                  </Typography>
-                  <Typography variant="body1">
-                    {transaction.confirmed_customer_name || transaction.auto_matched_customer_name}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Amount
-                  </Typography>
-                  <Typography variant="h4" color="success.main">
-                    {fCurrency(transaction.amount)}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Reference
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                    {transaction.reference_number}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Date
-                  </Typography>
-                  <Typography variant="body2">
-                    {fDate(transaction.email_date)}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Sender
-                  </Typography>
-                  <Typography variant="body2">{transaction.sender_name}</Typography>
-                </Box>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Customer
+                      </Typography>
+                      <Typography variant="body1">
+                        {customerName || 'Loading...'}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Available Credit
+                      </Typography>
+                      <Typography variant="h4" color="success.main">
+                        {fCurrency(customerCredit?.total_available || 0)}
+                      </Typography>
+                    </Box>
 
-                <Divider />
+                    <Divider />
 
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="body2">Total Allocated:</Typography>
-                  <Typography variant="subtitle2">{fCurrency(totalAllocated)}</Typography>
-                </Stack>
-                {totalCreditApplied > 0 && (
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2">Credit Applied:</Typography>
-                    <Typography variant="subtitle2" color="success.main">
-                      {fCurrency(totalCreditApplied)}
-                    </Typography>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Credit to Apply:</Typography>
+                      <Typography variant="subtitle2" color="primary.main">
+                        {fCurrency(totalCreditApplied)}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Remaining Credit:</Typography>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        {fCurrency(getRemainingCredit())}
+                      </Typography>
+                    </Stack>
+
+                    <Button
+                      variant="contained"
+                      size="large"
+                      fullWidth
+                      onClick={handleSubmit}
+                      disabled={submitting || creditAllocations.size === 0}
+                      startIcon={submitting ? <CircularProgress size={20} /> : <Iconify icon="eva:checkmark-circle-2-fill" />}
+                    >
+                      {submitting ? 'Processing...' : 'Apply Credit'}
+                    </Button>
+
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={() => router.push(PATH_DASHBOARD.payments.credit)}
+                    >
+                      Cancel
+                    </Button>
                   </Stack>
-                )}
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="body2">Remaining:</Typography>
-                  <Typography variant="subtitle2" color={remainingAmount > 0 ? 'warning.main' : 'text.secondary'}>
-                    {fCurrency(remainingAmount)}
+                </>
+              ) : (
+                <>
+                  <Typography variant="h6" gutterBottom>
+                    Payment Details
                   </Typography>
-                </Stack>
+                  <Divider sx={{ mb: 2 }} />
 
-                {remainingAmount > 0 && (
-                  <Alert severity="info" sx={{ mt: 1 }}>
-                    {fCurrency(remainingAmount)} will be added as customer credit
-                  </Alert>
-                )}
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Customer
+                      </Typography>
+                      <Typography variant="body1">
+                        {transaction?.confirmed_customer_name || transaction?.auto_matched_customer_name}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Amount
+                      </Typography>
+                      <Typography variant="h4" color="success.main">
+                        {fCurrency(transaction?.amount || 0)}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Reference
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                        {transaction?.reference_number}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Date
+                      </Typography>
+                      <Typography variant="body2">
+                        {transaction?.email_date ? fDate(transaction.email_date) : '-'}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Sender
+                      </Typography>
+                      <Typography variant="body2">{transaction?.sender_name}</Typography>
+                    </Box>
 
-                <Button
-                  variant="contained"
-                  size="large"
-                  fullWidth
-                  onClick={handleSubmit}
-                  disabled={submitting || selectedInvoices.size === 0}
-                  startIcon={submitting ? <CircularProgress size={20} /> : <Iconify icon="eva:checkmark-circle-2-fill" />}
-                >
-                  {submitting ? 'Processing...' : 'Confirm Allocation'}
-                </Button>
+                    <Divider />
 
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  onClick={() => router.push(PATH_DASHBOARD.payments.interac)}
-                >
-                  Cancel
-                </Button>
-              </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Total Allocated:</Typography>
+                      <Typography variant="subtitle2">{fCurrency(totalAllocated)}</Typography>
+                    </Stack>
+                    {totalCreditApplied > 0 && (
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography variant="body2">Credit Applied:</Typography>
+                        <Typography variant="subtitle2" color="success.main">
+                          {fCurrency(totalCreditApplied)}
+                        </Typography>
+                      </Stack>
+                    )}
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Remaining:</Typography>
+                      <Typography variant="subtitle2" color={remainingAmount > 0 ? 'warning.main' : 'text.secondary'}>
+                        {fCurrency(remainingAmount)}
+                      </Typography>
+                    </Stack>
+
+                    {remainingAmount > 0 && (
+                      <Alert severity="info" sx={{ mt: 1 }}>
+                        {fCurrency(remainingAmount)} will be added as customer credit
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      size="large"
+                      fullWidth
+                      onClick={handleSubmit}
+                      disabled={submitting || selectedInvoices.size === 0}
+                      startIcon={submitting ? <CircularProgress size={20} /> : <Iconify icon="eva:checkmark-circle-2-fill" />}
+                    >
+                      {submitting ? 'Processing...' : 'Confirm Allocation'}
+                    </Button>
+
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={() => router.push(PATH_DASHBOARD.payments.interac)}
+                    >
+                      Cancel
+                    </Button>
+                  </Stack>
+                </>
+              )}
             </Card>
           </Grid>
 
           {/* Invoice Selection */}
           <Grid item xs={12} md={8}>
-            {/* Customer Credit Card */}
-            {customerCredit && customerCredit.total_available > 0 && (
+            {/* Customer Credit Card - only show in payment mode, not credit-only mode */}
+            {!isCreditOnlyMode && customerCredit && customerCredit.total_available > 0 && (
               <Card sx={{ p: 3, mb: 3, bgcolor: 'success.lighter' }}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                   <Box>
@@ -563,10 +756,12 @@ export default function PaymentAllocationPage() {
 
             <Card sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>
-                Select Invoices to Pay
+                {isCreditOnlyMode ? 'Select Invoices for Credit' : 'Select Invoices to Pay'}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                The oldest unpaid invoices are auto-selected. You can modify allocations below.
+                {isCreditOnlyMode
+                  ? 'Enter credit amounts to apply to each invoice below.'
+                  : 'The oldest unpaid invoices are auto-selected. You can modify allocations below.'}
               </Typography>
 
               {invoices.length === 0 ? (
@@ -579,13 +774,13 @@ export default function PaymentAllocationPage() {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell padding="checkbox" />
+                          {!isCreditOnlyMode && <TableCell padding="checkbox" />}
                           <TableCell>Invoice Period</TableCell>
                           <TableCell align="right">Total</TableCell>
                           <TableCell align="right">Paid</TableCell>
                           <TableCell align="right">Balance Due</TableCell>
-                          <TableCell align="right">Allocate</TableCell>
-                          {customerCredit && customerCredit.total_available > 0 && (
+                          {!isCreditOnlyMode && <TableCell align="right">Allocate</TableCell>}
+                          {(isCreditOnlyMode || (customerCredit && customerCredit.total_available > 0)) && (
                             <TableCell align="right">Credit</TableCell>
                           )}
                           <TableCell align="right">After</TableCell>
@@ -597,7 +792,10 @@ export default function PaymentAllocationPage() {
                           const allocatedAmount = selectedInvoices.get(invoice.id) || 0;
                           const creditAmount = creditAllocations.get(invoice.id) || 0;
                           const afterPayment = invoice.balance_due - allocatedAmount - creditAmount;
-                          const remainingAfterPayment = Math.max(0, invoice.balance_due - allocatedAmount);
+                          // In credit-only mode, max credit is the invoice balance; in payment mode, it's balance minus payment
+                          const maxCreditAmount = isCreditOnlyMode
+                            ? invoice.balance_due
+                            : Math.max(0, invoice.balance_due - allocatedAmount);
 
                           return (
                             <TableRow
@@ -605,12 +803,14 @@ export default function PaymentAllocationPage() {
                               hover
                               sx={{ '&:last-child td': { borderBottom: 0 } }}
                             >
-                              <TableCell padding="checkbox">
-                                <Checkbox
-                                  checked={isSelected || creditAmount > 0}
-                                  onChange={() => handleToggleInvoice(invoice)}
-                                />
-                              </TableCell>
+                              {!isCreditOnlyMode && (
+                                <TableCell padding="checkbox">
+                                  <Checkbox
+                                    checked={isSelected || creditAmount > 0}
+                                    onChange={() => handleToggleInvoice(invoice)}
+                                  />
+                                </TableCell>
+                              )}
                               <TableCell>
                                 <Typography variant="body2">
                                   {fDate(invoice.billing_month, 'MMMM yyyy')}
@@ -634,21 +834,23 @@ export default function PaymentAllocationPage() {
                                   {fCurrency(invoice.balance_due)}
                                 </Typography>
                               </TableCell>
-                              <TableCell align="right" sx={{ width: 100 }}>
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  value={selectedInvoices.has(invoice.id) ? allocatedAmount : ''}
-                                  onChange={(e) => handleAllocationChange(invoice.id, e.target.value)}
-                                  inputProps={{
-                                    min: 0,
-                                    max: invoice.balance_due,
-                                    step: 0.01,
-                                  }}
-                                  sx={{ width: 90 }}
-                                />
-                              </TableCell>
-                              {customerCredit && customerCredit.total_available > 0 && (
+                              {!isCreditOnlyMode && (
+                                <TableCell align="right" sx={{ width: 100 }}>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    value={selectedInvoices.has(invoice.id) ? allocatedAmount : ''}
+                                    onChange={(e) => handleAllocationChange(invoice.id, e.target.value)}
+                                    inputProps={{
+                                      min: 0,
+                                      max: invoice.balance_due,
+                                      step: 0.01,
+                                    }}
+                                    sx={{ width: 90 }}
+                                  />
+                                </TableCell>
+                              )}
+                              {(isCreditOnlyMode || (customerCredit && customerCredit.total_available > 0)) && (
                                 <TableCell align="right" sx={{ width: 100 }}>
                                   <TextField
                                     size="small"
@@ -657,11 +859,11 @@ export default function PaymentAllocationPage() {
                                     onChange={(e) => handleCreditAllocationChange(invoice.id, e.target.value)}
                                     inputProps={{
                                       min: 0,
-                                      max: remainingAfterPayment,
+                                      max: maxCreditAmount,
                                       step: 0.01,
                                     }}
                                     sx={{ width: 90 }}
-                                    disabled={remainingAfterPayment <= 0}
+                                    disabled={maxCreditAmount <= 0}
                                   />
                                 </TableCell>
                               )}

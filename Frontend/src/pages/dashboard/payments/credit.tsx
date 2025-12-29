@@ -764,15 +764,26 @@ export default function CustomerCreditPage() {
                                 </IconButton>
                               </Tooltip>
                               {row.status === 'available' && row.current_balance > 0 && (
-                                <Tooltip title="Process Refund">
-                                  <IconButton
-                                    size="small"
-                                    color="primary"
-                                    onClick={() => handleOpenRefund(row)}
-                                  >
-                                    <Iconify icon="mdi:cash-refund" />
-                                  </IconButton>
-                                </Tooltip>
+                                <>
+                                  <Tooltip title="Apply to Invoice">
+                                    <IconButton
+                                      size="small"
+                                      color="success"
+                                      onClick={() => router.push(`/dashboard/payments/allocate?creditId=${row.id}&customerId=${row.customer_id}`)}
+                                    >
+                                      <Iconify icon="eva:file-text-outline" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Process Refund">
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => handleOpenRefund(row)}
+                                    >
+                                      <Iconify icon="mdi:cash-refund" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </>
                               )}
                             </Stack>
                           </TableCell>
