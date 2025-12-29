@@ -25,11 +25,12 @@ function killStaleElectronInstances() {
   try {
     if (process.platform === 'win32') {
       // Windows: Find and kill electron.exe processes
-      // Use tasklist to find electron processes
+      // Use tasklist to find electron processes with timeout to prevent hanging
       try {
         const result = execSync('tasklist /FI "IMAGENAME eq electron.exe" /FO CSV /NH', {
           encoding: 'utf8',
-          stdio: ['pipe', 'pipe', 'pipe']
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000 // 5 second timeout
         });
 
         // Parse CSV output: "electron.exe","12345","Console","1","123,456 K"
@@ -43,7 +44,7 @@ function killStaleElectronInstances() {
             if (match) {
               const pid = match[1];
               try {
-                execSync(`taskkill /PID ${pid} /F`, { stdio: 'pipe' });
+                execSync(`taskkill /PID ${pid} /F`, { stdio: 'pipe', timeout: 5000 });
                 console.log(`  Killed Electron process ${pid}`);
               } catch (e) {
                 // Process might already be gone
@@ -51,14 +52,18 @@ function killStaleElectronInstances() {
             }
           }
 
-          // Wait a bit for processes to fully terminate
+          // Wait a bit for processes to fully terminate using ping (more reliable than timeout command)
           console.log('Waiting for processes to terminate...');
-          require('child_process').spawnSync('timeout', ['/t', '2', '/nobreak'], { shell: true, stdio: 'ignore' });
+          try {
+            execSync('ping -n 3 127.0.0.1 >nul', { shell: true, stdio: 'ignore', timeout: 5000 });
+          } catch (e) {
+            // Ignore delay errors
+          }
         } else {
           console.log('No stale Electron instances found.');
         }
       } catch (e) {
-        // No electron processes found (tasklist returns error if no matches)
+        // No electron processes found or timeout - either way, continue
         console.log('No stale Electron instances found.');
       }
     } else {
@@ -66,7 +71,8 @@ function killStaleElectronInstances() {
       try {
         const result = execSync('pgrep -f "electron.*tms-desktop\\|node.*electron"', {
           encoding: 'utf8',
-          stdio: ['pipe', 'pipe', 'pipe']
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000
         });
 
         const pids = result.trim().split('\n').filter(Boolean);
@@ -78,7 +84,7 @@ function killStaleElectronInstances() {
             // Don't kill our own parent process
             if (pid !== String(process.ppid)) {
               try {
-                execSync(`kill -9 ${pid}`, { stdio: 'pipe' });
+                execSync(`kill -9 ${pid}`, { stdio: 'pipe', timeout: 5000 });
                 console.log(`  Killed Electron process ${pid}`);
               } catch (e) {
                 // Process might already be gone
@@ -88,12 +94,16 @@ function killStaleElectronInstances() {
 
           // Wait a bit for processes to fully terminate
           console.log('Waiting for processes to terminate...');
-          execSync('sleep 2', { stdio: 'ignore' });
+          try {
+            execSync('sleep 2', { stdio: 'ignore', timeout: 5000 });
+          } catch (e) {
+            // Ignore delay errors
+          }
         } else {
           console.log('No stale Electron instances found.');
         }
       } catch (e) {
-        // No electron processes found (pgrep returns error if no matches)
+        // No electron processes found or timeout - either way, continue
         console.log('No stale Electron instances found.');
       }
     }
