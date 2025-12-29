@@ -5,7 +5,8 @@
   "description": "Next.Js & Typescript",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 47848",
+    "dev": "node scripts/dev-server.js",
+    "next-dev": "next dev",
     "start": "next start",
     "build": "next build",
     "build-netlify": "next build && cp -r .next _next && mv _next .next/",

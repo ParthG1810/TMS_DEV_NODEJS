@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "npm run build && concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:electron\"",
-    "dev:electron": "wait-on http://localhost:47848 http://localhost:47847 && electron .",
+    "dev:electron": "node scripts/wait-for-servers.js && electron .",
     "dev:backend": "cd ../Backend && npm run dev",
     "dev:frontend": "cd ../Frontend && npm run dev",
     "build": "tsc -p tsconfig.json",
