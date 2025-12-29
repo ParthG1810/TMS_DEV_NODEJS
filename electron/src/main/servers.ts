@@ -438,11 +438,38 @@ export async function startServers(): Promise<{ backendPort: number; frontendPor
   log.info('Starting all servers...');
 
   try {
-    // Start backend first
-    const backendPort = await startBackend();
+    // First, check if servers are already running (started by concurrently/npm scripts)
+    // This avoids killing and restarting servers that are already up
+    let existingBackendPort: number | null = null;
+    let existingFrontendPort: number | null = null;
 
-    // Then start frontend (pass backend port so it knows where to connect)
-    const frontendPort = await startFrontend(backendPort);
+    for (const port of BACKEND_PORT_OPTIONS) {
+      if (await isOurStaleBackendServer(port)) {
+        existingBackendPort = port;
+        log.info(`Found existing Backend server on port ${port}`);
+        break;
+      }
+    }
+
+    for (const port of FRONTEND_PORT_OPTIONS) {
+      if (await isOurStaleFrontendServer(port)) {
+        existingFrontendPort = port;
+        log.info(`Found existing Frontend server on port ${port}`);
+        break;
+      }
+    }
+
+    // If both servers are already running, use them
+    if (existingBackendPort && existingFrontendPort) {
+      log.info(`Using existing servers (Backend: ${existingBackendPort}, Frontend: ${existingFrontendPort})`);
+      activeBackendPort = existingBackendPort;
+      activeFrontendPort = existingFrontendPort;
+      return { backendPort: existingBackendPort, frontendPort: existingFrontendPort };
+    }
+
+    // Otherwise, start the servers (this will kill stale ones if needed)
+    const backendPort = existingBackendPort || await startBackend();
+    const frontendPort = existingFrontendPort || await startFrontend(backendPort);
 
     log.info(`All servers started successfully (Backend: ${backendPort}, Frontend: ${frontendPort})`);
 
