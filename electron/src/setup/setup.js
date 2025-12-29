@@ -21,11 +21,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Attach event listeners (CSP blocks inline onclick handlers)
   document.getElementById("nextBtn").addEventListener("click", nextStep);
   document.getElementById("prevBtn").addEventListener("click", prevStep);
-  document.getElementById("resetBtn").addEventListener("click", resetToDefaults);
-  document.getElementById("testDbBtn").addEventListener("click", testDatabaseConnection);
-  document.getElementById("toggleDbPassword").addEventListener("click", () => togglePassword("dbPassword"));
-  document.getElementById("toggleClientSecret").addEventListener("click", () => togglePassword("googleClientSecret"));
-  document.getElementById("oauthHeader").addEventListener("click", function() {
+  document
+    .getElementById("resetBtn")
+    .addEventListener("click", resetToDefaults);
+  document
+    .getElementById("testDbBtn")
+    .addEventListener("click", testDatabaseConnection);
+  document
+    .getElementById("toggleDbPassword")
+    .addEventListener("click", () => togglePassword("dbPassword"));
+  document
+    .getElementById("toggleClientSecret")
+    .addEventListener("click", () => togglePassword("googleClientSecret"));
+  document.getElementById("oauthHeader").addEventListener("click", function () {
     toggleSection(this);
   });
 });
@@ -36,7 +44,7 @@ function populateForm(cfg) {
   if (cfg.database) {
     document.getElementById("dbHost").value = cfg.database.host || "localhost";
     document.getElementById("dbPort").value = cfg.database.port || 3306;
-    document.getElementById("dbName").value = cfg.database.name || "TmsDb_Dev";
+    document.getElementById("dbName").value = cfg.database.name || "Tms_db";
     document.getElementById("dbUser").value = cfg.database.user || "root";
     document.getElementById("dbPassword").value =
       cfg.database.password || "Mysql";
@@ -295,13 +303,13 @@ async function resetToDefaults() {
 // Toggle password visibility
 function togglePassword(inputId) {
   const input = document.getElementById(inputId);
-  const button = input.parentElement.querySelector('.toggle-password');
+  const button = input.parentElement.querySelector(".toggle-password");
   if (input.type === "password") {
     input.type = "text";
-    button.classList.add('visible');
+    button.classList.add("visible");
   } else {
     input.type = "password";
-    button.classList.remove('visible');
+    button.classList.remove("visible");
   }
 }
 

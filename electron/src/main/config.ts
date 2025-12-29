@@ -47,7 +47,7 @@ const DEFAULT_CONFIG: AppConfig = {
     port: 3306,
     user: "root",
     password: "Mysql",
-    name: "TmsDb_Dev",
+    name: "Tms_db",
   },
   server: {
     backendPort: 47847,

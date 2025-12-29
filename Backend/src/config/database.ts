@@ -7,7 +7,7 @@ const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'tms_database',
+  database: process.env.DB_NAME || 'tms_db',
   port: parseInt(process.env.DB_PORT || '3306'),
   waitForConnections: true,
   connectionLimit: 10,
@@ -18,7 +18,8 @@ const pool = mysql.createPool({
 });
 
 // Test database connection on startup
-pool.getConnection()
+pool
+  .getConnection()
   .then((connection) => {
     console.log('✓ Database connection established');
     connection.release();

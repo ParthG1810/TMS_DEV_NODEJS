@@ -57,10 +57,7 @@ export default async function handler(
 /**
  * GET /api/settings
  */
-async function handleGet(
-  req: NextApiRequest,
-  res: NextApiResponse<ApiResponse<AppSettings>>
-) {
+async function handleGet(req: NextApiRequest, res: NextApiResponse<ApiResponse<AppSettings>>) {
   try {
     // Check if settings table exists, if not create it
     await query(`
@@ -88,7 +85,8 @@ async function handleGet(
       company_name: settingsObj.company_name || 'TIFFIN MANAGEMENT SYSTEM',
       company_phone: settingsObj.company_phone || '+1-123-456-7890',
       company_email: settingsObj.company_email || 'admin@tiffinservice.com',
-      company_address: settingsObj.company_address || '123 Main Street, City, Province, Postal Code',
+      company_address:
+        settingsObj.company_address || '123 Main Street, City, Province, Postal Code',
       company_logo: settingsObj.company_logo || process.env.DEFAULT_COMPANY_LOGO || '',
 
       // Payment Settings
@@ -106,7 +104,7 @@ async function handleGet(
       // Database Configuration (from .env - read-only)
       db_host: process.env.DB_HOST || 'localhost',
       db_port: process.env.DB_PORT || '3306',
-      db_name: process.env.DB_NAME || 'tms_database',
+      db_name: process.env.DB_NAME || 'tms_db',
     };
 
     return res.status(200).json({
@@ -125,10 +123,7 @@ async function handleGet(
 /**
  * PUT /api/settings
  */
-async function handlePut(
-  req: NextApiRequest,
-  res: NextApiResponse<ApiResponse<AppSettings>>
-) {
+async function handlePut(req: NextApiRequest, res: NextApiResponse<ApiResponse<AppSettings>>) {
   try {
     const updates = req.body;
 

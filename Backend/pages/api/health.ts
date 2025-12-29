@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       port: parseInt(process.env.DB_PORT || '3306', 10),
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD || 'Mysql',
-      database: process.env.DB_NAME || 'TmsDb_Dev',
+      database: process.env.DB_NAME || 'Tms_db',
       connectTimeout: 5000,
     });
 
